@@ -214,12 +214,16 @@ func (a *App) mcpLoadTokens() map[string]mcp.TokenInfo {
 func (a *App) mcpResolveToken(hash string) string {
 	a.mcpTokenCacheMu.Lock()
 	defer a.mcpTokenCacheMu.Unlock()
+	var mtime time.Time
 	fi, err := os.Stat(a.mcpTokensPath())
-	if err != nil || fi.ModTime() != a.mcpTokenCacheMtime {
+	if err == nil {
+		mtime = fi.ModTime()
+	}
+	if err != nil || mtime != a.mcpTokenCacheMtime {
 		// Reload (also resets the mtime on failure so we don't hammer the
 		// disk on every request when the file is unreadable).
 		a.mcpTokenCache = a.mcpLoadTokens()
-		a.mcpTokenCacheMtime = fi.ModTime()
+		a.mcpTokenCacheMtime = mtime
 	}
 	if info, ok := a.mcpTokenCache[hash]; ok {
 		return info.Name

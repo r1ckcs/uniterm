@@ -266,6 +266,9 @@ func (s *Server) gateExec(ctx context.Context, req *mcp.CallToolRequest, session
 		// Dangerous commands still demand a dialog even in bypass mode
 		// (NyaTerm-style hard floor).
 		needsDialog = risk >= RiskDangerous
+	default:
+		// Unknown/corrupt policy value: fail closed.
+		needsDialog = true
 	}
 	if !needsDialog {
 		return nil

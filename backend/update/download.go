@@ -10,7 +10,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +36,15 @@ func downloadHTTPClient() *http.Client {
 		downloadClient = &http.Client{
 			Transport: transport,
 			Timeout:   0, // stream large assets without an overall deadline
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				if req.URL.Scheme != "https" {
+					return fmt.Errorf("refusing non-https redirect to %s", req.URL.Redacted())
+				}
+				if len(via) >= 10 {
+					return errors.New("too many redirects")
+				}
+				return nil
+			},
 		}
 	})
 	return downloadClient
@@ -112,7 +123,13 @@ func (m *Manager) downloadOne(cand UpdateAsset, onProgress func(Progress)) (*Pen
 		return nil, fmt.Errorf("download %s: %w", cand.Name, err)
 	}
 
-	if cand.SHA256 != "" {
+	// Fail closed: an asset with no published checksum (missing
+	// checksums.txt, fetch failure, or unlisted asset) is never installed.
+	if cand.SHA256 == "" {
+		cleanup()
+		return nil, fmt.Errorf("no sha256 checksum published for %s; refusing to install", cand.Name)
+	}
+	{
 		if onProgress != nil {
 			onProgress(Progress{Phase: "verifying", Total: -1, Message: cand.Name})
 		}
@@ -157,12 +174,15 @@ func (m *Manager) downloadOne(cand UpdateAsset, onProgress func(Progress)) (*Pen
 // downloadToFile streams url into dest, emitting progress when onProgress is
 // set. Non-200 responses are errors (the fallback loop then tries the mirror).
 // An overall 30-minute deadline bounds stalled connections.
-func downloadToFile(url, dest, label string, onProgress func(Progress)) error {
+func downloadToFile(rawURL, dest, label string, onProgress func(Progress)) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", rawURL, nil)
 	if err != nil {
 		return err
+	}
+	if req.URL.Scheme != "https" && !allowInsecureUpdateURL(req.URL) {
+		return fmt.Errorf("refusing non-https update URL")
 	}
 	req.Header.Set("User-Agent", "uniTerm")
 
@@ -321,4 +341,15 @@ func extractPortableZip(stage, zipPath string) (string, error) {
 		return "", fmt.Errorf("uniterm executable not found in %s", zipPath)
 	}
 	return binaryPath, nil
+}
+
+// allowInsecureUpdateURL permits plain-http update downloads only against a
+// loopback release server (the local end-to-end autotest); everything else
+// must be https.
+func allowInsecureUpdateURL(u *url.URL) bool {
+	if u.Scheme != "http" {
+		return false
+	}
+	ip := net.ParseIP(u.Hostname())
+	return u.Hostname() == "localhost" || (ip != nil && ip.IsLoopback())
 }

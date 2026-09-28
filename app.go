@@ -1906,7 +1906,11 @@ func (a *App) RelaunchApp() {
 }
 
 func (a *App) CheckForUpdate(source string) (*update.UpdateInfo, error) {
-	return update.Check(Version, source)
+	info, err := update.Check(Version, source)
+	if err == nil && info != nil {
+		updateManager.SetOffered(info.Assets)
+	}
+	return info, err
 }
 
 // updateManager holds the in-progress update state (download → apply).
@@ -1924,6 +1928,9 @@ func (a *App) DownloadUpdate(assets []update.UpdateAsset) error {
 	if devBuild {
 		return fmt.Errorf("updates are disabled in development builds")
 	}
+	// Only download assets the backend itself discovered in CheckForUpdate;
+	// never trust a URL/checksum pair supplied by the webview.
+	assets = updateManager.FilterOffered(assets)
 	if len(assets) == 0 {
 		return fmt.Errorf("no update assets available")
 	}

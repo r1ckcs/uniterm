@@ -40,7 +40,7 @@ func classifyCommand(cmd string) RiskClass {
 // splitSegments cuts a command line on ; && || | and newlines.
 func splitSegments(cmd string) []string {
 	return strings.FieldsFunc(cmd, func(r rune) bool {
-		return r == ';' || r == '\n' || r == '|'
+		return r == ';' || r == '\n' || r == '|' || r == '&'
 	})
 }
 
@@ -54,7 +54,7 @@ func classifySegment(seg string) RiskClass {
 	head := strings.ToLower(words[0])
 	// Strip env assignments and sudo/nohup wrappers: "sudo rm -rf" is judged
 	// as "rm -rf"; "FOO=1 rm" likewise.
-	for isWrapper(head) || (strings.Contains(head, "=") && len(words) > 1) {
+	for (isWrapper(head) || strings.Contains(head, "=")) && len(words) > 1 {
 		words = words[1:]
 		head = strings.ToLower(words[0])
 	}
@@ -110,6 +110,24 @@ var dangerousPaths = []string{"/etc/", "/boot/", "/sys/", "/dev/", "/proc/sys/"}
 
 // matchesDangerous checks unconditional danger patterns.
 func matchesDangerous(head string, words []string, joined string) bool {
+	// Opaque execution: command substitution, eval and inline interpreter
+	// scripts hide the real command from this classifier, so they can never
+	// be graded below dangerous.
+	if strings.Contains(joined, "$(") || strings.Contains(joined, "`") ||
+		strings.Contains(joined, "<(") || strings.Contains(joined, ">(") {
+		return true
+	}
+	switch head {
+	case "eval", "exec", "source", ".", "xargs":
+		return true
+	case "find":
+		if containsAnyFlag(words, "-exec", "-execdir", "-delete", "-ok", "-okdir") {
+			return true
+		}
+	}
+	if isInterpreter(head) && (containsAnyFlag(words, "-c", "-e", "-E", "-r", "--eval", "--command") || len(words) > 1) {
+		return true
+	}
 	if head == "rm" && (containsAnyFlag(words, "-rf", "-fr") || strings.Contains(joined, "rm -rf")) {
 		return true
 	}
@@ -249,4 +267,16 @@ func inList(list []string, v string) bool {
 		}
 	}
 	return false
+}
+
+// isInterpreter reports whether head is a shell or scripting runtime that can
+// execute arbitrary code passed inline or from a script file.
+func isInterpreter(head string) bool {
+	switch head {
+	case "sh", "bash", "zsh", "dash", "ksh", "fish", "csh", "tcsh", "ash",
+		"perl", "ruby", "node", "nodejs", "php", "lua", "osascript",
+		"pwsh", "powershell", "cmd", "cmd.exe":
+		return true
+	}
+	return strings.HasPrefix(head, "python")
 }

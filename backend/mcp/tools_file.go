@@ -88,6 +88,11 @@ func (s *Server) toolListRemoteDir(ctx context.Context, req *mcp.CallToolRequest
 	if !ok {
 		return nil, listDirOut{}, fmt.Errorf("session %s not found or not an SSH session", in.SessionID)
 	}
+	// Reads are graded RiskRead so confirm_all still asks before an agent
+	// browses the remote filesystem.
+	if err := s.gateExec(ctx, req, in.SessionID, "list "+in.RemotePath, RiskRead); err != nil {
+		return nil, listDirOut{}, err
+	}
 	entries, err := fe.MCPListDir(in.RemotePath)
 	if err != nil {
 		s.audit(ctx, req, "list_remote_dir", in.SessionID, in.RemotePath, nil, err)
@@ -107,6 +112,9 @@ func (s *Server) toolReadRemoteFile(ctx context.Context, req *mcp.CallToolReques
 	fe, ok := s.env.FileSession(in.SessionID)
 	if !ok {
 		return nil, readFileOut{}, fmt.Errorf("session %s not found or not an SSH session", in.SessionID)
+	}
+	if err := s.gateExec(ctx, req, in.SessionID, "read "+in.RemotePath, RiskRead); err != nil {
+		return nil, readFileOut{}, err
 	}
 	data, truncated, err := fe.MCPReadFile(in.RemotePath, in.Offset, in.MaxBytes)
 	if err != nil {
@@ -164,7 +172,7 @@ func (s *Server) toolDownloadFile(ctx context.Context, req *mcp.CallToolRequest,
 	if !ok {
 		return nil, downloadOut{}, fmt.Errorf("session %s not found or not an SSH session", in.SessionID)
 	}
-	if err := s.gateExec(ctx, req, in.SessionID, "download "+in.RemotePath+" → "+in.LocalPath, RiskWrite); err != nil {
+	if err := s.gateExec(ctx, req, in.SessionID, "download "+in.RemotePath+" → "+in.LocalPath, RiskDangerous); err != nil {
 		return nil, downloadOut{}, err
 	}
 	n, err := fe.MCPReadRemoteToFile(in.RemotePath, resolved)

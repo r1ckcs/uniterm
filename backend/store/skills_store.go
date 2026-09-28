@@ -703,11 +703,19 @@ func (s *SkillsStore) ImportFromZip(zipPath string) (string, error) {
 		if f.FileInfo().IsDir() {
 			continue
 		}
+		if f.Mode()&os.ModeSymlink != 0 {
+			return "", fmt.Errorf("unsafe zip entry (symlink): %s", f.Name)
+		}
 		rel := strings.TrimPrefix(f.Name, root+"/")
 		if rel == f.Name {
 			rel = filepath.Base(f.Name)
 		}
-		target := filepath.Join(tmpDir, rel)
+		// Zip-slip guard: an entry like "x/../../../.zshrc" must never
+		// resolve outside the extraction directory.
+		if !filepath.IsLocal(filepath.FromSlash(rel)) {
+			return "", fmt.Errorf("unsafe zip entry: %s", f.Name)
+		}
+		target := filepath.Join(tmpDir, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 			return "", fmt.Errorf("mkdir: %w", err)
 		}
