@@ -471,7 +471,7 @@
   "settings.languageDesc": "切换界面显示语言",
   "settings.colorSchemeDesc": "终端窗口的配色方案",
   "settings.followAppTheme": "跟随应用主题",
-"settings.terminalTheme": "终端主题",
+  "settings.terminalTheme": "终端主题",
   "settings.fontDesc": "终端显示的字体",
   "settings.fontPrimary": "主字体",
   "settings.fontFallback": "备选字体",
@@ -1725,5 +1725,10 @@
   "mcp.regenerateHint": "令牌 {name} 的明文已不可查看(仅存储哈希)。重新生成将使旧令牌立即失效,需在客户端更新配置。",
   "mcp.zcodeHint": "在 ~/.zcode/cli/config.json 的 mcp.servers 中加入(merges 到现有 JSON,勿整文件替换):",
   "mcp.traeHint": "保存为项目根 .trae/mcp.json(或用户级 ~/.trae/mcp.json):",
-  "mcp.workbuddyHint": "WorkBuddy 连接器格式。保存为 ~/.workbuddy/connectors-marketplace/connectors/uniterm/mcp.json,并在 App 内完成启用:"
+  "mcp.workbuddyHint": "WorkBuddy 连接器格式。保存为 ~/.workbuddy/connectors-marketplace/connectors/uniterm/mcp.json,并在 App 内完成启用:",
+  "hostKey.title": "未知的 SSH 主机密钥",
+  "hostKey.message": "无法确认主机 {host} 的真实性。{keyType} 密钥指纹为 {fingerprint}。请仅在该指纹与服务器真实指纹一致时继续。",
+  "hostKey.otherTypes": "该主机已信任另一种类型的密钥。",
+  "hostKey.accept": "信任并连接",
+  "hostKey.reject": "取消"
 }

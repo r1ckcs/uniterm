@@ -471,7 +471,7 @@
   "settings.languageDesc": "Switch the display language",
   "settings.colorSchemeDesc": "Terminal color scheme",
   "settings.followAppTheme": "Follow app theme",
-"settings.terminalTheme": "Terminal theme",
+  "settings.terminalTheme": "Terminal theme",
   "settings.fontDesc": "Terminal font family",
   "settings.fontPrimary": "Primary font",
   "settings.fontFallback": "Fallback Font",
@@ -1725,5 +1725,10 @@
   "mcp.regenerateHint": "The plaintext of token {name} can no longer be viewed (only a hash is stored). Regenerating invalidates the old token immediately; client configs must be updated.",
   "mcp.zcodeHint": "Merge into the mcp.servers field of ~/.zcode/cli/config.json (do not replace the whole file):",
   "mcp.traeHint": "Save as .trae/mcp.json in the project root (or ~/.trae/mcp.json user-level):",
-  "mcp.workbuddyHint": "WorkBuddy connector format. Save as ~/.workbuddy/connectors-marketplace/connectors/uniterm/mcp.json and enable it in the app:"
+  "mcp.workbuddyHint": "WorkBuddy connector format. Save as ~/.workbuddy/connectors-marketplace/connectors/uniterm/mcp.json and enable it in the app:",
+  "hostKey.title": "Unknown SSH host key",
+  "hostKey.message": "The authenticity of host {host} can't be established. {keyType} key fingerprint is {fingerprint}. Only continue if this matches the server's real fingerprint.",
+  "hostKey.otherTypes": "A key of a different type is already trusted for this host.",
+  "hostKey.accept": "Trust and connect",
+  "hostKey.reject": "Cancel"
 }

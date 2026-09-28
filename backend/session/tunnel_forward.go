@@ -255,7 +255,7 @@ func (ts *TunnelService) dialChain(chain []ConnectionConfig, upstream *SocksProx
 			User:              cfg.User,
 			Auth:              authMethods,
 			Timeout:           30 * time.Second,
-			HostKeyCallback:   ssh.InsecureIgnoreHostKey(),
+			HostKeyCallback:   hostKeyCallback(nil),
 			Config:            algoSet.config(),
 			HostKeyAlgorithms: algoSet.HostKeys,
 		}

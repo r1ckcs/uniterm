@@ -67,7 +67,7 @@ func (ts *TunnelService) Start(sessionID string, sshConfig ConnectionConfig, tar
 		User:              sshConfig.User,
 		Auth:              authMethods,
 		Timeout:           30 * time.Second,
-		HostKeyCallback:   ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback:   hostKeyCallback(nil),
 		Config:            algoSet.config(),
 		HostKeyAlgorithms: algoSet.HostKeys,
 	}

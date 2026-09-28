@@ -93,7 +93,7 @@ func probeSSH(config ConnectionConfig) (string, error) {
 			if err != nil {
 				return nil, nil, err
 			}
-			return &ssh.ClientConfig{User: config.User, Auth: authMethods, Timeout: 15 * time.Second, HostKeyCallback: ssh.InsecureIgnoreHostKey()}, cleanup, nil
+			return &ssh.ClientConfig{User: config.User, Auth: authMethods, Timeout: 15 * time.Second, HostKeyCallback: hostKeyCallbackNoPrompt()}, cleanup, nil
 		}
 	}
 	// Honor a materialized proxy (set by App.materializeProxy) on the first hop,
@@ -130,7 +130,7 @@ func probeSFTP(config ConnectionConfig) (string, error) {
 			if err != nil {
 				return nil, nil, err
 			}
-			return &ssh.ClientConfig{User: config.User, Auth: authMethods, Timeout: 15 * time.Second, HostKeyCallback: ssh.InsecureIgnoreHostKey()}, cleanup, nil
+			return &ssh.ClientConfig{User: config.User, Auth: authMethods, Timeout: 15 * time.Second, HostKeyCallback: hostKeyCallbackNoPrompt()}, cleanup, nil
 		}
 	}
 	var keyboardConfig sshClientConfigFactory
@@ -169,7 +169,7 @@ func probeSCP(config ConnectionConfig) (string, error) {
 			if err != nil {
 				return nil, nil, err
 			}
-			return &ssh.ClientConfig{User: config.User, Auth: authMethods, Timeout: 15 * time.Second, HostKeyCallback: ssh.InsecureIgnoreHostKey()}, cleanup, nil
+			return &ssh.ClientConfig{User: config.User, Auth: authMethods, Timeout: 15 * time.Second, HostKeyCallback: hostKeyCallbackNoPrompt()}, cleanup, nil
 		}
 	}
 	var keyboardConfig sshClientConfigFactory

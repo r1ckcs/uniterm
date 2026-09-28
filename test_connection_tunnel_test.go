@@ -12,9 +12,12 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 
 	"github.com/ys-ll/uniterm/backend/session"
 	"github.com/ys-ll/uniterm/backend/store"
@@ -67,6 +70,10 @@ func startFakeJumpSSHD(t *testing.T) int {
 		t.Fatalf("listen: %v", err)
 	}
 	t.Cleanup(func() { ln.Close() })
+
+	// Host keys are verified: pre-trust this fake server's key in a
+	// throwaway known_hosts, as a user who accepted it earlier would have.
+	trustTestHostKey(t, ln.Addr().String(), signer.PublicKey())
 
 	go func() {
 		for {
@@ -172,4 +179,17 @@ func TestApp_TestConnection_RidesJumpHostTunnel(t *testing.T) {
 	}); err == nil {
 		t.Fatal("direct probe to unreachable target unexpectedly succeeded")
 	}
+}
+
+// trustTestHostKey points the session package at a temp known_hosts that
+// trusts key for addr ("host:port").
+func trustTestHostKey(t *testing.T, addr string, key ssh.PublicKey) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "known_hosts")
+	line := knownhosts.Line([]string{knownhosts.Normalize(addr)}, key) + "\n"
+	if err := os.WriteFile(path, []byte(line), 0o600); err != nil {
+		t.Fatalf("write known_hosts: %v", err)
+	}
+	session.SetKnownHostsPath(path)
+	t.Cleanup(func() { session.SetKnownHostsPath("") })
 }

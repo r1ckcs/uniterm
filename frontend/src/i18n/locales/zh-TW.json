@@ -471,7 +471,7 @@
   "settings.languageDesc": "切換介面顯示語言",
   "settings.colorSchemeDesc": "終端機視窗的配色方案",
   "settings.followAppTheme": "跟隨應用程式主題",
-"settings.terminalTheme": "終端主題",
+  "settings.terminalTheme": "終端主題",
   "settings.fontDesc": "終端機顯示的字型",
   "settings.fontPrimary": "主字型",
   "settings.fontFallback": "備選字型",
@@ -1673,5 +1673,10 @@
   "workspace.openCancelled": "已取消，{count} 個成員未開啟",
   "workspace.createCancelled": "已取消建立，已連線的成員保留",
   "workspace.createSkippedHosts": "{count} 個所選連線類型不支援加入工作區",
-  "workspace.dropHint": "將連線拖動到此處加入工作區"
+  "workspace.dropHint": "將連線拖動到此處加入工作區",
+  "hostKey.title": "未知的 SSH 主機金鑰",
+  "hostKey.message": "無法確認主機 {host} 的真實性。{keyType} 金鑰指紋為 {fingerprint}。請僅在該指紋與伺服器真實指紋一致時繼續。",
+  "hostKey.otherTypes": "該主機已信任另一種類型的金鑰。",
+  "hostKey.accept": "信任並連線",
+  "hostKey.reject": "取消"
 }

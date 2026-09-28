@@ -200,6 +200,58 @@ func (s *SSHSession) keyboardInteractiveChallenge(config ConnectionConfig, autoA
 	}
 }
 
+// terminalHostKeyPrompt asks, inline in the terminal like the OpenSSH
+// client, whether to trust an unknown server key. Only a typed "yes"
+// accepts; anything else, Ctrl+C or the timeout rejects.
+func (s *SSHSession) terminalHostKeyPrompt(p HostKeyPrompt) (bool, error) {
+	s.mu.RLock()
+	ch := s.authAnswerCh
+	s.mu.RUnlock()
+	if ch == nil {
+		return false, fmt.Errorf("no terminal to confirm the host key")
+	}
+	var msg strings.Builder
+	msg.WriteString("\r\nThe authenticity of host '" + p.Host + "' can't be established.\r\n")
+	if p.OtherKeyTypesKnown {
+		msg.WriteString("\x1b[33mA key of a different type is already trusted for this host.\x1b[0m\r\n")
+	}
+	msg.WriteString(fmt.Sprintf("%s key fingerprint is %s.\r\n", p.KeyType, p.Fingerprint))
+	msg.WriteString("Are you sure you want to continue connecting (yes/no)? ")
+	s.emitData([]byte(msg.String()))
+	var answer string
+	for {
+		select {
+		case data := <-ch:
+			for _, b := range data {
+				switch b {
+				case '\r', '\n':
+					s.emitData([]byte("\r\n"))
+					if strings.EqualFold(strings.TrimSpace(answer), "yes") {
+						return true, nil
+					}
+					return false, nil
+				case '\x03':
+					s.emitData([]byte("^C\r\n"))
+					return false, fmt.Errorf("cancelled")
+				case 127, '\b':
+					if len(answer) > 0 {
+						answer = answer[:len(answer)-1]
+						s.emitData([]byte("\b \b"))
+					}
+				case '\x15':
+					answer = ""
+				default:
+					answer += string(b)
+					s.emitData([]byte{b})
+				}
+			}
+		case <-time.After(120 * time.Second):
+			s.emitData([]byte("\r\nHost key confirmation timeout\r\n"))
+			return false, fmt.Errorf("timeout")
+		}
+	}
+}
+
 // NewSSHChannelSession creates a session that opens a fresh channel on the
 // source session's already-authenticated client (no re-auth, no 2FA prompt —
 // issue #983). The clone inherits the detected remoteOS. The source must be
@@ -331,7 +383,7 @@ func (s *SSHSession) Connect(config ConnectionConfig) error {
 				User:            config.User,
 				Auth:            authMethods,
 				Timeout:         30 * time.Second,
-				HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+				HostKeyCallback: hostKeyCallback(s.terminalHostKeyPrompt),
 			}, cleanup, nil
 		}
 	}

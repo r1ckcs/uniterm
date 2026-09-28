@@ -230,7 +230,7 @@ import { useDuplicateSession } from './composables/useDuplicateSession'
 import { useTunnelCredentials } from './composables/useTunnelCredentials'
 import type { ShortcutAction } from './types/settings'
 import { useI18n } from './i18n'
-import { CreateSession, CloseSession, RDPHide, RDPShow, RDPInvalidate, RDPSnapshot, RDPSetPosition, RecordRecentConnection, GetPlatform, GetBackgroundImage, SessionStart, RelaunchApp, ResolveMCPApproval } from '../bindings/github.com/ys-ll/uniterm/app'
+import { CreateSession, CloseSession, RDPHide, RDPShow, RDPInvalidate, RDPSnapshot, RDPSetPosition, RecordRecentConnection, GetPlatform, GetBackgroundImage, SessionStart, RelaunchApp, ResolveMCPApproval, ResolveHostKeyPrompt } from '../bindings/github.com/ys-ll/uniterm/app'
 import { waitForTerminalSize } from './services/terminalManager'
 import { msg } from './services/message'
 import { unregisterTransferRoute } from './services/transferTaskCenter'
@@ -646,6 +646,43 @@ function onMcpApprovalResolve(approved: boolean, reason: string) {
   if (req) ResolveMCPApproval(req.id, approved, reason).catch(() => {})
 }
 
+// ── SSH host key confirmation (non-terminal dials: SFTP/SCP/monitor/tunnels) ──
+// backend ssh:hostkey-prompt event → confirm dialog → ResolveHostKeyPrompt.
+interface HostKeyPromptRequest {
+  id: string
+  host: string
+  keyType: string
+  fingerprint: string
+  otherKeyTypesKnown: boolean
+}
+let unsubHostKeyPrompt: (() => void) | null = null
+
+async function onHostKeyPrompt(req: HostKeyPromptRequest) {
+  let accept = false
+  RDPHideForOverlay()
+  try {
+    const lines = [t('hostKey.message', { host: req.host, keyType: req.keyType, fingerprint: req.fingerprint })]
+    if (req.otherKeyTypesKnown) lines.push(t('hostKey.otherTypes'))
+    await ElMessageBox.confirm(
+      h('div', { style: 'display:flex;flex-direction:column;gap:0.625rem;word-break:break-all' },
+        lines.map((l) => h('span', l))),
+      t('hostKey.title'),
+      {
+        confirmButtonText: t('hostKey.accept'),
+        cancelButtonText: t('hostKey.reject'),
+        type: 'warning',
+        closeOnClickModal: false,
+      }
+    )
+    accept = true
+  } catch {
+    accept = false
+  } finally {
+    RDPShowForOverlay()
+  }
+  ResolveHostKeyPrompt(req.id, accept).catch(() => {})
+}
+
 // backend mcp:session-created: an agent opened a new SSH session; mount a
 // visible terminal tab for it so the user can watch and control it.
 function onMcpSessionCreated(payload: { sessionId: string; name?: string; host?: string }) {
@@ -959,6 +996,9 @@ onMounted(async () => {
     mcpApprovalRequest.value = ev.data as MCPApprovalRequest
     mcpApprovalVisible.value = true
   })
+  unsubHostKeyPrompt = Events.On('ssh:hostkey-prompt', (ev) => {
+    onHostKeyPrompt(ev.data as HostKeyPromptRequest)
+  })
   unsubMcpSessionCreated = Events.On('mcp:session-created', (ev) => {
     onMcpSessionCreated(ev.data)
   })
@@ -1212,6 +1252,7 @@ onUnmounted(() => {
   unsubTrayOpenSettings?.()
   unsubTrayOpenAbout?.()
   unsubMcpApproval?.()
+  unsubHostKeyPrompt?.()
   unsubMcpSessionCreated?.()
   rdpAreaObserver?.disconnect()
   settingsStore.dispose?.()

@@ -195,6 +195,8 @@ func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOpt
 
 	a.sessionManager = session.NewSessionManager()
 	a.tunnelService = session.NewTunnelService()
+	// Unknown SSH host keys on non-terminal dials are confirmed in a dialog.
+	session.SetHostKeyPrompter(a.hostKeyDialogPrompt)
 
 	// Defer EventsEmit from WndProc to avoid blocking the modal resize/move loop.
 	a.moveResizeCh = make(chan string, 10)
@@ -247,6 +249,8 @@ func (a *App) initStores(dataDir string, upgrade bool) {
 	// Point clink:// local shells at the app data dir (they drop a tuned
 	// clink profile next to the stores; see backend/session/local_clink.go).
 	session.SetClinkProfileDir(filepath.Join(dataDir, "clink"))
+	// Trusted SSH host keys live next to the other stores.
+	session.SetKnownHostsPath(filepath.Join(dataDir, "known_hosts"))
 
 	cs, err := store.NewConnectionStore(dataDir)
 	if err != nil {
