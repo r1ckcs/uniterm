@@ -170,6 +170,7 @@ import de from 'element-plus/es/locale/lang/de'
 import es from 'element-plus/es/locale/lang/es'
 import fr from 'element-plus/es/locale/lang/fr'
 import ru from 'element-plus/es/locale/lang/ru'
+import ptBr from 'element-plus/es/locale/lang/pt-br'
 import AppHeader from './components/AppHeader.vue'
 import Sidebar from './components/Sidebar.vue'
 import TerminalTabContent from './components/TerminalTabContent.vue'
@@ -374,7 +375,7 @@ let unsubTrayOpenSettings: (() => void) | null = null
 let unsubTrayOpenAbout: (() => void) | null = null
 const { t, locale } = useI18n()
 const EL_LOCALE_MAP: Record<string, typeof enUs> = {
-  'zh-CN': zhCn, 'zh-TW': zhTw, en: enUs, ja, ko, de, es, fr, ru,
+  'zh-CN': zhCn, 'zh-TW': zhTw, en: enUs, ja, ko, de, es, fr, ru, 'pt-BR': ptBr,
 }
 const elLocale = computed(() => EL_LOCALE_MAP[locale.value] || enUs)
 

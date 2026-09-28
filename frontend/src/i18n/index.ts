@@ -11,6 +11,7 @@ import de from './locales/de.json'
 import es from './locales/es.json'
 import fr from './locales/fr.json'
 import ru from './locales/ru.json'
+import ptBR from './locales/pt-BR.json'
 
 const messages: Record<Locale, Record<string, string>> = {
   'zh-CN': zhCN,
@@ -22,6 +23,7 @@ const messages: Record<Locale, Record<string, string>> = {
   es,
   fr,
   ru,
+  'pt-BR': ptBR,
 }
 
 const currentLocale = ref<Locale>('en')
@@ -29,7 +31,7 @@ const currentLocale = ref<Locale>('en')
 export const locale = computed(() => currentLocale.value)
 
 const localePrefixMap: Record<string, Locale> = Object.fromEntries(
-  SUPPORTED_LOCALES.filter((loc) => loc !== 'zh-CN' && loc !== 'zh-TW').map((loc) => [loc, loc])
+  SUPPORTED_LOCALES.filter((loc) => loc !== 'zh-CN' && loc !== 'zh-TW' && loc !== 'pt-BR').map((loc) => [loc, loc])
 )
 
 function resolveLocale(lang: Language): Locale {
@@ -46,6 +48,9 @@ function resolveLocale(lang: Language): Locale {
     if (nav.includes('tw') || nav.includes('hk') || nav.includes('mo')) return 'zh-TW'
     return 'zh-CN'
   }
+
+  // Any Portuguese variant (pt, pt-BR, pt-PT) uses the Brazilian bundle.
+  if (nav.startsWith('pt')) return 'pt-BR'
 
   for (const [prefix, loc] of Object.entries(localePrefixMap)) {
     if (nav.startsWith(prefix)) return loc
