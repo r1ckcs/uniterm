@@ -15,6 +15,8 @@ export type HighlightCategory =
 
 export interface HighlightRule {
   category: HighlightCategory
+  /** Explicit CSS color (user rules); overrides the category's theme color. */
+  color?: string
   noLeadTrim?: boolean
   regexes: RegExp[]
 }
@@ -70,6 +72,8 @@ export interface TextSpan {
   /** String index just past the last character (exclusive). */
   end: number
   category: HighlightCategory
+  /** Explicit color from a user rule; undefined → category theme color. */
+  color?: string
 }
 
 export interface MatchTextOptions {
@@ -107,7 +111,7 @@ export function matchTextSpans(
   // Occupied string positions prevent multi-rule overlap (first rule wins).
   const occupied = new Uint8Array(text.length)
 
-  for (const { category, noLeadTrim, regexes } of rules) {
+  for (const { category, color, noLeadTrim, regexes } of rules) {
     if (spans.length >= maxMatches) break
     if (shouldStop?.()) return { spans, complete: stopEarly() }
     for (const regex of regexes) {
@@ -138,7 +142,7 @@ export function matchTextSpans(
         }
         if (isOverlapping) continue
 
-        spans.push({ start, end, category })
+        spans.push(color ? { start, end, category, color } : { start, end, category })
         for (let k = start; k < end; k++) occupied[k] = 1
       }
     }

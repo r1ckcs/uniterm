@@ -366,7 +366,7 @@ function show(t: Terminal, sbRect: DOMRect) {
     // Keyword highlight colors, matching what the terminal itself renders
     // (same rules + palette source as overlayHighlight).
     const hlColors = line && highlightOn
-      ? getLineHighlightColors(line, t.cols, t.options.theme)
+      ? getLineHighlightColors(line, t.cols, t.options.theme, t)
       : undefined
     const runs = line ? lineToRuns(line, t.cols, palette, hlColors ? (col) => hlColors[col] : undefined) : []
     // Mirror the gutter's semantics: numbers/timestamps come from the logical

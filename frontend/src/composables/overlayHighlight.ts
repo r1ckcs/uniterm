@@ -16,8 +16,77 @@
 // max-wait escape so sustained output still gets highlighted. Matching is per
 // physical line.
 import type { Terminal as XTerm, IBufferCell, IBufferLine, ICellColorSpan, IDisposable } from '@xterm/xterm'
-import { matchTextSpans, HIGHLIGHT_RULES, type HighlightCategory } from './highlightRules'
+import { matchTextSpans, HIGHLIGHT_RULES, type HighlightCategory, type HighlightRule } from './highlightRules'
+import { activeRuleSets, compileRuleSets, type HighlightRuleSet } from './userHighlightRules'
 import { useSettingsStore } from '../stores/settingsStore'
+
+// ── Rule sources ────────────────────────────────────────────────────────
+// User rule sets come from a provider installed by the app (the highlight
+// store); per-terminal session set ids come from the attach options. Both
+// are read on every refresh, so edits apply live.
+let ruleSetsProvider: () => HighlightRuleSet[] = () => []
+
+/** Install the source of user-defined highlight rule sets. */
+export function setHighlightRuleSetsProvider(fn: () => HighlightRuleSet[]): void {
+  ruleSetsProvider = fn
+}
+
+export interface OverlayHighlightOptions {
+  /** Rule set ids the terminal's connection opted into (per-session sets). */
+  getSessionSetIds?: () => readonly string[]
+}
+
+function builtinEnabled(): boolean {
+  return useSettingsStore().settings.terminal.highlightEnabled ?? true
+}
+
+// Combined rule list memo: same inputs → same array instance, so a changed
+// identity means the rules changed and cached/applied spans are stale.
+let lastUserRules: HighlightRule[] | null = null
+let lastBuiltin = true
+let lastCombined: HighlightRule[] = HIGHLIGHT_RULES
+
+/** Rules for one terminal: user rules first (they win overlaps), then the
+ * built-in categories when the global highlight switch is on. */
+export function resolveTerminalRules(sessionSetIds: readonly string[] = []): HighlightRule[] {
+  let sets: HighlightRuleSet[] = []
+  try {
+    sets = ruleSetsProvider()
+  } catch {
+    sets = []
+  }
+  const user = compileRuleSets(activeRuleSets(sets, sessionSetIds))
+  const builtin = builtinEnabled()
+  if (user === lastUserRules && builtin === lastBuiltin) return lastCombined
+  lastUserRules = user
+  lastBuiltin = builtin
+  lastCombined = builtin ? (user.length ? [...user, ...HIGHLIGHT_RULES] : HIGHLIGHT_RULES) : user
+  return lastCombined
+}
+
+/** Split [startCol, endCol) into runs of cells the program left in the
+ * default foreground color. Text the remote side already colored (ls, htop,
+ * colored prompts) keeps its own color instead of being painted over. */
+function defaultFgRuns(
+  line: IBufferLine,
+  startCol: number,
+  endCol: number,
+  scratchCell?: IBufferCell,
+): Array<[number, number]> {
+  const runs: Array<[number, number]> = []
+  let runStart = -1
+  for (let col = startCol; col < endCol; col++) {
+    const cell = scratchCell ? line.getCell(col, scratchCell) : line.getCell(col)
+    const plain = !cell || cell.isFgDefault()
+    if (plain && runStart < 0) runStart = col
+    if (!plain && runStart >= 0) {
+      runs.push([runStart, col])
+      runStart = -1
+    }
+  }
+  if (runStart >= 0) runs.push([runStart, endCol])
+  return runs
+}
 
 // Category → xterm theme key, mirroring the legacy inject renderer's SGR
 // choices (30-37/90-97 follow the theme palette; we read the palette here).
@@ -64,6 +133,7 @@ export function getLineHighlightColors(
   line: IBufferLine,
   cols: number,
   theme: unknown,
+  term?: XTerm,
 ): Array<string | undefined> {
   const colors = resolveHighlightColors(theme)
   const perCol: Array<string | undefined> = new Array(cols)
@@ -73,12 +143,15 @@ export function getLineHighlightColors(
   const cellMap = hasMultibyte
     ? buildStringToCellMap(line, lineText.length, cols)
     : null
-  const { spans } = matchTextSpans(lineText, HIGHLIGHT_RULES)
+  const rules = (term && attached.get(term)?.currentRules()) || resolveTerminalRules()
+  const { spans } = matchTextSpans(lineText, rules)
   for (const span of spans) {
-    const color = colors[span.category]
+    const color = span.color ?? colors[span.category]
     const cellStartCol = cellMap ? (cellMap[span.start] ?? span.start) : span.start
     const cellEndCol = cellMap ? (cellMap[span.end] ?? span.end) : span.end
-    for (let col = cellStartCol; col < cellEndCol; col++) perCol[col] = color
+    for (const [a, b] of defaultFgRuns(line, cellStartCol, cellEndCol)) {
+      for (let col = a; col < b; col++) perCol[col] = color
+    }
   }
   return perCol
 }
@@ -87,6 +160,7 @@ interface HighlightSpan {
   cellStartCol: number
   cellWidth: number
   category: HighlightCategory
+  color?: string
 }
 
 interface RefreshBudget {
@@ -164,9 +238,13 @@ export class OverlayHighlighter {
   /** Active buffer kind at the last refresh; a switch means every override
    * and cached span is stale (full-screen app took over / released). */
   private lastBufferType: string | null = null
+  private options: OverlayHighlightOptions
+  /** Rule list used by the last refresh (identity-compared). */
+  private rules: HighlightRule[] = HIGHLIGHT_RULES
 
-  constructor(term: XTerm) {
+  constructor(term: XTerm, options: OverlayHighlightOptions = {}) {
     this.term = term
+    this.options = options
 
     this.disposables.push(
       this.term.onWriteParsed(() => this.triggerWriteRefresh()),
@@ -199,9 +277,20 @@ export class OverlayHighlighter {
     this.disposables = []
   }
 
+  /** Rules currently in force for this terminal. */
+  public currentRules(): HighlightRule[] {
+    let ids: readonly string[] = []
+    try {
+      ids = this.options.getSessionSetIds?.() ?? []
+    } catch {
+      ids = []
+    }
+    return resolveTerminalRules(ids)
+  }
+
   private isEnabled(): boolean {
     if (this.dead) return false
-    return useSettingsStore().settings.terminal.highlightEnabled ?? true
+    return this.currentRules().length > 0
   }
 
   /** Public mirror of isEnabled() for render-mirroring consumers. */
@@ -252,7 +341,21 @@ export class OverlayHighlighter {
   }
 
   private canRefresh(): boolean {
-    if (!this.isEnabled() || this.dead) return false
+    if (this.dead) return false
+    if (!this.isEnabled()) {
+      // Rules went away (switch off / last rule removed): drop the colors
+      // already painted instead of leaving them stale on screen.
+      if (this.rules.length > 0) {
+        this.rules = []
+        this.lineMatchCache.clear()
+        try {
+          this.term.clearCellColorOverrides()
+        } catch {
+          this.dead = true
+        }
+      }
+      return false
+    }
     try {
       // Touch the buffer so a disposed terminal flips us off here rather
       // than throwing inside the scan.
@@ -383,7 +486,7 @@ export class OverlayHighlighter {
       ? buildStringToCellMap(line, lineText.length, cols, scratchCell)
       : null
 
-    const result = matchTextSpans(lineText, HIGHLIGHT_RULES, {
+    const result = matchTextSpans(lineText, this.rules, {
       shouldStop: () => this.isBudgetExhausted(budget),
     })
 
@@ -395,9 +498,11 @@ export class OverlayHighlighter {
     for (const span of result.spans) {
       const cellStartCol = cellMap ? (cellMap[span.start] ?? span.start) : span.start
       const cellEndCol = cellMap ? (cellMap[span.end] ?? span.end) : span.end
-      const cellWidth = cellEndCol - cellStartCol
-      if (cellWidth <= 0) continue
-      spans.push({ cellStartCol, cellWidth, category: span.category })
+      if (cellEndCol <= cellStartCol) continue
+      // Only recolor cells still in the default foreground color.
+      for (const [a, b] of defaultFgRuns(line, cellStartCol, cellEndCol, scratchCell)) {
+        spans.push({ cellStartCol: a, cellWidth: b - a, category: span.category, color: span.color })
+      }
     }
     return { spans, complete: result.complete }
   }
@@ -416,6 +521,15 @@ export class OverlayHighlighter {
   private refreshViewportInner(): void {
     const buffer = this.term.buffer.active
     const bufferType = buffer.type
+
+    // Rule edits (or toggling the built-in categories) invalidate every
+    // applied override and cached span.
+    const rules = this.currentRules()
+    if (rules !== this.rules) {
+      this.rules = rules
+      this.term.clearCellColorOverrides()
+      this.lineMatchCache.clear()
+    }
 
     // Entering or leaving a full-screen app invalidates everything at once:
     // absolute indices refer to a different buffer and the match cache
@@ -483,7 +597,7 @@ export class OverlayHighlighter {
           ? spans.map((s): ICellColorSpan => ({
               col: s.cellStartCol,
               width: s.cellWidth,
-              color: colors[s.category],
+              color: s.color ?? colors[s.category],
             }))
           : null,
       )
@@ -499,9 +613,9 @@ const attached = new WeakMap<XTerm, OverlayHighlighter>()
 
 /** Attach an overlay highlighter to a terminal (idempotent per terminal).
  * Applies to every terminal type; the "文本高亮" setting is the only gate. */
-export function attachOverlayHighlighter(term: XTerm): void {
+export function attachOverlayHighlighter(term: XTerm, options: OverlayHighlightOptions = {}): void {
   if (attached.has(term)) return
-  const highlighter = new OverlayHighlighter(term)
+  const highlighter = new OverlayHighlighter(term, options)
   attached.set(term, highlighter)
   highlighter.attach()
 }
