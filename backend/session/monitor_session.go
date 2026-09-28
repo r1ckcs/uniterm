@@ -2320,7 +2320,9 @@ func validServiceAction(action string) bool {
 
 // validUnitName rejects anything but the characters a systemd unit name may
 // contain, so a hostile name cannot escape the shell command.
-var unitNameRe = regexp.MustCompile(`^[A-Za-z0-9@._\-]+$`)
+// First char must be alphanumeric so a name can never be parsed as an option
+// (e.g. "--force") by systemctl/journalctl.
+var unitNameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9@._\-]*$`)
 
 func validUnitName(name string) bool {
 	return unitNameRe.MatchString(name)

@@ -41,10 +41,24 @@ func (p *sqlserverProvider) DSN(host string, port int, user, password, dbName st
 	if dbName != "" {
 		q.Set("database", dbName)
 	}
-	q.Set("encrypt", "disable")
+	// "disable" sent the whole session, login packet included, without TLS
+	// (the TDS password is only XOR-obfuscated). "false" still negotiates TLS
+	// for at least the login packet and works with servers that do not
+	// support full encryption. TrustServerCertificate keeps self-signed
+	// servers working; set encrypt=strict (or true + TrustServerCertificate
+	// =false) in the extra params for full certificate validation.
+	q.Set("encrypt", "false")
+	q.Set("TrustServerCertificate", "true")
 	q.Set("dial timeout", "10")
 	q.Set("connection timeout", "30")
 	for k, v := range extraParams {
+		// The driver lowercases keys: drop a default spelled differently so
+		// the user's value is the only one left.
+		for dk := range q {
+			if strings.EqualFold(dk, k) {
+				q.Del(dk)
+			}
+		}
 		q.Set(k, v)
 	}
 	u.RawQuery = q.Encode()

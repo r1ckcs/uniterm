@@ -17,7 +17,6 @@ import (
 	"github.com/go-ole/go-ole"
 	"github.com/ys-ll/uniterm/backend/log"
 	"golang.org/x/sys/windows"
-	"golang.org/x/sys/windows/registry"
 )
 
 var (
@@ -456,8 +455,11 @@ func (s *RDPSession) Connect(config ConnectionConfig) error {
 		}
 	}
 
-	// Suppress server certificate warning at OS level
-	setAuthLevelOverride()
+	// NOTE: upstream wrote AuthenticationLevelOverride=0 and the
+	// RedirectionWarningDialogVersion policy to HKCU (falling back to an
+	// elevated reg.exe write to HKLM) on every connect. Those are persistent,
+	// system-wide settings that also silence mstsc.exe's certificate and
+	// rogue-.rdp warnings outside this app, so they were removed.
 
 	// Auto-dismiss any security dialogs that appear during Connect (e.g.
 	// "网站正在尝试启动远程连接"). The goroutine polls for dialog windows
@@ -681,114 +683,6 @@ func (s *RDPSession) findRdpProgID() string {
 	return ""
 }
 
-// setAuthLevelOverride sets the system-wide RDP authentication level to 0,
-// which suppresses the server certificate warning dialog.
-func setAuthLevelOverride() {
-	// AuthenticationLevelOverride = 0 disables server cert verification.
-	k, err := registry.OpenKey(registry.CURRENT_USER,
-		`Software\Microsoft\Terminal Server Client`,
-		registry.SET_VALUE)
-	if err != nil {
-		k, _, err = registry.CreateKey(registry.CURRENT_USER,
-			`Software\Microsoft\Terminal Server Client`,
-			registry.SET_VALUE)
-		if err != nil {
-			return
-		}
-	}
-	defer k.Close()
-	k.SetDWordValue("AuthenticationLevelOverride", 0)
-	// Also disable the redirection warning dialog via the non-policy key
-	k.SetDWordValue("ShowRedirectionWarningDialog", 0)
-
-	// RedirectionWarningDialogVersion = 1 suppresses the "unknown remote
-	// connection" security warning dialog. Check if already set first.
-	if isRDWAlreadySet() {
-		return
-	}
-
-	// Write to HKCU policy path (no elevation needed, works on Windows 11)
-	rdwPath := `Software\Policies\Microsoft\Windows NT\Terminal Services\Client`
-	if writeRegDWORD(registry.CURRENT_USER, rdwPath, "RedirectionWarningDialogVersion", 1) {
-		return
-	}
-
-	// Fallback: try HKLM policy path (requires admin)
-	rdwPathLM := `SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services\Client`
-	if writeRegDWORD(registry.LOCAL_MACHINE, rdwPathLM, "RedirectionWarningDialogVersion", 1) {
-		return
-	}
-	elevateRegWrite()
-}
-
-// isRDWAlreadySet returns true if RedirectionWarningDialogVersion is already 1.
-func isRDWAlreadySet() bool {
-	paths := []struct {
-		root registry.Key
-		path string
-	}{
-		{registry.LOCAL_MACHINE, `SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services\Client`},
-		{registry.CURRENT_USER, `Software\Policies\Microsoft\Windows NT\Terminal Services\Client`},
-	}
-	for _, p := range paths {
-		if readRegDWORD(p.root, p.path, "RedirectionWarningDialogVersion") == 1 {
-			return true
-		}
-	}
-	return false
-}
-
-// writeRegDWORD writes a DWORD value to the registry. Returns true on success.
-func writeRegDWORD(root registry.Key, path, name string, value uint32) bool {
-	k, err := registry.OpenKey(root, path, registry.SET_VALUE)
-	if err != nil {
-		k, _, err = registry.CreateKey(root, path, registry.SET_VALUE)
-		if err != nil {
-			return false
-		}
-	}
-	defer k.Close()
-	return k.SetDWordValue(name, value) == nil
-}
-
-// readRegDWORD reads a DWORD value from the registry. Returns 0 if not found.
-func readRegDWORD(root registry.Key, path, name string) uint32 {
-	k, err := registry.OpenKey(root, path, registry.QUERY_VALUE)
-	if err != nil {
-		return 0
-	}
-	defer k.Close()
-	val, _, err := k.GetIntegerValue(name)
-	if err != nil {
-		return 0
-	}
-	return uint32(val)
-}
-
-// elevateRegWrite launches reg.exe with the "runas" verb to write the
-// RedirectionWarningDialogVersion machine-policy key with admin rights.
-func elevateRegWrite() {
-	shell32 := windows.NewLazySystemDLL("shell32.dll")
-	procShellExecute := shell32.NewProc("ShellExecuteW")
-
-	op, _ := windows.UTF16PtrFromString("runas")
-	file, _ := windows.UTF16PtrFromString("reg.exe")
-	params, _ := windows.UTF16PtrFromString(
-		`add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services\Client" /v RedirectionWarningDialogVersion /t REG_DWORD /d 1 /f`,
-	)
-
-	ret, _, _ := procShellExecute.Call(
-		0,
-		uintptr(unsafe.Pointer(op)),
-		uintptr(unsafe.Pointer(file)),
-		uintptr(unsafe.Pointer(params)),
-		0,
-		0, // SW_HIDE
-	)
-	if ret <= 32 {
-		log.Writef("[RDP] ShellExecute runas failed: %d", ret)
-	}
-}
 
 func (s *RDPSession) configureNonScriptable(password string) {
 	if s.rdp == nil {
