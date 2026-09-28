@@ -91,6 +91,9 @@ type ConnectionConfig struct {
 	// equivalent of "mstsc /admin". Mapped to the ActiveX
 	// IMsRdpClientAdvancedSettings8::ConnectToAdministerServer property.
 	RdpAdminSession bool `json:"rdpAdminSession"`
+	// HighlightSets lists the ids of non-global highlight rule sets
+	// (highlightRules.json) applied to this connection's terminals.
+	HighlightSets []string `json:"highlightSets,omitempty"`
 	// Local terminal shell path
 	ShellPath string `json:"shellPath,omitempty"`
 	// Working directory for local terminal (defaults to user home directory if empty)

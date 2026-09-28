@@ -723,7 +723,7 @@ func (s *SyncService) ConfigureRepo(repoURL, username, token, masterPassword str
 // getConfigModTime returns the latest modification time of config files in a directory.
 func getConfigModTime(dir string) time.Time {
 	var latest time.Time
-	for _, name := range []string{"connections.json", "settings.json", "quickCommands.json", "tunnels.json", "identities.json", "proxies.json"} {
+	for _, name := range []string{"connections.json", "settings.json", "quickCommands.json", "tunnels.json", "identities.json", "proxies.json", "highlightRules.json"} {
 		info, err := os.Stat(filepath.Join(dir, name))
 		if err != nil {
 			continue

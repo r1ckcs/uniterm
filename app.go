@@ -52,6 +52,7 @@ type App struct {
 	proxyStore           *store.ProxyStore
 	localStateStore      *store.LocalStateStore
 	quickCommandsStore   *store.QuickCommandsStore
+	highlightRulesStore  *store.HighlightRulesStore
 	skillsStore          *store.SkillsStore
 	commandsStore        *store.CommandsStore
 	tunnelStore          *store.TunnelStore
@@ -309,6 +310,7 @@ func (a *App) initStores(dataDir string, upgrade bool) {
 
 	a.terminalHistoryStore = store.NewTerminalHistoryStore(dataDir)
 	a.quickCommandsStore = store.NewQuickCommandsStore(dataDir)
+	a.highlightRulesStore = store.NewHighlightRulesStore(dataDir)
 	a.skillsStore = store.NewSkillsStore(dataDir)
 	a.commandsStore = store.NewCommandsStore(dataDir)
 	a.tunnelStore = store.NewTunnelStore(dataDir)
@@ -1309,6 +1311,11 @@ func (a *App) reloadStoresAfterSync() {
 			a.emit("store:quickCommands:changed", data)
 		}
 	}
+	if a.highlightRulesStore != nil {
+		if data, err := a.highlightRulesStore.Load(); err == nil {
+			a.emit("store:highlightRules:changed", data)
+		}
+	}
 	if a.identityStore != nil {
 		if data, err := a.identityStore.Load(); err == nil {
 			a.emit("store:identities:changed", data)
@@ -1565,6 +1572,28 @@ func (a *App) LoadQuickCommands() (store.QuickCommandData, error) {
 		return store.QuickCommandData{}, fmt.Errorf("quick commands store not initialized")
 	}
 	return a.quickCommandsStore.Load()
+}
+
+// HighlightRulesStore methods
+
+func (a *App) SaveHighlightRules(data store.HighlightRulesData) error {
+	if a.highlightRulesStore == nil {
+		return fmt.Errorf("highlight rules store not initialized")
+	}
+	err := a.highlightRulesStore.Save(data)
+	if err == nil {
+		// Other windows (and terminals in them) pick up the edit live.
+		a.emit("store:highlightRules:changed", data)
+		a.triggerAutoSync()
+	}
+	return err
+}
+
+func (a *App) LoadHighlightRules() (store.HighlightRulesData, error) {
+	if a.highlightRulesStore == nil {
+		return store.HighlightRulesData{}, fmt.Errorf("highlight rules store not initialized")
+	}
+	return a.highlightRulesStore.Load()
 }
 
 // CommandsStore methods

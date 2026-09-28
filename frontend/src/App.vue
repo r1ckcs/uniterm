@@ -216,6 +216,7 @@ import { useAIStore } from './stores/aiStore'
 import { useCompanionStore } from './stores/companionStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { useQuickCommandStore } from './stores/quickCommandStore'
+import { useHighlightRuleStore } from './stores/highlightRuleStore'
 import { useSkillStore } from './stores/skillStore'
 import { useCommandStore } from './stores/commandStore'
 import { useTunnelStore } from './stores/tunnelStore'
@@ -412,6 +413,7 @@ function onDataDirDone(restart: boolean) {
   connectionStore.load()
   settingsStore.reload()
   useQuickCommandStore().load()
+  useHighlightRuleStore().load()
   useSkillStore().reload()
   useCommandStore().reload()
   tunnelStore.load()
@@ -948,6 +950,8 @@ onMounted(async () => {
   sidebarVisible.value = localStateStore.state.sidebarVisible ?? false
   // Pre-load quick commands so suggestions can read them immediately
   useQuickCommandStore().load()
+  // Highlight rule sets feed every terminal's keyword highlighter
+  useHighlightRuleStore().load()
   // Pre-load tunnels so auto-start state and the panel are ready
   useTunnelStore().load()
   // Auto-open start tab if no tabs are open

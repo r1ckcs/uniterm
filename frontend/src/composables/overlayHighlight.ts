@@ -428,6 +428,15 @@ export class OverlayHighlighter {
    * refresh from the terminal's palette, so a forced pass over the viewport
    * rewrites them with the new theme's colors (and wiping the store drops
    * the stale colors baked into off-viewport rows). */
+  /** forceRefresh for broadcast callers; false once the terminal is gone. */
+  public forceRefreshIfAlive(): boolean {
+    if (this.dead) return false
+    // Also runs when rules were just removed: canRefresh then clears the
+    // stale colors.
+    if (this.canRefresh()) this.forceRefresh()
+    return !this.dead
+  }
+
   public forceRefresh(): void {
     if (!this.canRefresh()) return
     this.term.clearCellColorOverrides()
@@ -610,6 +619,16 @@ export class OverlayHighlighter {
 }
 
 const attached = new WeakMap<XTerm, OverlayHighlighter>()
+// Live highlighters, for broadcast refreshes (rule edits). Dead ones are
+// dropped on the next broadcast.
+const live = new Set<OverlayHighlighter>()
+
+/** Re-scan every open terminal now (e.g. after the user edited rules). */
+export function refreshAllOverlayHighlighters(): void {
+  for (const h of live) {
+    if (!h.forceRefreshIfAlive()) live.delete(h)
+  }
+}
 
 /** Attach an overlay highlighter to a terminal (idempotent per terminal).
  * Applies to every terminal type; the "文本高亮" setting is the only gate. */
@@ -617,6 +636,7 @@ export function attachOverlayHighlighter(term: XTerm, options: OverlayHighlightO
   if (attached.has(term)) return
   const highlighter = new OverlayHighlighter(term, options)
   attached.set(term, highlighter)
+  live.add(highlighter)
   highlighter.attach()
 }
 

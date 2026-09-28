@@ -54,6 +54,8 @@ export interface ConnectionConfig {
   // "DOMAIN\user" prefix in user is used as a fallback.
   rdpDomain?: string
   rdpAdminSession?: boolean
+  // Ids of non-global highlight rule sets applied to this connection.
+  highlightSets?: string[]
   // Local terminal shell path (for WSL, `wsl://<distro>` carries the distro)
   shellPath?: string
   // Working directory for local terminal (defaults to user home)
