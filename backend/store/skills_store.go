@@ -796,6 +796,11 @@ func (s *SkillsStore) CreateSkill(name, description, body string) error {
 		return fmt.Errorf("description is required")
 	}
 	skillDir := filepath.Join(s.skillsRoot(), name)
+	// Never overwrite an existing skill here: that bypassed SaveSkill's lock
+	// check and silently unlocked (Locked=false) a user-locked skill.
+	if _, err := os.Lstat(skillDir); err == nil {
+		return fmt.Errorf("skill %s already exists", name)
+	}
 	if err := os.MkdirAll(skillDir, 0755); err != nil {
 		return err
 	}

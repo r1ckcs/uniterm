@@ -163,6 +163,9 @@ export const useAIStore = defineStore('ai', () => {
     timeout?: number
     headLines?: number
     tailLines?: number
+    // Tool-specific payload replayed by approveTool (send_terminal_key,
+    // save_skill).
+    extra?: Record<string, unknown>
   } | null>(null)
   const pendingQuestion = ref<{
     messageId: string
@@ -230,7 +233,7 @@ export const useAIStore = defineStore('ai', () => {
     lastDebugInfo.value = null
   }
 
-  function setPendingCommand(cmd: { messageId: string; toolId: string; toolName: string; command: string; risk: string; dangerous: boolean; panel?: string; timeout?: number; headLines?: number; tailLines?: number }) {
+  function setPendingCommand(cmd: { messageId: string; toolId: string; toolName: string; command: string; risk: string; dangerous: boolean; panel?: string; timeout?: number; headLines?: number; tailLines?: number; extra?: Record<string, unknown> }) {
     pendingCommand.value = cmd
   }
 

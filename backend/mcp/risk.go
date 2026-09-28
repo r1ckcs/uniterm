@@ -125,7 +125,9 @@ func matchesDangerous(head string, words []string, joined string) bool {
 			return true
 		}
 	}
-	if isInterpreter(head) && (containsAnyFlag(words, "-c", "-e", "-E", "-r", "--eval", "--command") || len(words) > 1) {
+	// Any interpreter is opaque: with args it runs inline code or a script,
+	// without args it runs whatever is piped in ("curl … | sh").
+	if isInterpreter(head) {
 		return true
 	}
 	if head == "rm" && (containsAnyFlag(words, "-rf", "-fr") || strings.Contains(joined, "rm -rf")) {

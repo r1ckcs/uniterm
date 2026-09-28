@@ -25,12 +25,28 @@ export function sanitizeRenderedHtml(html: string): string {
   // matches a quoted value so URLs like href="/online=1" stay intact.
   html = html.replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
   html = html.replace(/\/on[a-z]+\s*=\s*("[^"]*"|'[^']*')/gi, '')
-  // Strip javascript:/data:/vbscript: URL schemes in href/src.
+  // URL attributes: allowlist schemes instead of blacklisting. The browser's
+  // URL parser drops ASCII tab/newline anywhere and leading C0 controls, so
+  // "java\tscript:" or "\x01javascript:" slipped past a literal match.
   html = html.replace(
-    /\s+(href|src|action|formaction|xlink:href)\s*=\s*("\s*(?:javascript|data|vbscript):[^"]*"|'\s*(?:javascript|data|vbscript):[^']*'|(?:javascript|data|vbscript):[^\s>]+)/gi,
-    '',
+    /\s+(href|src|action|formaction|xlink:href)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi,
+    (match, _attr: string, rawValue: string) => {
+      const value = rawValue.replace(/^["']|["']$/g, '')
+      return isSafeUrl(value) ? match : ''
+    },
   )
   return html
+}
+
+// isSafeUrl normalizes a URL the way the browser's parser would (strip C0
+// controls and spaces) and accepts only http(s), mailto, fragments and
+// scheme-less relative URLs.
+export function isSafeUrl(value: string): boolean {
+  // eslint-disable-next-line no-control-regex
+  const normalized = value.replace(/[\x00-\x20\x7f]/g, '').replace(/&(amp;)?#0*(9|10|13);?/gi, '')
+  const scheme = /^([a-z][a-z0-9+.\-]*):/i.exec(normalized)
+  if (!scheme) return true
+  return ['http', 'https', 'mailto'].includes(scheme[1].toLowerCase())
 }
 
 // Escape HTML-significant characters (including quotes — a raw double quote

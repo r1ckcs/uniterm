@@ -135,7 +135,8 @@ import { ref, computed } from 'vue'
 import { Copy, Check, BookOpen, Terminal } from '@lucide/vue'
 import { useAIStore } from '../stores/aiStore'
 import { useI18n } from '../i18n'
-import { sanitizeRenderedHtml, escapeHtml as escapeHtmlBase } from '../utils/markdown'
+import { sanitizeRenderedHtml, escapeHtml as escapeHtmlBase, isSafeUrl } from '../utils/markdown'
+import { Browser } from '@wailsio/runtime'
 import type { AIMessage } from '../types/ai'
 
 const props = defineProps<{ message: AIMessage; searchText?: string }>()
@@ -263,6 +264,17 @@ async function copyToolText(text: string, key: string) {
 }
 
 function onTextClick(event: MouseEvent) {
+  // Links from model output: open only http(s)/mailto in the system browser,
+  // never navigate the app webview (which can call every Go binding).
+  const link = (event.target as HTMLElement).closest('a') as HTMLAnchorElement | null
+  if (link) {
+    event.preventDefault()
+    const href = link.getAttribute('href') || ''
+    if (/^(https?:|mailto:)/i.test(href.trim()) && isSafeUrl(href)) {
+      Browser.OpenURL(href.trim())
+    }
+    return
+  }
   const btn = (event.target as HTMLElement).closest('.code-copy-btn') as HTMLElement | null
   if (!btn) return
   const wrapper = btn.closest('.code-block-wrapper')
@@ -405,8 +417,11 @@ function renderMarkdown(text: string): string {
   html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
   html = html.replace(/\*(.*?)\*/g, '<em>$1</em>')
   html = html.replace(/~~(.+?)~~/g, '<del>$1</del>')
-  // Images (must be before links so ![ doesn't get partially matched)
-  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">')
+  // Images (must be before links so ![ doesn't get partially matched).
+  // Rendered as links, never as <img>: an auto-loading image lets a
+  // prompt-injected model exfiltrate terminal content in the URL with no
+  // click at all.
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">[image: $1]</a>')
   // Markdown links
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
   // Auto-link raw URLs (after markdown links/images, only in text outside HTML tags)
