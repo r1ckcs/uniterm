@@ -1291,7 +1291,10 @@ func (s *SFTPSession) walkRemoteForDownload(remoteDir, localDir string, task *Tr
 	}
 	for _, fi := range infos {
 		rp := path.Join(remoteDir, fi.Name())
-		lp := filepath.Join(localDir, fi.Name())
+		lp, err := safeLocalChild(localDir, fi.Name())
+		if err != nil {
+			continue
+		}
 		if fi.IsDir() {
 			if err := s.walkRemoteForDownload(rp, lp, task, out); err != nil {
 				return err

@@ -438,7 +438,10 @@ func (s *WebDAVSession) downloadDir(remoteDir, localDir string, task *TransferTa
 		default:
 		}
 		rp := path.Join(remoteDir, e.Name())
-		lp := filepath.Join(localDir, e.Name())
+		lp, err := safeLocalChild(localDir, e.Name())
+		if err != nil {
+			continue
+		}
 		if e.IsDir() {
 			if err := s.downloadDir(rp, lp, task); err != nil {
 				return err

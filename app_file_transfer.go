@@ -425,8 +425,16 @@ type extEditWatcher struct {
 
 // extEditRootDir is the scratch root for external-edit temp files; each
 // session gets a subdirectory keyed by its sanitized ID.
+//
+// It lives under the per-user cache dir rather than the shared system temp
+// dir: on multi-user Linux a predictable /tmp/uniterm-extedit could be
+// pre-created (or symlinked) by another local user to read or swap the files
+// that the watcher later uploads with this user's credentials.
 func extEditRootDir() string {
-	return filepath.Join(os.TempDir(), "uniterm-extedit")
+	if dir, err := os.UserCacheDir(); err == nil && dir != "" {
+		return filepath.Join(dir, "uniterm", "extedit")
+	}
+	return filepath.Join(os.TempDir(), fmt.Sprintf("uniterm-extedit-%d", os.Getuid()))
 }
 
 // extEditSessionDir is a session's scratch dir. The PID prefix attributes the
@@ -453,11 +461,11 @@ const (
 // like the old unique-name scheme instead of failing outright.
 func writeExtEditTemp(dir, stem string, sum []byte, ext string, content []byte) (string, error) {
 	tmp := filepath.Join(dir, fmt.Sprintf("%s-%x%s", stem, sum, ext))
-	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		// Locked by a live editor copy: fall back to a unique name.
 		tmp = filepath.Join(dir, stem+"-"+hex.EncodeToString(sum)+"-"+strconv.FormatUint(extEditRunSeq.Add(1), 10)+ext)
-		f, err = os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+		f, err = os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 		if err != nil {
 			return "", err
 		}
@@ -509,6 +517,10 @@ func (a *App) SftpOpenExternalEditor(sessionID, remotePath, editorCmd string) er
 		return err
 	}
 
+	if err := checkEditorArg(prog, tmp); err != nil {
+		unregisterExternalEdit(sessionID, runKey)
+		return err
+	}
 	args = append(args, tmp)
 
 	cmd := exec.CommandContext(runCtx, prog, args...)
@@ -580,7 +592,7 @@ func (a *App) emitExtEditStarted(sessionID, remotePath, tmp string) {
 // registerExternalEdit) and runKey unregisters it on launch failure.
 func (a *App) startExtEditWatcher(sessionID, remotePath string, fs fileTransferSession, content []byte) (tmp string, runCtx context.Context, runKey string, err error) {
 	dir := extEditSessionDir(sessionID)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", nil, "", err
 	}
 	base := sanitizePart(path.Base(remotePath))
@@ -627,6 +639,9 @@ func (a *App) OpenExternalEditorLocal(localPath, editorCmd string) error {
 	}
 	prog, args, err := splitCommand(editorCmd)
 	if err != nil {
+		return err
+	}
+	if err := checkEditorArg(prog, localPath); err != nil {
 		return err
 	}
 	args = append(args, localPath)
@@ -855,7 +870,10 @@ func sanitizePart(s string) string {
 	var b strings.Builder
 	for _, r := range s {
 		switch r {
-		case '\\', '/', ':', '*', '?', '"', '<', '>', '|', ' ', '\n', '\r', '\t':
+		case '\\', '/', ':', '*', '?', '"', '<', '>', '|', ' ', '\n', '\r', '\t',
+			// cmd.exe metacharacters: a remote name like "a&calc&.txt" must
+			// not reach a .cmd/.bat editor shim (BatBadBut).
+			'&', '^', '%', '!', '(', ')', ';', ',', '=', '\'', '`':
 			b.WriteRune('_')
 		default:
 			b.WriteRune(r)
@@ -894,4 +912,20 @@ func (a *App) ListExternalEditors() ([]ExternalEditorOption, error) {
 func pathExists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
+}
+
+// checkEditorArg refuses to hand a file path containing cmd.exe
+// metacharacters to a batch-file editor (e.g. VS Code's code.cmd shim).
+// Windows runs .cmd/.bat through cmd.exe, and Go's argument quoting does not
+// protect against cmd.exe parsing (os/exec docs, "BatBadBut").
+func checkEditorArg(prog, arg string) error {
+	switch strings.ToLower(filepath.Ext(prog)) {
+	case ".cmd", ".bat":
+	default:
+		return nil
+	}
+	if strings.ContainsAny(arg, "&|<>^%!\"()`\r\n") {
+		return fmt.Errorf("refusing to pass path with shell metacharacters to %s: %s", filepath.Base(prog), arg)
+	}
+	return nil
 }

@@ -22,14 +22,17 @@ func Init() error {
 	}
 
 	dir := filepath.Dir(logPath())
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
 
-	f, err := os.OpenFile(logPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	// The app log records hosts, users and frontend diagnostics: keep it
+	// private to the user (and tighten logs created by older versions).
+	f, err := os.OpenFile(logPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
 	}
+	_ = f.Chmod(0o600)
 	file = f
 	return nil
 }

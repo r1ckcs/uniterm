@@ -624,7 +624,10 @@ func (s *SMBSession) downloadDir(remoteDir, localDir string, task *TransferTask)
 		default:
 		}
 		rp := smbJoin(remoteDir, e.Name())
-		lp := filepath.Join(localDir, e.Name())
+		lp, err := safeLocalChild(localDir, e.Name())
+		if err != nil {
+			continue
+		}
 		if e.IsDir() {
 			if err := s.downloadDir(rp, lp, task); err != nil {
 				return err

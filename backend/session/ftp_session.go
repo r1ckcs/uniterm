@@ -724,8 +724,14 @@ func (s *FTPSession) downloadDir(remoteDir, localDir string, task *TransferTask)
 		return err
 	}
 	for _, e := range entries {
+		if e.Name == "." || e.Name == ".." {
+			continue
+		}
 		rp := path.Join(remoteDir, e.Name)
-		lp := filepath.Join(localDir, e.Name)
+		lp, err := safeLocalChild(localDir, e.Name)
+		if err != nil {
+			continue
+		}
 		if e.Type == ftp.EntryTypeFolder {
 			if err := s.downloadDir(rp, lp, task); err != nil {
 				return err

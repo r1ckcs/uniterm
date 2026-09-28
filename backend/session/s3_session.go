@@ -833,7 +833,10 @@ func (s *S3Session) downloadDir(remoteDir, localDir string, task *TransferTask) 
 		if name == "" || strings.HasSuffix(name, "/") {
 			continue
 		}
-		lp := filepath.Join(localDir, name)
+		lp, err := safeLocalRelPath(localDir, name)
+		if err != nil {
+			continue
+		}
 		if err := s.downloadFile(task, path.Join(remoteDir, name), lp); err != nil {
 			return err
 		}
@@ -849,7 +852,10 @@ func (s *S3Session) downloadDir(remoteDir, localDir string, task *TransferTask) 
 		dirName := strings.TrimPrefix(pfx, prefix)
 		dirName = strings.TrimSuffix(dirName, "/")
 		rp := path.Join(remoteDir, dirName)
-		lp := filepath.Join(localDir, dirName)
+		lp, err := safeLocalRelPath(localDir, dirName)
+		if err != nil {
+			continue
+		}
 		if err := s.downloadDir(rp, lp, task); err != nil {
 			return err
 		}

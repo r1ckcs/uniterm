@@ -460,7 +460,7 @@ func (l *OutputLogger) Enable(dir, filenameTemplate, name, host, protocol string
 	if dir == "" {
 		dir = defaultSessionLogDir()
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", fmt.Errorf("mkdir log dir %s: %w", dir, err)
 	}
 	now := time.Now()
@@ -480,7 +480,7 @@ func (l *OutputLogger) Enable(dir, filenameTemplate, name, host, protocol string
 		} else {
 			candidate = filepath.Join(dir, fmt.Sprintf("%s_%d%s", base, suffix, ext))
 		}
-		f, err := os.OpenFile(candidate, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+		f, err := os.OpenFile(candidate, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600) // transcripts may hold secrets
 		if err == nil {
 			file = f
 			final = candidate

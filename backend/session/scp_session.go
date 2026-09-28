@@ -838,6 +838,9 @@ func (s *SCPSession) fetchTree(c *scpProtoConn, remoteDir, localRoot string, tas
 			if name == "" {
 				return fmt.Errorf("scp: protocol error: bad dir directive %q", line)
 			}
+			if !first && !safeRemoteName(name) {
+				return fmt.Errorf("scp: refusing unsafe directory name %q from server", name)
+			}
 			dir := path.Join(cur, name)
 			rdir := path.Join(rcur, name)
 			if first {
@@ -875,6 +878,10 @@ func (s *SCPSession) fetchTree(c *scpProtoConn, remoteDir, localRoot string, tas
 			}
 		case 'C':
 			name := scpDirectiveName(line)
+			// CVE-2019-6111 class: the server controls this name.
+			if !safeRemoteName(name) {
+				return fmt.Errorf("scp: refusing unsafe file name %q from server", name)
+			}
 			local := path.Join(cur, name)
 			rel := relPath(path.Join(rcur, name), task.RemotePath)
 			if err := s.fetchTreeFile(c, line, local, rel, name, task); err != nil {
