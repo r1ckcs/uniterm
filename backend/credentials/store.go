@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	stdsync "sync"
 
 	unitsync "github.com/ys-ll/uniterm/backend/sync"
@@ -156,6 +157,29 @@ func (s *Store) Unlock(masterPassword string) error {
 		return errors.New("not in master-password mode")
 	}
 	key := unitsync.DeriveKey(masterPassword, salt)
+	// Verify before caching: a wrong password must never become the sticky
+	// auto-unlock key, nor seal new secrets under a key nobody can re-derive.
+	meta, err := ReadMeta(s.dataDir)
+	if err != nil {
+		return err
+	}
+	if meta != nil && meta.Check != "" {
+		if pt, err := DecryptField(meta.Check, key); err != nil || pt != KeyCheckPlaintext {
+			return ErrWrongPassword
+		}
+	} else if sample := s.firstCiphertext(); sample != "" {
+		// Stores created before the key-check value existed: test-decrypt an
+		// existing secret, then record the check value for next time.
+		if _, err := DecryptField(sample, key); err != nil {
+			return ErrWrongPassword
+		}
+	}
+	if meta != nil && meta.Check == "" {
+		if chk, err := EncryptField(KeyCheckPlaintext, key); err == nil {
+			meta.Check = chk
+			_ = WriteMeta(s.dataDir, meta)
+		}
+	}
 	// Cache the derived key for future auto-unlock.
 	if err := s.keychain.Set("master-key/"+s.DirHash(), hex.EncodeToString(key)); err != nil {
 		return err
@@ -211,7 +235,11 @@ func (s *Store) Rekey(mode string, salt, key []byte) error {
 	if err := s.keychain.Set(entry, hex.EncodeToString(key)); err != nil {
 		return err
 	}
-	if err := WriteMeta(s.dataDir, &Meta{Mode: mode, Salt: salt}); err != nil {
+	check, err := EncryptField(KeyCheckPlaintext, key)
+	if err != nil {
+		return err
+	}
+	if err := WriteMeta(s.dataDir, &Meta{Mode: mode, Salt: salt, Check: check}); err != nil {
 		return err
 	}
 	s.set(mode, salt, key)
@@ -286,4 +314,27 @@ func randomKey() ([]byte, error) {
 		return nil, fmt.Errorf("generate master key: %w", err)
 	}
 	return k, nil
+}
+
+// KeyCheckPlaintext is the known plaintext sealed into Meta.Check.
+const KeyCheckPlaintext = "uniterm-key-check-v1"
+
+// ErrWrongPassword is returned by Unlock when the master password does not
+// match the key that sealed the existing data.
+var ErrWrongPassword = errors.New("wrong master password")
+
+var ciphertextRe = regexp.MustCompile(`enc:v1:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+`)
+
+// firstCiphertext returns one enc:v1 value from the data files, or "".
+func (s *Store) firstCiphertext() string {
+	for _, name := range []string{"connections.json", "settings.json", "identities.json", "proxies.json", "ai.json"} {
+		data, err := os.ReadFile(filepath.Join(s.dataDir, name))
+		if err != nil {
+			continue
+		}
+		if m := ciphertextRe.Find(data); m != nil {
+			return string(m)
+		}
+	}
+	return ""
 }

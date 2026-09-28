@@ -25,14 +25,25 @@ type utmFile struct {
 	session.ConnectionStoreData
 }
 
+// utmSecretFields lists every secret-bearing field of a connection. Export
+// clears or encrypts all of them — not only Password — so an export never
+// carries inline private keys or auxiliary passwords in plaintext.
+func utmSecretFields(c *session.ConnectionConfig) []*string {
+	return []*string{&c.Password, &c.KeyContent, &c.SentinelPassword, &c.TunnelSSHPassword}
+}
+
 // ExportUniterm serializes the full store to .utm JSON. When password is empty,
-// all password fields are cleared and encrypted=false. Otherwise passwords are
+// all secret fields are cleared and encrypted=false. Otherwise secrets are
 // encrypted with a fresh PBKDF2-derived key and encrypted=true.
 func ExportUniterm(data session.ConnectionStoreData, password string) ([]byte, error) {
 	f := utmFile{Format: unitermFormat, Version: 1, ConnectionStoreData: data}
+	// Copy the slice so clearing/encrypting never mutates the caller's store.
+	f.Connections = append([]session.ConnectionConfig(nil), data.Connections...)
 	if password == "" {
 		for i := range f.Connections {
-			f.Connections[i].Password = ""
+			for _, fld := range utmSecretFields(&f.Connections[i]) {
+				*fld = ""
+			}
 		}
 		return json.MarshalIndent(f, "", "  ")
 	}
@@ -43,15 +54,16 @@ func ExportUniterm(data session.ConnectionStoreData, password string) ([]byte, e
 	f.Encrypted = true
 	f.KDF = &utmKDF{Algo: kdfAlgo, Iterations: kdfIterations, Salt: encodeSalt(salt)}
 	for i := range f.Connections {
-		c := &f.Connections[i]
-		if c.Password == "" || strings.HasPrefix(c.Password, credentials.Prefix) {
-			continue
+		for _, fld := range utmSecretFields(&f.Connections[i]) {
+			if *fld == "" || strings.HasPrefix(*fld, credentials.Prefix) {
+				continue
+			}
+			enc, err := encryptField(*fld, password, salt)
+			if err != nil {
+				return nil, err
+			}
+			*fld = enc
 		}
-		enc, err := encryptField(c.Password, password, salt)
-		if err != nil {
-			return nil, err
-		}
-		c.Password = enc
 	}
 	return json.MarshalIndent(f, "", "  ")
 }
@@ -77,15 +89,26 @@ func parseUniterm(data []byte, opts ParseOptions) (*ImportResult, error) {
 			return nil, fmt.Errorf("decode salt: %w", err)
 		}
 		for i := range f.Connections {
-			c := &f.Connections[i]
-			if c.Password == "" {
-				continue
+			for _, fld := range utmSecretFields(&f.Connections[i]) {
+				if *fld == "" {
+					continue
+				}
+				// Files written before all secrets were encrypted may carry
+				// plaintext in non-password fields; only decrypt ciphertext.
+				if fld != &f.Connections[i].Password && !isUtmCiphertext(*fld) {
+					continue
+				}
+				plain, err := decryptField(*fld, opts.Password, salt)
+				if err != nil {
+					if fld == &f.Connections[i].Password {
+						return nil, fmt.Errorf("wrong import password")
+					}
+					// Auxiliary secret sealed with another key (e.g. a
+					// device-local store key): drop it rather than fail.
+					plain = ""
+				}
+				*fld = plain
 			}
-			plain, err := decryptField(c.Password, opts.Password, salt)
-			if err != nil {
-				return nil, fmt.Errorf("wrong import password")
-			}
-			c.Password = plain
 		}
 	}
 
@@ -117,3 +140,6 @@ func parseUniterm(data []byte, opts ParseOptions) (*ImportResult, error) {
 	}
 	return &ImportResult{Groups: groups, Connections: connections}, nil
 }
+
+// isUtmCiphertext reports whether a field value is an encrypted envelope.
+func isUtmCiphertext(v string) bool { return strings.HasPrefix(v, credentials.Prefix) }

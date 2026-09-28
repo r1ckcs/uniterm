@@ -77,7 +77,15 @@ func (s *ConnectionStore) Save(data session.ConnectionStoreData) error {
 			// surfacing as a literal enc:v1: on other devices (issue #711).
 			conn.Password = ""
 			conn.User = ""
+			if err := encryptAuxSecrets(conn, s.passwordStore); err != nil {
+				return err
+			}
 			continue
+		}
+		// Auxiliary secrets (Redis Sentinel password, tunnel SSH password)
+		// are encrypted at rest regardless of the auth type.
+		if err := encryptAuxSecrets(conn, s.passwordStore); err != nil {
+			return err
 		}
 		// keyText connections carry the inline private-key text in KeyContent —
 		// a secret like passwords — so encrypt it before it lands in
@@ -91,6 +99,12 @@ func (s *ConnectionStore) Save(data session.ConnectionStoreData) error {
 			continue
 		}
 		if conn.AuthType != "password" {
+			// For every other auth type the password field still carries a
+			// secret: the key passphrase (key/keyText) or an API key
+			// (Elasticsearch "apikey"). Never leave it in plaintext.
+			if err := encryptSecretField(&conn.Password, s.passwordStore); err != nil {
+				return err
+			}
 			continue
 		}
 		if conn.Password == "" {
@@ -201,14 +215,34 @@ func (s *ConnectionStore) populatePasswords(data *session.ConnectionStoreData) e
 
 	for i := range data.Connections {
 		conn := &data.Connections[i]
-		if conn.AuthType == "keyText" && conn.KeyContent != "" && credentials.IsEncrypted(conn.KeyContent) && s.passwordStore != nil {
+		if conn.KeyContent != "" && credentials.IsEncrypted(conn.KeyContent) && s.passwordStore != nil {
 			dec, err := s.passwordStore.Decrypt(conn.KeyContent)
 			if err != nil {
 				return err
 			}
 			conn.KeyContent = dec
 		}
+		for _, fld := range []*string{&conn.SentinelPassword, &conn.TunnelSSHPassword} {
+			if *fld != "" && credentials.IsEncrypted(*fld) && s.passwordStore != nil {
+				dec, err := s.passwordStore.Decrypt(*fld)
+				if err != nil {
+					return err
+				}
+				*fld = dec
+			} else if *fld != "" {
+				needsSave = true // plaintext from an older version: re-save encrypted
+			}
+		}
 		if conn.AuthType != "password" {
+			if conn.Password != "" && credentials.IsEncrypted(conn.Password) && s.passwordStore != nil {
+				dec, err := s.passwordStore.Decrypt(conn.Password)
+				if err != nil {
+					return err
+				}
+				conn.Password = dec
+			} else if conn.Password != "" && conn.AuthType != "identity" {
+				needsSave = true
+			}
 			continue
 		}
 		if conn.Password == "" {
@@ -271,7 +305,12 @@ func (s *ConnectionStore) encryptForSaveLocked(data session.ConnectionStoreData)
 	copy(out.Connections, data.Connections)
 	for i := range out.Connections {
 		conn := &out.Connections[i]
-		if conn.AuthType != "password" || conn.Password == "" || credentials.IsEncrypted(conn.Password) {
+		// Best-effort: plaintext remains on error, encrypted on next Save.
+		_ = encryptAuxSecrets(conn, s.passwordStore)
+		if conn.AuthType == "keyText" {
+			_ = encryptSecretField(&conn.KeyContent, s.passwordStore)
+		}
+		if conn.AuthType == "identity" || conn.Password == "" || credentials.IsEncrypted(conn.Password) {
 			continue
 		}
 		if s.passwordStore == nil {
@@ -315,4 +354,15 @@ func (s *ConnectionStore) EnsurePassword(connID string) (string, error) {
 		s.pwdMu.Unlock()
 	}
 	return pw, nil
+}
+
+// encryptAuxSecrets encrypts the connection's auxiliary secret fields
+// (Redis Sentinel password, tunnel SSH password) in place.
+func encryptAuxSecrets(conn *session.ConnectionConfig, ps PasswordStore) error {
+	for _, fld := range []*string{&conn.SentinelPassword, &conn.TunnelSSHPassword} {
+		if err := encryptSecretField(fld, ps); err != nil {
+			return err
+		}
+	}
+	return nil
 }

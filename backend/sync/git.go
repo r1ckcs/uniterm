@@ -3,16 +3,18 @@ package sync
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	gittransport "github.com/go-git/go-git/v5/plumbing/transport"
+	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 )
 
 type GitRepo struct {
@@ -23,7 +25,7 @@ type GitRepo struct {
 type SyncDirection int
 
 const (
-	SyncNone    SyncDirection = iota
+	SyncNone SyncDirection = iota
 	SyncPush
 	SyncPull
 	SyncConflict
@@ -31,6 +33,9 @@ const (
 
 // CloneOrOpen opens the repo at repoPath, or clones it from the given URL.
 func CloneOrOpen(repoPath, repoURL, branch, username, token string) (*GitRepo, error) {
+	if err := checkRepoURL(repoURL, token); err != nil {
+		return nil, err
+	}
 	repo, err := git.PlainOpen(repoPath)
 	if err == nil {
 		return &GitRepo{repo: repo, repoPath: repoPath}, nil
@@ -126,6 +131,9 @@ func (g *GitRepo) StageAndCommit(msg string) (bool, error) {
 }
 
 func (g *GitRepo) Push(username, token string) error {
+	if err := g.checkOrigin(token); err != nil {
+		return err
+	}
 	err := g.repo.Push(&git.PushOptions{Auth: buildAuth(username, token)})
 	if errors.Is(err, git.NoErrAlreadyUpToDate) {
 		return nil
@@ -134,6 +142,9 @@ func (g *GitRepo) Push(username, token string) error {
 }
 
 func (g *GitRepo) Pull(username, token string) error {
+	if err := g.checkOrigin(token); err != nil {
+		return err
+	}
 	wt, err := g.repo.Worktree()
 	if err != nil {
 		return fmt.Errorf("worktree: %w", err)
@@ -142,6 +153,9 @@ func (g *GitRepo) Pull(username, token string) error {
 }
 
 func (g *GitRepo) Fetch(username, token string) error {
+	if err := g.checkOrigin(token); err != nil {
+		return err
+	}
 	err := g.repo.Fetch(&git.FetchOptions{Auth: buildAuth(username, token), Force: true})
 	if errors.Is(err, git.NoErrAlreadyUpToDate) {
 		return nil
@@ -281,6 +295,9 @@ func (g *GitRepo) ExtractCommitFiles(hash plumbing.Hash, destDir string) error {
 
 // PushToBranch pushes the current HEAD to the specified remote branch.
 func (g *GitRepo) PushToBranch(branch, username, token string) error {
+	if err := g.checkOrigin(token); err != nil {
+		return err
+	}
 	srcRef := plumbing.NewBranchReferenceName(branch)
 	err := g.repo.Push(&git.PushOptions{
 		Auth: buildAuth(username, token),
@@ -314,6 +331,9 @@ func (g *GitRepo) ResetToRemote(branch string) error {
 
 // TestConnection verifies the repo URL is reachable.
 func TestConnection(repoURL, username, token string) error {
+	if err := checkRepoURL(repoURL, token); err != nil {
+		return err
+	}
 	remote := git.NewRemote(nil, &config.RemoteConfig{
 		Name: "origin",
 		URLs: []string{repoURL},
@@ -330,4 +350,38 @@ func buildAuth(username, token string) gittransport.AuthMethod {
 		Username: username,
 		Password: token,
 	}
+}
+
+// checkRepoURL refuses to send a token over a cleartext transport: the git
+// PAT goes out as HTTP basic auth, so http:// or git:// would leak it to
+// anyone on the network path.
+func checkRepoURL(repoURL, token string) error {
+	if token == "" {
+		return nil
+	}
+	u, err := url.Parse(strings.TrimSpace(repoURL))
+	if err != nil {
+		return fmt.Errorf("invalid repo URL: %w", err)
+	}
+	if !strings.EqualFold(u.Scheme, "https") {
+		return fmt.Errorf("insecure repo URL: only https:// is allowed when a token is configured")
+	}
+	return nil
+}
+
+// checkOrigin applies checkRepoURL to the repo's configured origin remote.
+func (g *GitRepo) checkOrigin(token string) error {
+	if token == "" {
+		return nil
+	}
+	remote, err := g.repo.Remote("origin")
+	if err != nil {
+		return nil // no origin: the operation itself will fail
+	}
+	for _, u := range remote.Config().URLs {
+		if err := checkRepoURL(u, token); err != nil {
+			return err
+		}
+	}
+	return nil
 }

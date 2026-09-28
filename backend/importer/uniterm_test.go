@@ -98,3 +98,33 @@ func TestUnitermWrongPasswordFails(t *testing.T) {
 		t.Fatal("expected error for missing password")
 	}
 }
+
+func TestExportUnitermProtectsAllSecrets(t *testing.T) {
+	data := session.ConnectionStoreData{Connections: []session.ConnectionConfig{{
+		ID: "c1", Name: "n", Password: "pw", KeyContent: "-----BEGIN KEY-----",
+		SentinelPassword: "sp", TunnelSSHPassword: "tp",
+	}}}
+	for _, pass := range []string{"", "export-pass"} {
+		out, err := ExportUniterm(data, pass)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, secret := range []string{`"pw"`, "BEGIN KEY", `"sp"`, `"tp"`} {
+			if strings.Contains(string(out), secret) {
+				t.Errorf("pass=%q: export leaks %s", pass, secret)
+			}
+		}
+	}
+	if data.Connections[0].KeyContent == "" {
+		t.Error("export mutated the caller's store")
+	}
+	out, _ := ExportUniterm(data, "export-pass")
+	res, err := parseUniterm(out, ParseOptions{Password: "export-pass"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := res.Connections[0]
+	if c.Password != "pw" || c.KeyContent != "-----BEGIN KEY-----" || c.SentinelPassword != "sp" || c.TunnelSSHPassword != "tp" {
+		t.Errorf("round trip lost secrets: %+v", c)
+	}
+}

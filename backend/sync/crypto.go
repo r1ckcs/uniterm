@@ -100,12 +100,17 @@ func encryptConnectionsFile(src, dest string, key []byte, kc *Keychain, ps Passw
 						cm["password"] = pt
 					}
 				}
-			case "keyText":
-				// Normalize the inline private-key text to plaintext for upload,
-				// mirroring the password path so enc:v1: never escapes the file.
-				if kc, _ := cm["keyContent"].(string); kc != "" && isEncryptedField(kc) && ps != nil {
-					if pt, err := ps.Decrypt(kc); err == nil {
-						cm["keyContent"] = pt
+			}
+			// Normalize every other in-place encrypted secret (inline key,
+			// key passphrase / API key in the password field, Sentinel and
+			// tunnel passwords) to plaintext for upload, so enc:v1: — sealed
+			// with this device's local key — never escapes the file.
+			if ps != nil {
+				for _, f := range connSecretFields {
+					if v, _ := cm[f].(string); v != "" && isEncryptedField(v) {
+						if pt, err := ps.Decrypt(v); err == nil {
+							cm[f] = pt
+						}
 					}
 				}
 			}
@@ -296,15 +301,19 @@ func decryptConnectionsFile(src, dest string, key []byte, ps PasswordStore) erro
 						cm["password"] = enc
 					}
 				}
-			case "keyText":
-				if kc, ok := cm["keyContent"].(string); ok && kc != "" && !isEncryptedField(kc) {
-					if enc, err := ps.Encrypt(kc); err == nil {
-						cm["keyContent"] = enc
+			}
+			// Mirror ConnectionStore.Save: every secret field is stored
+			// encrypted under the local credential key (identity connections
+			// carry no password of their own).
+			for _, f := range connSecretFields {
+				if f == "password" && (cm["authType"] == "password" || cm["authType"] == "identity") {
+					continue // handled above / intentionally empty
+				}
+				if v, ok := cm[f].(string); ok && v != "" && !isEncryptedField(v) {
+					if enc, err := ps.Encrypt(v); err == nil {
+						cm[f] = enc
 					}
 				}
-				// The keyText passphrase (password field) is never in-place
-				// encrypted locally, so sync carries it through as-is — re-encrypting
-				// it here would corrupt real passphrases on the receiving side.
 			}
 		}
 		plaintext, _ = json.MarshalIndent(wrapper, "", "  ")
@@ -465,9 +474,11 @@ func decryptFieldsInPlace(obj map[string]interface{}, ps PasswordStore) {
 	if conns, ok := obj["connections"].([]interface{}); ok {
 		for _, c := range conns {
 			if cm, ok := c.(map[string]interface{}); ok {
-				if pw, ok := cm["password"].(string); ok && isEncryptedField(pw) {
-					if pt, err := ps.Decrypt(pw); err == nil {
-						cm["password"] = pt
+				for _, f := range connSecretFields {
+					if v, ok := cm[f].(string); ok && isEncryptedField(v) {
+						if pt, err := ps.Decrypt(v); err == nil {
+							cm[f] = pt
+						}
 					}
 				}
 			}
@@ -598,3 +609,7 @@ func WriteSaltFile(repoPath string, salt []byte) error {
 	saltPath := filepath.Join(repoPath, ".sync-salt")
 	return os.WriteFile(saltPath, []byte(hex.EncodeToString(salt)), 0600)
 }
+
+// connSecretFields are the connection JSON fields that hold secrets and are
+// encrypted in place by the local ConnectionStore.
+var connSecretFields = []string{"password", "keyContent", "sentinelPassword", "tunnelSSHPassword"}

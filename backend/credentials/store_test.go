@@ -127,3 +127,25 @@ func TestEncryptWhenLockedFails(t *testing.T) {
 		t.Fatalf("Encrypt should fail when locked")
 	}
 }
+
+func TestUnlockRejectsWrongMasterPassword(t *testing.T) {
+	dir := t.TempDir()
+	kc := newFakeKeychain()
+	s := New(dir, kc)
+	if err := s.Setup(ModeMasterPassword, "right"); err != nil {
+		t.Fatal(err)
+	}
+	s2 := New(dir, newFakeKeychain())
+	if err := s2.AutoUnlock(); err != nil {
+		t.Fatal(err)
+	}
+	if err := s2.Unlock("wrong"); !errors.Is(err, ErrWrongPassword) {
+		t.Fatalf("Unlock(wrong) = %v, want ErrWrongPassword", err)
+	}
+	if s2.Unlocked() {
+		t.Fatal("store unlocked with wrong password")
+	}
+	if err := s2.Unlock("right"); err != nil {
+		t.Fatalf("Unlock(right) = %v", err)
+	}
+}

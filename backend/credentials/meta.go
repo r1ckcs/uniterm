@@ -19,11 +19,15 @@ const (
 type Meta struct {
 	Mode string
 	Salt []byte
+	// Check is a key-check value (KeyCheckPlaintext sealed under the key),
+	// used to reject a wrong master password at Unlock time.
+	Check string
 }
 
 type metaJSON struct {
-	Mode string `json:"mode"`
-	Salt string `json:"salt,omitempty"`
+	Mode  string `json:"mode"`
+	Salt  string `json:"salt,omitempty"`
+	Check string `json:"check,omitempty"`
 }
 
 // MetaPath returns the path of credentials.meta inside dataDir.
@@ -42,7 +46,7 @@ func ReadMeta(dataDir string) (*Meta, error) {
 	if err := json.Unmarshal(data, &mj); err != nil {
 		return nil, err
 	}
-	m := &Meta{Mode: mj.Mode}
+	m := &Meta{Mode: mj.Mode, Check: mj.Check}
 	if mj.Salt != "" {
 		salt, err := base64.StdEncoding.DecodeString(mj.Salt)
 		if err != nil {
@@ -55,7 +59,7 @@ func ReadMeta(dataDir string) (*Meta, error) {
 
 // WriteMeta writes credentials.meta (base64-encodes the salt).
 func WriteMeta(dataDir string, m *Meta) error {
-	mj := metaJSON{Mode: m.Mode}
+	mj := metaJSON{Mode: m.Mode, Check: m.Check}
 	if len(m.Salt) > 0 {
 		mj.Salt = base64.StdEncoding.EncodeToString(m.Salt)
 	}
