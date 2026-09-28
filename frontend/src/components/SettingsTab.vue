@@ -862,6 +862,13 @@
         <ProxyEditDialog v-model:visible="proxyDialogVisible" :proxy="editingProxy" @saved="proxyStore.load()" />
       </div>
 
+      <!-- Keyword highlight rule sets -->
+      <div v-if="settingsStore.activeCategory === 'highlight'" class="settings-section">
+        <h2 class="section-title">{{ t('hl.title') }}</h2>
+        <p class="section-desc">{{ t('hl.desc') }}</p>
+        <HighlightRulesManager />
+      </div>
+
       <!-- 隧道 -->
       <div v-if="settingsStore.activeCategory === 'tunnels'" class="settings-section">
         <h2 class="section-title">{{ t('settings.tunnels') }}</h2>
@@ -1434,7 +1441,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch, computed, onMounted, onUnmounted } from 'vue'
-import { Settings, Monitor, MessageCircleMore, Info, RefreshCw, Pencil, Trash2, Globe, Keyboard, Plus, BookOpen, Wrench, FolderOpen, Key, Network, ArrowRightLeft, ChevronLeft, ChevronRight, Copy } from '@lucide/vue'
+import { Highlighter, Settings, Monitor, MessageCircleMore, Info, RefreshCw, Pencil, Trash2, Globe, Keyboard, Plus, BookOpen, Wrench, FolderOpen, Key, Network, ArrowRightLeft, ChevronLeft, ChevronRight, Copy } from '@lucide/vue'
 import { msg } from '../services/message'
 import { FetchModels, ChatCompletion, GetPlatform, GetAllFonts, GetDefaultSessionLogDir, OpenDirectoryDialog, OpenFileDialogFiltered, SetBackgroundImage, ClearBackgroundImage, GetBackgroundImage, RelaunchApp, ListExternalEditors, GenerateMCPToken, RevokeMCPToken, ListMCPTokens, GetMCPStatus } from '../../bindings/github.com/ys-ll/uniterm/app'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -1463,6 +1470,7 @@ import CustomThemeEditor from './CustomThemeEditor.vue'
 import DataDirDialog from './DataDirDialog.vue'
 import IdentityEditDialog from './IdentityEditDialog.vue'
 import ProxyEditDialog from './ProxyEditDialog.vue'
+import HighlightRulesManager from './HighlightRulesManager.vue'
 import TunnelEditDialog from './TunnelEditDialog.vue'
 import { useCredentialStore } from '../stores/credentialStore'
 import { useIdentityStore } from '../stores/identityStore'
@@ -2278,6 +2286,7 @@ const categories = computed(() => {
   const cats = [
     { key: 'basic', label: t('settings.basic'), icon: Settings },
     { key: 'terminal', label: t('settings.terminal'), icon: Monitor },
+    { key: 'highlight', label: t('hl.title'), icon: Highlighter },
     // Keyboard shortcuts still WORK on mobile (physical keyboards), but the
     // rebinding UI is desktop-only and hidden from the category list there.
     ...(!isMobile ? [{ key: 'keyboard', label: t('shortcut.title'), icon: Keyboard }] : []),
