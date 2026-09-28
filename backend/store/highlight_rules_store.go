@@ -23,6 +23,11 @@ type HighlightRule struct {
 	WholeWord     bool   `json:"wholeWord,omitempty"`
 	// TrimLead: regex group 1 is a consumed left guard, not colored.
 	TrimLead bool `json:"trimLead,omitempty"`
+	// LineMarker: MobaXterm-style rule matched against marker+line+marker
+	// (the marker, e.g. "¨", stands for line start/end in the pattern).
+	LineMarker string `json:"lineMarker,omitempty"`
+	// ColorGroup1: color capture group 1 instead of the whole match.
+	ColorGroup1 bool `json:"colorGroup1,omitempty"`
 	// Group is a free-text label that organizes the list.
 	Group string `json:"group,omitempty"`
 	// Enabled is a pointer so a missing field (older files) means enabled.
@@ -52,7 +57,7 @@ const (
 	maxHighlightRules        = 2000
 	maxHighlightSets         = 200
 	maxHighlightRulesPerSet  = 500
-	maxHighlightPatternBytes = 500
+	maxHighlightPatternBytes = 2000
 	maxHighlightGroupBytes   = 60
 )
 
@@ -68,6 +73,9 @@ func (r HighlightRule) validate() error {
 	}
 	if !highlightColorRe.MatchString(r.Color) {
 		return fmt.Errorf("rule %q: invalid color %q", r.ID, r.Color)
+	}
+	if len(r.LineMarker) > 8 {
+		return fmt.Errorf("rule %q: line marker too long", r.ID)
 	}
 	if len(r.Group) > maxHighlightGroupBytes {
 		return fmt.Errorf("rule %q: group label too long", r.ID)

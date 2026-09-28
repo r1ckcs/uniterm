@@ -3,10 +3,10 @@
 // directly — once seeded, the user's file is the only source.
 //
 // Order matters: earlier rules win overlaps, so specific network phrases
-// come first ("administratively down" before "down"), then the general
-// categories that used to be hard-wired (errors, warnings, IPs, paths, …).
+// come first ("administratively down" before "down"), then the MobaXterm
+// "Standard keywords + Shell syntax" profile for general output.
 import type { UserHighlightRule } from './userHighlightRules'
-import { HIGHLIGHT_RULES, CATEGORY_THEME_KEY, type HighlightCategory } from './highlightRules'
+import { mobaxtermStandardRules } from './mobaxtermStandard'
 
 // Palette chosen to stay readable on dark themes; the terminal's
 // minimumContrast setting still applies to override colors.
@@ -109,33 +109,13 @@ function networkRules(): Array<[string, UserHighlightRule[]]> {
   ]
 }
 
-/** The categories that used to be hard-wired, as ordinary rules. Colors
- * follow the theme palette ("theme:red"), and the rules keep their original
- * guard-group convention (trimLead). */
-function categoryRules(): Array<[string, UserHighlightRule[]]> {
-  const byCategory = new Map<HighlightCategory, UserHighlightRule[]>()
-  for (const rule of HIGHLIGHT_RULES) {
-    const list = byCategory.get(rule.category) ?? []
-    for (const rx of rule.regexes) {
-      list.push({
-        id: `d${++seq}`,
-        pattern: rx.source,
-        kind: 'regex',
-        color: `theme:${CATEGORY_THEME_KEY[rule.category]}`,
-        caseSensitive: !rx.flags.includes('i'),
-        trimLead: !rule.noLeadTrim,
-      })
-    }
-    byCategory.set(rule.category, list)
-  }
-  return [...byCategory.entries()].map(([cat, rules]) => [`cat.${cat}`, rules])
-}
-
 /** Build the default list with group labels in the user's language. Rule ids
  * are stable across calls, so restoring defaults yields the same ids. */
 export function buildDefaultRules(label: GroupLabel): UserHighlightRule[] {
   seq = 0
-  const groups = [...networkRules(), ...categoryRules()]
+  // Network rules first (more specific), then the MobaXterm profile, which
+  // colors general terminal output (errors, warnings, IPs, shell syntax…).
+  const groups: Array<[string, UserHighlightRule[]]> = [...networkRules(), ['mobaStandard', mobaxtermStandardRules()]]
   const out: UserHighlightRule[] = []
   for (const [slug, rules] of groups) {
     for (const r of rules) {

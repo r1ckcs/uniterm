@@ -191,6 +191,8 @@ function sanitizeImported(raw: unknown): { rules: UserHighlightRule[]; dropped: 
       caseSensitive: !!r?.caseSensitive,
       wholeWord: !!r?.wholeWord,
       trimLead: !!r?.trimLead,
+      lineMarker: typeof r?.lineMarker === 'string' && r.lineMarker.length <= 8 ? r.lineMarker || undefined : undefined,
+      colorGroup1: !!r?.colorGroup1,
       group: typeof r?.group === 'string' ? r.group.slice(0, 60) : undefined,
       enabled: r?.enabled !== false,
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { matchTextSpans, HIGHLIGHT_RULES } from './highlightRules'
+import { matchTextSpans } from './highlightRules'
 import { compileRules, validateRule } from './userHighlightRules'
 import { buildDefaultRules } from './highlightDefaults'
 
@@ -51,30 +51,40 @@ describe('default list', () => {
     expect(off).toEqual(['connected', 'down', 'up'])
   })
 
-  it('network rules come before the general categories', () => {
-    const firstCat = DEFAULTS.findIndex(r => r.group!.startsWith('cat.'))
-    expect(DEFAULTS.slice(firstCat).every(r => r.group!.startsWith('cat.'))).toBe(true)
+  it('network rules come before the MobaXterm profile', () => {
+    const firstMoba = DEFAULTS.findIndex(r => r.group === 'mobaStandard')
+    expect(firstMoba).toBeGreaterThan(0)
+    expect(DEFAULTS.slice(firstMoba).every(r => r.group === 'mobaStandard')).toBe(true)
+    expect(DEFAULTS.filter(r => r.group === 'mobaStandard')).toHaveLength(7)
+  })
+})
+
+describe('MobaXterm Standard + Shell profile', () => {
+  const moba = compileRules(DEFAULTS.filter(r => r.group === 'mobaStandard'))
+  const color = (line: string, text: string) =>
+    matchTextSpans(line, moba).spans.find(s => line.slice(s.start, s.end).trim().replace(/[:,]$/, '') === text)?.color
+
+  it('colors errors, warnings, success and info with theme colors', () => {
+    expect(color('ssh: connect to host x port 22: Connection refused', 'Connection refused')).toBe('theme:red')
+    expect(color('Permission denied (publickey).', 'Permission denied')).toBe('theme:red')
+    expect(color('warning: unable to resolve host', 'warning')).toBe('theme:yellow')
+    expect(color('Starting daemon... success', 'success')).toBe('theme:green')
+    expect(color('Last login: Mon Sep 28 17:52:21 2026', 'Last login')).toBe('theme:cyan')
   })
 
-  it('converted categories color exactly what the hard-wired rules did', () => {
-    const cats = compileRules(DEFAULTS.filter(r => r.group!.startsWith('cat.')))
-    const lines = [
-      'Last login: Mon Sep 28 17:52:21 2026 from 10.0.0.1',
-      'ERROR: connection refused (permission denied) at /var/log/app.log',
-      'warning: disk low memory, deprecated option "foo bar" => false',
-      'Starting nginx ... success; see https://example.com/docs?q=1',
-      'fe80::1a2b:3c4d  2026-09-28T17:52:21Z  {{[[ ==== ]]}}  ~/src/g++',
-    ]
-    for (const line of lines) {
-      const old = matchTextSpans(line, HIGHLIGHT_RULES).spans.map(s => [s.start, s.end])
-      const now = matchTextSpans(line, cats).spans.map(s => [s.start, s.end])
-      expect(now, line).toEqual(old)
-    }
+  it('uses the line marker for start-of-line constructs and never colors it', () => {
+    const line = '# this is a comment'
+    const [span] = matchTextSpans(line, moba).spans
+    expect(line.slice(span.start, span.end)).toBe(line)
+    expect(span.color).toBe('theme:green')
+    expect(matchTextSpans('x # not a comment', moba).spans.find(s => s.color === 'theme:green')).toBeUndefined()
   })
 
-  it('categories follow the theme palette', () => {
-    const err = DEFAULTS.find(r => r.group === 'cat.error')!
-    expect(err.color).toBe('theme:red')
+  it('colors shell syntax and network tokens', () => {
+    expect(color('echo $(whoami) done', '$(whoami)')).toBe('theme:red')
+    expect(color('interface GigabitEthernet0/1', 'interface GigabitEthernet0/1')).toBe('theme:magenta')
+    expect(color('from 10.0.0.1 now', '10.0.0.1')).toBe('theme:magenta')
+    expect(color('see https://example.com/x', 'https://example.com/x')).toBe('theme:blue')
   })
 })
 

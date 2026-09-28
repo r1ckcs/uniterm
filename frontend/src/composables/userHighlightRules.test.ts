@@ -44,7 +44,7 @@ describe('validateRule', () => {
 
   it.each([
     [{ pattern: '' }, 'empty'],
-    [{ pattern: 'x'.repeat(501) }, 'tooLong'],
+    [{ pattern: 'x'.repeat(2001) }, 'tooLong'],
     [{ color: 'red' }, 'badColor'],
     [{ color: '#fff' }, 'badColor'],
     [{ kind: 'regex' as const, pattern: '(' }, 'invalidRegex'],

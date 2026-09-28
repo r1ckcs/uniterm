@@ -21,6 +21,7 @@ func TestHighlightRulesStoreRoundTrip(t *testing.T) {
 		{ID: "r1", Pattern: "LOS", Kind: "keyword", Color: "#ff0000", WholeWord: true, Group: "OLT ZTE"},
 		{ID: "r2", Pattern: `-2[7-9]\.\d+`, Kind: "regex", Color: "#ffaa00", Enabled: &off},
 		{ID: "r3", Pattern: `(^|\s)(/\S+)`, Kind: "regex", Color: "theme:magenta", TrimLead: true},
+		{ID: "r4", Pattern: `(¨( *)?#[^¨]+)+`, Kind: "regex", Color: "theme:green", LineMarker: "¨", ColorGroup1: true},
 	}}
 	if err := s.Save(data); err != nil {
 		t.Fatal(err)
@@ -33,7 +34,8 @@ func TestHighlightRulesStoreRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Version != 2 || len(got.Rules) != 3 || got.Rules[0].Group != "OLT ZTE" || !got.Rules[2].TrimLead {
+	if got.Version != 2 || len(got.Rules) != 4 || got.Rules[0].Group != "OLT ZTE" || !got.Rules[2].TrimLead ||
+		got.Rules[3].LineMarker != "¨" || !got.Rules[3].ColorGroup1 {
 		t.Fatalf("round trip = %+v", got)
 	}
 	if r := got.Rules[1]; r.Enabled == nil || *r.Enabled {
@@ -62,7 +64,7 @@ func TestHighlightRulesValidate(t *testing.T) {
 	cases := map[string]HighlightRulesData{
 		"bad kind":   rule(func(r *HighlightRule) { r.Kind = "glob" }),
 		"empty":      rule(func(r *HighlightRule) { r.Pattern = "" }),
-		"too long":   rule(func(r *HighlightRule) { r.Pattern = strings.Repeat("a", 501) }),
+		"too long":   rule(func(r *HighlightRule) { r.Pattern = strings.Repeat("a", 2001) }),
 		"bad color":  rule(func(r *HighlightRule) { r.Color = "red" }),
 		"bad theme":  rule(func(r *HighlightRule) { r.Color = "theme:" }),
 		"long group": rule(func(r *HighlightRule) { r.Group = strings.Repeat("g", 61) }),

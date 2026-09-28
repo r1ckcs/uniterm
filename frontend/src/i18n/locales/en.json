@@ -1773,14 +1773,5 @@
   "hl.group.zteOlt": "OLT ZTE",
   "hl.group.mikrotik": "MikroTik",
   "hl.group.ciscoHuawei": "Cisco / Huawei",
-  "hl.group.cat.url": "URLs",
-  "hl.group.cat.host": "Hosts / IPs",
-  "hl.group.cat.error": "Errors",
-  "hl.group.cat.success": "Success",
-  "hl.group.cat.warning": "Warnings",
-  "hl.group.cat.info": "Info",
-  "hl.group.cat.path": "Paths",
-  "hl.group.cat.datetime": "Dates / times",
-  "hl.group.cat.string": "Quoted text",
-  "hl.group.cat.brace": "Symbols"
+  "hl.group.mobaStandard": "MobaXterm (Standard + Shell)"
 }

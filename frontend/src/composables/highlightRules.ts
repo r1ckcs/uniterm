@@ -18,6 +18,13 @@ export interface HighlightRule {
   /** Explicit CSS color (user rules); overrides the category's theme color. */
   color?: string
   noLeadTrim?: boolean
+  /** MobaXterm convention: the line is matched as marker+line+marker, so a
+   * regex can use the marker (e.g. "¨") as a line start/end token. */
+  lineMarker?: string
+  /** Color only capture group 1 when it took part in the match (else the
+   * whole match), as MobaXterm does for "guard(word)guard" patterns.
+   * Overrides the lead-trim convention. */
+  group1Only?: boolean
   regexes: RegExp[]
 }
 
@@ -126,7 +133,11 @@ export function matchTextSpans(
   // Occupied string positions prevent multi-rule overlap (first rule wins).
   const occupied = new Uint8Array(text.length)
 
-  for (const { category, color, noLeadTrim, regexes } of rules) {
+  for (const { category, color, noLeadTrim, lineMarker, group1Only, regexes } of rules) {
+    // Marker-wrapped subject; offsets are shifted back and clamped to the
+    // real line so the markers themselves are never colored.
+    const subject = lineMarker ? lineMarker + text + lineMarker : text
+    const shift = lineMarker ? lineMarker.length : 0
     if (spans.length >= maxMatches) break
     if (shouldStop?.()) return { spans, complete: stopEarly() }
     for (const regex of regexes) {
@@ -134,18 +145,28 @@ export function matchTextSpans(
       if (shouldStop?.()) return { spans, complete: stopEarly() }
       regex.lastIndex = 0
       let match: RegExpExecArray | null
-      while ((match = regex.exec(text)) !== null) {
+      while ((match = regex.exec(subject)) !== null) {
         if (spans.length >= maxMatches) break
         if (shouldStop?.()) return { spans, complete: stopEarly() }
         if (match[0].length === 0) {
           regex.lastIndex++
           continue
         }
-        // Trim the consumed left word guard (group 1) — unless the rule
-        // marks its group as part of the span (run anchor).
-        const lead = noLeadTrim ? 0 : (match[1] ? match[1].length : 0)
-        const start = match.index + lead
-        const end = match.index + match[0].length
+        let start: number
+        let end: number
+        if (group1Only) {
+          const g = groupOneRange(match)
+          start = g[0]
+          end = g[1]
+        } else {
+          // Trim the consumed left word guard (group 1) — unless the rule
+          // marks its group as part of the span (run anchor).
+          const lead = noLeadTrim ? 0 : (match[1] ? match[1].length : 0)
+          start = match.index + lead
+          end = match.index + match[0].length
+        }
+        start = Math.max(0, start - shift)
+        end = Math.min(text.length, end - shift)
         if (end <= start) continue
 
         let isOverlapping = false
@@ -167,3 +188,28 @@ export function matchTextSpans(
   // callers don't cache the truncated result as final.
   return { spans, complete: spans.length < maxMatches }
 }
+
+/** [start, end) of capture group 1 in the subject, or of the whole match
+ * when group 1 did not participate. Uses match indices (the "d" flag) when
+ * the engine provides them; otherwise locates the group text inside the
+ * match, which is exact for "guard(group)guard" shapes. */
+function groupOneRange(match: RegExpExecArray): [number, number] {
+  const g = match[1]
+  if (g === undefined || g === '') return [match.index, match.index + match[0].length]
+  const ind = (match as RegExpExecArray & { indices?: Array<[number, number] | undefined> }).indices
+  const r = ind?.[1]
+  if (r) return [r[0], r[1]]
+  const off = match[0].indexOf(g)
+  const start = match.index + Math.max(0, off)
+  return [start, start + g.length]
+}
+
+/** Whether this engine supports RegExp match indices (the "d" flag). */
+export const SUPPORTS_MATCH_INDICES: boolean = (() => {
+  try {
+    new RegExp('', 'd')
+    return true
+  } catch {
+    return false
+  }
+})()

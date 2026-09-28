@@ -10,7 +10,7 @@
 // validated before use: size cap, no lookbehind (unparseable on macOS <=12.3
 // WebKit), no empty matches, and a timing probe against adversarial input to
 // reject catastrophic backtracking.
-import type { HighlightRule } from './highlightRules'
+import { SUPPORTS_MATCH_INDICES, type HighlightRule } from './highlightRules'
 
 export type UserRuleKind = 'keyword' | 'regex'
 
@@ -26,13 +26,17 @@ export interface UserHighlightRule {
   /** Regex whose capture group 1 is a consumed left guard that must not be
    * colored (the former built-in rules use this convention). */
   trimLead?: boolean
+  /** MobaXterm-style rule: the line is matched as marker+line+marker. */
+  lineMarker?: string
+  /** Color capture group 1 (MobaXterm "guard(word)guard" patterns). */
+  colorGroup1?: boolean
   /** Free-text label used to organize the list (e.g. "OLT ZTE"). */
   group?: string
   /** Defaults to true. */
   enabled?: boolean
 }
 
-export const MAX_PATTERN_LENGTH = 500
+export const MAX_PATTERN_LENGTH = 2000
 /** A single rule exceeding this on the probe input is rejected as too slow. */
 export const MAX_PROBE_MS = 8
 
@@ -100,7 +104,7 @@ const validationCache = new Map<string, RuleValidation>()
 
 /** Validate a rule before it is saved or applied. */
 export function validateRule(rule: UserHighlightRule): RuleValidation {
-  const key = JSON.stringify([rule.pattern, rule.kind, rule.color, !!rule.caseSensitive, !!rule.wholeWord])
+  const key = JSON.stringify([rule.pattern, rule.kind, rule.color, !!rule.caseSensitive, !!rule.wholeWord, rule.lineMarker ?? ''])
   const hit = validationCache.get(key)
   if (hit) return hit
   const result = validateRuleUncached(rule)
@@ -122,21 +126,20 @@ function validateRuleUncached(rule: UserHighlightRule): RuleValidation {
   } catch (e) {
     return { ok: false, code: 'invalidRegex', detail: e instanceof Error ? e.message : String(e) }
   }
+  // MobaXterm-style rules see the line wrapped in their marker.
+  const w = (s: string) => (rule.lineMarker ? rule.lineMarker + s + rule.lineMarker : s)
   // Empty matches would highlight nothing and spin the matcher.
-  re.lastIndex = 0
-  const m = re.exec('')
-  if (m && m[0].length === 0) return { ok: false, code: 'matchesEmpty' }
   const probe = new RegExp(re.source, re.flags.replace('g', ''))
-  if (probe.test('') || probe.exec(' x ')?.[0] === '') {
+  if (probe.exec(w(''))?.[0] === '' || probe.exec(w(' x '))?.[0] === '') {
     return { ok: false, code: 'matchesEmpty' }
   }
   for (const family of PROBE_FAMILIES) {
     for (const n of PROBE_LENGTHS) {
-      if (probeTooSlow(re, family(n))) return { ok: false, code: 'tooSlow' }
+      if (probeTooSlow(re, w(family(n)))) return { ok: false, code: 'tooSlow' }
     }
   }
   for (const line of PROBE_LINES) {
-    if (probeTooSlow(re, line)) return { ok: false, code: 'tooSlow' }
+    if (probeTooSlow(re, w(line))) return { ok: false, code: 'tooSlow' }
   }
   return { ok: true }
 }
@@ -145,7 +148,8 @@ function validateRuleUncached(rule: UserHighlightRule): RuleValidation {
  * left guard (trimmed by matchTextSpans, same convention as the built-in
  * rules); the right guard is a zero-width lookahead. Throws on bad regex. */
 function buildRegex(rule: UserHighlightRule): RegExp {
-  const flags = rule.caseSensitive ? 'g' : 'gi'
+  // "d" (match indices) locates group 1 exactly for colorGroup1 rules.
+  const flags = (rule.caseSensitive ? 'g' : 'gi') + (rule.colorGroup1 && SUPPORTS_MATCH_INDICES ? 'd' : '')
   const src = ruleSource(rule)
   if (rule.wholeWord) {
     return new RegExp(`(^|[^${WORD_CHAR}])(?:${src})(?![${WORD_CHAR}])`, flags)
@@ -164,6 +168,8 @@ export function compileUserRule(rule: UserHighlightRule): HighlightRule | null {
     // Group 1 is trimmed only when it is a guard we (wholeWord) or the rule
     // (trimLead) put there; a user's own capture groups are never trimmed.
     noLeadTrim: !(rule.wholeWord || rule.trimLead),
+    lineMarker: rule.lineMarker || undefined,
+    group1Only: !!rule.colorGroup1,
     regexes: [buildRegex(rule)],
   }
 }
