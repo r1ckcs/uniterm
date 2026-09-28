@@ -1773,5 +1773,7 @@
   "hl.group.zteOlt": "OLT ZTE",
   "hl.group.mikrotik": "MikroTik",
   "hl.group.ciscoHuawei": "Cisco / Huawei",
-  "hl.group.mobaStandard": "MobaXterm（标准 + Shell）"
+  "hl.group.mobaStandard": "MobaXterm（标准 + Shell）",
+  "hl.group.ipv6": "IPv6",
+  "hl.group.juniper": "Juniper"
 }

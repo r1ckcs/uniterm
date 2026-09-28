@@ -11,6 +11,7 @@ import { mobaxtermStandardRules } from './mobaxtermStandard'
 // Palette chosen to stay readable on dark themes; the terminal's
 // minimumContrast setting still applies to override colors.
 const C = {
+  theme: (key: string) => `theme:${key}`,
   red: '#ff4d4f',
   orange: '#fa8c16',
   yellow: '#fadb14',
@@ -51,6 +52,19 @@ const off = { enabled: false }
 function networkRules(): Array<[string, UserHighlightRule[]]> {
   return [
     ['optical', opticalRules],
+    ['ipv6', [
+      // Full and ::-compressed forms, optional prefix length. Group 1 is a
+      // consumed left guard (trimLead); MAC addresses and clock times never
+      // contain "::" and have fewer than 8 groups, so they don't match.
+      re('(^|[^0-9a-z_&:.-])((?:[a-f0-9]{1,4}:){7}[a-f0-9]{1,4}|(?:[a-f0-9]{1,4}:){1,7}:|(?:[a-f0-9]{1,4}:){1,6}:[a-f0-9]{1,4}|(?:[a-f0-9]{1,4}:){1,5}(?::[a-f0-9]{1,4}){1,2}|(?:[a-f0-9]{1,4}:){1,4}(?::[a-f0-9]{1,4}){1,3}|(?:[a-f0-9]{1,4}:){1,3}(?::[a-f0-9]{1,4}){1,4}|(?:[a-f0-9]{1,4}:){1,2}(?::[a-f0-9]{1,4}){1,5}|[a-f0-9]{1,4}:(?::[a-f0-9]{1,4}){1,6}|:(?::[a-f0-9]{1,4}){1,7}|::(?=/\\d))(?:/\\d{1,3})?(?![0-9a-z_:-])', C.theme('magenta'), { trimLead: true }),
+    ]],
+    ['juniper', [
+      // Physical: ge-0/0/0, xe-1/2/3:1 (channelized), with optional unit .0
+      re('\\b(?:ge|xe|et|fe|so|gr|lt|ip|vt|ms|sp|mt|pe|pd|ps|vcp|lsi|fti)-\\d+/\\d+/\\d+(?::\\d+)?(?:\\.\\d+)?\\b', C.blue),
+      // Logical: ae0, reth0, lo0.0, irb.100, vlan.10, fxp0, em0, me0, st0.1, pp0
+      re('\\b(?:ae|reth|lo|fxp|em|me|vme|st|pp|bme|jsrv|dsc)\\d+(?:\\.\\d+)?\\b', C.blue),
+      re('\\b(?:irb|vlan)\\.\\d+\\b', C.blue),
+    ]],
     ['macVlan', [
       // MAC: aa:bb:cc:dd:ee:ff, aa-bb-…, and Cisco dotted aabb.ccdd.eeff
       re('(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}', C.teal, { wholeWord: true }),

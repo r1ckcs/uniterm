@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { matchTextSpans } from './highlightRules'
 import { compileRules, validateRule } from './userHighlightRules'
 import { buildDefaultRules } from './highlightDefaults'
+import en from '../i18n/locales/en.json'
+import ptBR from '../i18n/locales/pt-BR.json'
+import zhCN from '../i18n/locales/zh-CN.json'
 
 const RED = '#ff4d4f'
 const ORANGE = '#fa8c16'
@@ -11,8 +14,10 @@ const BLUE = '#4096ff'
 const GRAY = '#8c8c8c'
 const PURPLE = '#b37feb'
 const TEAL = '#36cfc9'
+const MAGENTA = 'theme:magenta'
 
 const SLUG: Record<string, string> = {
+  ipv6: 'ipv6', juniper: 'juniper',
   generic: 'macVlan', 'zte-olt': 'zteOlt', mikrotik: 'mikrotik', 'cisco-huawei': 'ciscoHuawei',
 }
 const DEFAULTS = buildDefaultRules(slug => slug)
@@ -44,6 +49,13 @@ describe('default list', () => {
     expect(a.map(r => r.id)).toEqual(b.map(r => r.id))
     expect(new Set(a.map(r => r.id)).size).toBe(a.length)
     expect(a.every(r => r.group!.startsWith('L:'))).toBe(true)
+  })
+
+  it('every default group has a label in en, pt-BR and zh-CN', () => {
+    const slugs = [...new Set(DEFAULTS.map(r => r.group!))]
+    for (const bundle of [en, ptBR, zhCN] as Array<Record<string, string>>) {
+      for (const slug of slugs) expect(bundle[`hl.group.${slug}`], slug).toBeTruthy()
+    }
   })
 
   it('keeps words that are noisy in every terminal disabled', () => {
@@ -196,5 +208,46 @@ describe('MAC / VLAN', () => {
     expect(colorOf('add bridge=bridge1 pvid=3026', 'pvid=3026', 'generic')).toBe(PURPLE)
     expect(colorOf('interface Vlan-interface100', 'Vlan-interface100', 'generic')).toBe(PURPLE)
     expect(colorOf('switchport access vlan 10', 'vlan 10', 'generic')).toBe(PURPLE)
+  })
+})
+
+describe('IPv6', () => {
+  it.each([
+    ['inet6 2001:db8::1/64 scope global', '2001:db8::1/64'],
+    ['fe80::1a2b:3c4d%eth0', 'fe80::1a2b:3c4d'],
+    ['addr 2001:0db8:0000:0000:0000:ff00:0042:8329 ok', '2001:0db8:0000:0000:0000:ff00:0042:8329'],
+    ['route ::/0 via fe80::1', '::/0'],
+    ['nexthop ::1', '::1'],
+  ])('colors %s', (line, addr) => {
+    expect(colorOf(line, addr, 'ipv6')).toBe(MAGENTA)
+  })
+
+  it.each([
+    'mac 48:a9:8a:12:34:56 dynamic',
+    'at 17:52:21 today',
+    'ratio 1:2:3',
+    'std::vector<int>',
+    'x :: y',
+  ])('leaves %s alone', (line) => {
+    expect(paint(line, 'ipv6')).toEqual([])
+  })
+})
+
+describe('Juniper', () => {
+  it('colors physical interfaces with units and channels', () => {
+    const line = 'ge-0/0/0.0              up    up   inet     10.0.0.1/30'
+    expect(colorOf(line, 'ge-0/0/0.0', 'juniper')).toBe(BLUE)
+    expect(colorOf('xe-1/2/3:1   up    down', 'xe-1/2/3:1', 'juniper')).toBe(BLUE)
+    expect(colorOf('et-0/0/49 up up', 'et-0/0/49', 'juniper')).toBe(BLUE)
+  })
+
+  it('colors logical interfaces', () => {
+    for (const ifname of ['ae0', 'ae12.100', 'lo0.0', 'irb.100', 'vlan.10', 'fxp0', 'em0', 'reth1', 'st0.1']) {
+      expect(colorOf(`${ifname}   up    up`, ifname, 'juniper'), ifname).toBe(BLUE)
+    }
+  })
+
+  it('does not match inside words', () => {
+    expect(paint('hello0 system1 fe-male stem0', 'juniper')).toEqual([])
   })
 })
