@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 const highlightRulesFileName = "highlightRules.json"
@@ -37,6 +38,9 @@ type HighlightRuleSet struct {
 type HighlightRulesData struct {
 	Version int                `json:"version"`
 	Sets    []HighlightRuleSet `json:"sets"`
+	// PresetGlobals overrides whether a bundled preset (id "preset:…") is
+	// global; presets without an entry use their built-in default.
+	PresetGlobals map[string]bool `json:"presetGlobals,omitempty"`
 }
 
 const (
@@ -52,8 +56,19 @@ func (d HighlightRulesData) Validate() error {
 	if len(d.Sets) > maxHighlightSets {
 		return fmt.Errorf("too many highlight rule sets (%d > %d)", len(d.Sets), maxHighlightSets)
 	}
+	if len(d.PresetGlobals) > maxHighlightSets {
+		return fmt.Errorf("too many preset entries")
+	}
+	for id := range d.PresetGlobals {
+		if !strings.HasPrefix(id, "preset:") || len(id) > 64 {
+			return fmt.Errorf("invalid preset id %q", id)
+		}
+	}
 	seen := map[string]bool{}
 	for _, s := range d.Sets {
+		if strings.HasPrefix(s.ID, "preset:") {
+			return fmt.Errorf("set id %q uses the reserved preset prefix", s.ID)
+		}
 		if s.ID == "" {
 			return fmt.Errorf("highlight rule set without id")
 		}

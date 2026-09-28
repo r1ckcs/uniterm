@@ -56,11 +56,16 @@ func TestHighlightRulesValidate(t *testing.T) {
 		"bad color":   rule(func(r *HighlightRule) { r.Color = "red" }),
 		"no set id":   {Sets: []HighlightRuleSet{{Name: "x"}}},
 		"dup set ids": {Sets: []HighlightRuleSet{{ID: "a"}, {ID: "a"}}},
+		"reserved id": {Sets: []HighlightRuleSet{{ID: "preset:x"}}},
+		"bad preset":  {PresetGlobals: map[string]bool{"zte": true}},
 	}
 	for name, d := range cases {
 		if err := d.Validate(); err == nil {
 			t.Errorf("%s: expected error", name)
 		}
+	}
+	if err := (HighlightRulesData{PresetGlobals: map[string]bool{"preset:zte-olt": true}}).Validate(); err != nil {
+		t.Errorf("valid preset override rejected: %v", err)
 	}
 	if err := rule(func(*HighlightRule) {}).Validate(); err != nil {
 		t.Errorf("valid data rejected: %v", err)
