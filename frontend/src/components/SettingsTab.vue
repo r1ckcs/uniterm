@@ -866,7 +866,7 @@
       <div v-if="settingsStore.activeCategory === 'highlight'" class="settings-section">
         <h2 class="section-title">{{ t('hl.title') }}</h2>
         <p class="section-desc">{{ t('hl.desc') }}</p>
-        <HighlightRulesManager />
+        <HighlightRulesEditor />
       </div>
 
       <!-- 隧道 -->
@@ -1470,7 +1470,7 @@ import CustomThemeEditor from './CustomThemeEditor.vue'
 import DataDirDialog from './DataDirDialog.vue'
 import IdentityEditDialog from './IdentityEditDialog.vue'
 import ProxyEditDialog from './ProxyEditDialog.vue'
-import HighlightRulesManager from './HighlightRulesManager.vue'
+import HighlightRulesEditor from './HighlightRulesEditor.vue'
 import TunnelEditDialog from './TunnelEditDialog.vue'
 import { useCredentialStore } from '../stores/credentialStore'
 import { useIdentityStore } from '../stores/identityStore'

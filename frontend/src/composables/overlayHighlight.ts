@@ -16,52 +16,31 @@
 // max-wait escape so sustained output still gets highlighted. Matching is per
 // physical line.
 import type { Terminal as XTerm, IBufferCell, IBufferLine, ICellColorSpan, IDisposable } from '@xterm/xterm'
-import { matchTextSpans, HIGHLIGHT_RULES, type HighlightCategory, type HighlightRule } from './highlightRules'
-import { activeRuleSets, compileRuleSets, type HighlightRuleSet } from './userHighlightRules'
+import { matchTextSpans, CATEGORY_THEME_KEY, type HighlightCategory, type HighlightRule } from './highlightRules'
 import { useSettingsStore } from '../stores/settingsStore'
 
-// ── Rule sources ────────────────────────────────────────────────────────
-// User rule sets come from a provider installed by the app (the highlight
-// store); per-terminal session set ids come from the attach options. Both
-// are read on every refresh, so edits apply live.
-let ruleSetsProvider: () => HighlightRuleSet[] = () => []
+// ── Rule source ─────────────────────────────────────────────────────────
+// The single rule list (highlightRules.json) is compiled by the highlight
+// store and handed over through a provider, read on every refresh so edits
+// apply live. The provider must return the same array instance while the
+// rules are unchanged (identity marks a change).
+let rulesProvider: () => HighlightRule[] = () => []
 
-/** Install the source of user-defined highlight rule sets. */
-export function setHighlightRuleSetsProvider(fn: () => HighlightRuleSet[]): void {
-  ruleSetsProvider = fn
+/** Install the source of compiled highlight rules. */
+export function setHighlightRulesProvider(fn: () => HighlightRule[]): void {
+  rulesProvider = fn
 }
 
-export interface OverlayHighlightOptions {
-  /** Rule set ids the terminal's connection opted into (per-session sets). */
-  getSessionSetIds?: () => readonly string[]
-}
+const NO_RULES: HighlightRule[] = []
 
-function builtinEnabled(): boolean {
-  return useSettingsStore().settings.terminal.highlightEnabled ?? true
-}
-
-// Combined rule list memo: same inputs → same array instance, so a changed
-// identity means the rules changed and cached/applied spans are stale.
-let lastUserRules: HighlightRule[] | null = null
-let lastBuiltin = true
-let lastCombined: HighlightRule[] = HIGHLIGHT_RULES
-
-/** Rules for one terminal: user rules first (they win overlaps), then the
- * built-in categories when the global highlight switch is on. */
-export function resolveTerminalRules(sessionSetIds: readonly string[] = []): HighlightRule[] {
-  let sets: HighlightRuleSet[] = []
+/** Rules in force: the compiled list, or none when highlighting is off. */
+export function resolveTerminalRules(): HighlightRule[] {
+  if (!(useSettingsStore().settings.terminal.highlightEnabled ?? true)) return NO_RULES
   try {
-    sets = ruleSetsProvider()
+    return rulesProvider()
   } catch {
-    sets = []
+    return NO_RULES
   }
-  const user = compileRuleSets(activeRuleSets(sets, sessionSetIds))
-  const builtin = builtinEnabled()
-  if (user === lastUserRules && builtin === lastBuiltin) return lastCombined
-  lastUserRules = user
-  lastBuiltin = builtin
-  lastCombined = builtin ? (user.length ? [...user, ...HIGHLIGHT_RULES] : HIGHLIGHT_RULES) : user
-  return lastCombined
 }
 
 /** Split [startCol, endCol) into runs of cells the program left in the
@@ -88,32 +67,33 @@ function defaultFgRuns(
   return runs
 }
 
-// Category → xterm theme key, mirroring the legacy inject renderer's SGR
-// choices (30-37/90-97 follow the theme palette; we read the palette here).
-const CATEGORY_THEME_KEY: Record<HighlightCategory, string> = {
-  url: 'blue',
-  host: 'magenta',
-  path: 'magenta',
-  datetime: 'brightBlue',
-  string: 'yellow',
-  success: 'green',
-  error: 'red',
-  warning: 'yellow',
-  info: 'cyan',
-  brace: 'brightMagenta',
-}
-
 // xterm.js default palette values, used when the active theme doesn't
 // define the expected key.
 const FALLBACK_COLORS: Record<string, string> = {
+  black: '#000000',
   red: '#cd3131',
   green: '#0dbc79',
   yellow: '#e5e510',
   blue: '#2472c8',
   magenta: '#bc3fbc',
   cyan: '#11a8cd',
+  white: '#e5e5e5',
+  brightBlack: '#666666',
+  brightRed: '#f14c4c',
+  brightGreen: '#23d18b',
+  brightYellow: '#f5f543',
   brightBlue: '#2f9ded',
   brightMagenta: '#d33682',
+  brightCyan: '#29b8db',
+  brightWhite: '#e5e5e5',
+}
+
+/** Palette keys usable as "theme:<key>" rule colors. */
+export const THEME_COLOR_KEYS = Object.keys(FALLBACK_COLORS)
+
+/** Default hex for a palette key (UI swatches outside a terminal). */
+export function themeColorFallback(key: string): string {
+  return FALLBACK_COLORS[key] ?? '#cccccc'
 }
 
 /** Resolve the highlight color for every category from the terminal's
@@ -125,6 +105,21 @@ export function resolveHighlightColors(theme: unknown): Record<HighlightCategory
     colors[category] = t?.[CATEGORY_THEME_KEY[category]] ?? FALLBACK_COLORS[CATEGORY_THEME_KEY[category]] ?? '#cccccc'
   }
   return colors
+}
+
+/** Resolve a span color: "theme:<key>" reads the terminal palette (with
+ * xterm's defaults as fallback); explicit hex colors pass through. */
+export function resolveSpanColor(
+  color: string | undefined,
+  category: HighlightCategory,
+  theme: unknown,
+  categoryColors: Record<HighlightCategory, string>,
+): string {
+  if (!color) return categoryColors[category]
+  if (!color.startsWith('theme:')) return color
+  const key = color.slice(6)
+  const t = theme as Record<string, string | undefined> | undefined
+  return t?.[key] ?? FALLBACK_COLORS[key] ?? '#cccccc'
 }
 
 /** Per-column highlight color for one buffer line (undefined = no highlight).
@@ -146,7 +141,7 @@ export function getLineHighlightColors(
   const rules = (term && attached.get(term)?.currentRules()) || resolveTerminalRules()
   const { spans } = matchTextSpans(lineText, rules)
   for (const span of spans) {
-    const color = span.color ?? colors[span.category]
+    const color = resolveSpanColor(span.color, span.category, theme, colors)
     const cellStartCol = cellMap ? (cellMap[span.start] ?? span.start) : span.start
     const cellEndCol = cellMap ? (cellMap[span.end] ?? span.end) : span.end
     for (const [a, b] of defaultFgRuns(line, cellStartCol, cellEndCol)) {
@@ -238,13 +233,11 @@ export class OverlayHighlighter {
   /** Active buffer kind at the last refresh; a switch means every override
    * and cached span is stale (full-screen app took over / released). */
   private lastBufferType: string | null = null
-  private options: OverlayHighlightOptions
   /** Rule list used by the last refresh (identity-compared). */
-  private rules: HighlightRule[] = HIGHLIGHT_RULES
+  private rules: HighlightRule[] = NO_RULES
 
-  constructor(term: XTerm, options: OverlayHighlightOptions = {}) {
+  constructor(term: XTerm) {
     this.term = term
-    this.options = options
 
     this.disposables.push(
       this.term.onWriteParsed(() => this.triggerWriteRefresh()),
@@ -279,13 +272,7 @@ export class OverlayHighlighter {
 
   /** Rules currently in force for this terminal. */
   public currentRules(): HighlightRule[] {
-    let ids: readonly string[] = []
-    try {
-      ids = this.options.getSessionSetIds?.() ?? []
-    } catch {
-      ids = []
-    }
-    return resolveTerminalRules(ids)
+    return resolveTerminalRules()
   }
 
   private isEnabled(): boolean {
@@ -606,7 +593,7 @@ export class OverlayHighlighter {
           ? spans.map((s): ICellColorSpan => ({
               col: s.cellStartCol,
               width: s.cellWidth,
-              color: s.color ?? colors[s.category],
+              color: resolveSpanColor(s.color, s.category, this.term.options.theme, colors),
             }))
           : null,
       )
@@ -632,9 +619,9 @@ export function refreshAllOverlayHighlighters(): void {
 
 /** Attach an overlay highlighter to a terminal (idempotent per terminal).
  * Applies to every terminal type; the "文本高亮" setting is the only gate. */
-export function attachOverlayHighlighter(term: XTerm, options: OverlayHighlightOptions = {}): void {
+export function attachOverlayHighlighter(term: XTerm): void {
   if (attached.has(term)) return
-  const highlighter = new OverlayHighlighter(term, options)
+  const highlighter = new OverlayHighlighter(term)
   attached.set(term, highlighter)
   live.add(highlighter)
   highlighter.attach()

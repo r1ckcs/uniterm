@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 )
 
 const highlightRulesFileName = "highlightRules.json"
@@ -22,12 +21,16 @@ type HighlightRule struct {
 	Color         string `json:"color"`
 	CaseSensitive bool   `json:"caseSensitive,omitempty"`
 	WholeWord     bool   `json:"wholeWord,omitempty"`
+	// TrimLead: regex group 1 is a consumed left guard, not colored.
+	TrimLead bool `json:"trimLead,omitempty"`
+	// Group is a free-text label that organizes the list.
+	Group string `json:"group,omitempty"`
 	// Enabled is a pointer so a missing field (older files) means enabled.
 	Enabled *bool `json:"enabled,omitempty"`
 }
 
-// HighlightRuleSet groups rules; Global sets apply to every terminal, others
-// only to connections that list the set id in highlightSets.
+// HighlightRuleSet is the version-1 layout (named sets, global or per
+// connection). It is only read so the frontend can migrate old files.
 type HighlightRuleSet struct {
 	ID     string          `json:"id"`
 	Name   string          `json:"name"`
@@ -35,59 +38,63 @@ type HighlightRuleSet struct {
 	Rules  []HighlightRule `json:"rules"`
 }
 
+// HighlightRulesData is highlightRules.json: one ordered rule list applied
+// to every terminal (earlier rules win overlaps). Rules is nil until the
+// frontend seeds the defaults on first run.
 type HighlightRulesData struct {
-	Version int                `json:"version"`
-	Sets    []HighlightRuleSet `json:"sets"`
-	// PresetGlobals overrides whether a bundled preset (id "preset:…") is
-	// global; presets without an entry use their built-in default.
-	PresetGlobals map[string]bool `json:"presetGlobals,omitempty"`
+	Version int             `json:"version"`
+	Rules   []HighlightRule `json:"rules"`
+	// Sets is the legacy (version 1) layout, kept for migration only.
+	Sets []HighlightRuleSet `json:"sets,omitempty"`
 }
 
 const (
+	maxHighlightRules        = 2000
 	maxHighlightSets         = 200
 	maxHighlightRulesPerSet  = 500
 	maxHighlightPatternBytes = 500
+	maxHighlightGroupBytes   = 60
 )
 
-var highlightColorRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+// "#rrggbb", or "theme:<palette key>" to follow the terminal theme.
+var highlightColorRe = regexp.MustCompile(`^(?:#[0-9a-fA-F]{6}|theme:[A-Za-z]{2,20})$`)
+
+func (r HighlightRule) validate() error {
+	if r.Kind != "keyword" && r.Kind != "regex" {
+		return fmt.Errorf("rule %q: invalid kind %q", r.ID, r.Kind)
+	}
+	if r.Pattern == "" || len(r.Pattern) > maxHighlightPatternBytes {
+		return fmt.Errorf("rule %q: pattern must be 1-%d bytes", r.ID, maxHighlightPatternBytes)
+	}
+	if !highlightColorRe.MatchString(r.Color) {
+		return fmt.Errorf("rule %q: invalid color %q", r.ID, r.Color)
+	}
+	if len(r.Group) > maxHighlightGroupBytes {
+		return fmt.Errorf("rule %q: group label too long", r.ID)
+	}
+	return nil
+}
 
 // Validate enforces the shape invariants the frontend relies on.
 func (d HighlightRulesData) Validate() error {
+	if len(d.Rules) > maxHighlightRules {
+		return fmt.Errorf("too many highlight rules (%d > %d)", len(d.Rules), maxHighlightRules)
+	}
+	for _, r := range d.Rules {
+		if err := r.validate(); err != nil {
+			return err
+		}
+	}
 	if len(d.Sets) > maxHighlightSets {
-		return fmt.Errorf("too many highlight rule sets (%d > %d)", len(d.Sets), maxHighlightSets)
+		return fmt.Errorf("too many legacy highlight rule sets")
 	}
-	if len(d.PresetGlobals) > maxHighlightSets {
-		return fmt.Errorf("too many preset entries")
-	}
-	for id := range d.PresetGlobals {
-		if !strings.HasPrefix(id, "preset:") || len(id) > 64 {
-			return fmt.Errorf("invalid preset id %q", id)
-		}
-	}
-	seen := map[string]bool{}
 	for _, s := range d.Sets {
-		if strings.HasPrefix(s.ID, "preset:") {
-			return fmt.Errorf("set id %q uses the reserved preset prefix", s.ID)
-		}
-		if s.ID == "" {
-			return fmt.Errorf("highlight rule set without id")
-		}
-		if seen[s.ID] {
-			return fmt.Errorf("duplicate highlight rule set id %q", s.ID)
-		}
-		seen[s.ID] = true
 		if len(s.Rules) > maxHighlightRulesPerSet {
 			return fmt.Errorf("set %q has too many rules", s.Name)
 		}
 		for _, r := range s.Rules {
-			if r.Kind != "keyword" && r.Kind != "regex" {
-				return fmt.Errorf("rule %q: invalid kind %q", r.ID, r.Kind)
-			}
-			if r.Pattern == "" || len(r.Pattern) > maxHighlightPatternBytes {
-				return fmt.Errorf("rule %q: pattern must be 1-%d bytes", r.ID, maxHighlightPatternBytes)
-			}
-			if !highlightColorRe.MatchString(r.Color) {
-				return fmt.Errorf("rule %q: invalid color %q", r.ID, r.Color)
+			if err := r.validate(); err != nil {
+				return err
 			}
 		}
 	}
@@ -111,10 +118,7 @@ func (s *HighlightRulesStore) Save(data HighlightRulesData) error {
 		return err
 	}
 	if data.Version == 0 {
-		data.Version = 1
-	}
-	if data.Sets == nil {
-		data.Sets = []HighlightRuleSet{}
+		data.Version = 2
 	}
 	bytes, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
@@ -127,19 +131,14 @@ func (s *HighlightRulesStore) Load() (HighlightRulesData, error) {
 	bytes, err := os.ReadFile(s.filePath())
 	if err != nil {
 		if os.IsNotExist(err) {
-			return HighlightRulesData{Version: 1, Sets: []HighlightRuleSet{}}, nil
+			// Rules stays nil: the frontend seeds the default list.
+			return HighlightRulesData{}, nil
 		}
 		return HighlightRulesData{}, err
 	}
 	var data HighlightRulesData
 	if err := json.Unmarshal(bytes, &data); err != nil {
 		return HighlightRulesData{}, err
-	}
-	if data.Version == 0 {
-		data.Version = 1
-	}
-	if data.Sets == nil {
-		data.Sets = []HighlightRuleSet{}
 	}
 	return data, nil
 }

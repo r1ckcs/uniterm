@@ -21,6 +21,21 @@ export interface HighlightRule {
   regexes: RegExp[]
 }
 
+// Category → xterm theme palette key. Default rules for these categories
+// use "theme:<key>" colors so they follow the active theme.
+export const CATEGORY_THEME_KEY: Record<HighlightCategory, string> = {
+  url: 'blue',
+  host: 'magenta',
+  path: 'magenta',
+  datetime: 'brightBlue',
+  string: 'yellow',
+  success: 'green',
+  error: 'red',
+  warning: 'yellow',
+  info: 'cyan',
+  brace: 'brightMagenta',
+}
+
 export const HIGHLIGHT_RULES: HighlightRule[] = [
   { category: 'url',     regexes: [
     /https?:\/\/[A-Za-z0-9_.&?=%~#{}()@+-]+(?::?[A-Za-z0-9_./&?=%~#{}()@+-]+)?/gi,

@@ -1,15 +1,15 @@
-// User-defined keyword highlight rules: rule sets the user (or a bundled
-// network preset) defines, compiled into the same HighlightRule shape the
-// built-in categories use, but carrying an explicit color.
+// Keyword highlight rules: one ordered list (highlightRules.json) that holds
+// everything — the network rules and the former built-in categories alike —
+// applied to every terminal. Earlier rules win overlaps.
 //
-// A rule set applies to a terminal when it is enabled globally, or when the
-// terminal's connection opts into it (per-session sets). User rules run
-// before the built-in categories, so on overlap the user's color wins.
+// Colors are either fixed ("#rrggbb") or follow the terminal theme palette
+// ("theme:red", "theme:brightBlue", …) so defaults stay legible on light and
+// dark themes.
 //
 // User regexes run on the UI thread for every visible line, so they are
 // validated before use: size cap, no lookbehind (unparseable on macOS <=12.3
-// WebKit, like the built-ins), no empty matches, and a timing probe against
-// adversarial input to reject catastrophic backtracking.
+// WebKit), no empty matches, and a timing probe against adversarial input to
+// reject catastrophic backtracking.
 import type { HighlightRule } from './highlightRules'
 
 export type UserRuleKind = 'keyword' | 'regex'
@@ -18,24 +18,18 @@ export interface UserHighlightRule {
   id: string
   pattern: string
   kind: UserRuleKind
-  /** CSS hex color, #rrggbb. */
+  /** "#rrggbb", or "theme:<palette key>" to follow the terminal theme. */
   color: string
   caseSensitive?: boolean
   /** Match only when not glued to letters/digits/underscore on either side. */
   wholeWord?: boolean
+  /** Regex whose capture group 1 is a consumed left guard that must not be
+   * colored (the former built-in rules use this convention). */
+  trimLead?: boolean
+  /** Free-text label used to organize the list (e.g. "OLT ZTE"). */
+  group?: string
   /** Defaults to true. */
   enabled?: boolean
-}
-
-export interface HighlightRuleSet {
-  id: string
-  name: string
-  /** Applies to every terminal when true; otherwise only to connections
-   * that list this set's id. */
-  global: boolean
-  /** Bundled preset: read-only in the UI (duplicate to customize). */
-  builtin?: boolean
-  rules: UserHighlightRule[]
 }
 
 export const MAX_PATTERN_LENGTH = 500
@@ -57,7 +51,7 @@ export interface RuleValidation {
   detail?: string
 }
 
-const COLOR_RE = /^#[0-9a-fA-F]{6}$/
+const COLOR_RE = /^(?:#[0-9a-fA-F]{6}|theme:[A-Za-z]{2,20})$/
 const WORD_CHAR = 'A-Za-z0-9_'
 
 function escapeRegExp(s: string): string {
@@ -100,8 +94,22 @@ function probeTooSlow(re: RegExp, input: string): boolean {
   return performance.now() - t0 > MAX_PROBE_MS
 }
 
+// Validation (with its timing probe) is memoized: the editor re-validates the
+// whole list on every keystroke.
+const validationCache = new Map<string, RuleValidation>()
+
 /** Validate a rule before it is saved or applied. */
 export function validateRule(rule: UserHighlightRule): RuleValidation {
+  const key = JSON.stringify([rule.pattern, rule.kind, rule.color, !!rule.caseSensitive, !!rule.wholeWord])
+  const hit = validationCache.get(key)
+  if (hit) return hit
+  const result = validateRuleUncached(rule)
+  if (validationCache.size > 2000) validationCache.clear()
+  validationCache.set(key, result)
+  return result
+}
+
+function validateRuleUncached(rule: UserHighlightRule): RuleValidation {
   if (!rule.pattern) return { ok: false, code: 'empty' }
   if (rule.pattern.length > MAX_PATTERN_LENGTH) return { ok: false, code: 'tooLong' }
   if (!COLOR_RE.test(rule.color)) return { ok: false, code: 'badColor' }
@@ -153,37 +161,29 @@ export function compileUserRule(rule: UserHighlightRule): HighlightRule | null {
     // Category is only consulted when no explicit color is set.
     category: 'info',
     color: rule.color,
-    // Without the word guard there is no consumed group 1; the user's own
-    // capture groups must not be mistaken for one.
-    noLeadTrim: !rule.wholeWord,
+    // Group 1 is trimmed only when it is a guard we (wholeWord) or the rule
+    // (trimLead) put there; a user's own capture groups are never trimmed.
+    noLeadTrim: !(rule.wholeWord || rule.trimLead),
     regexes: [buildRegex(rule)],
   }
 }
 
-/** Sets that apply to a terminal: global ones plus the connection's picks,
- * in the order the sets are defined. */
-export function activeRuleSets(sets: HighlightRuleSet[], sessionSetIds: readonly string[] = []): HighlightRuleSet[] {
-  const picked = new Set(sessionSetIds)
-  return sets.filter(s => s.global || picked.has(s.id))
-}
-
 // Compilation (including the timing probe) is too costly to redo on every
-// refresh; memoize by the sets' content.
+// refresh; memoize by content.
 const compileCache = new Map<string, HighlightRule[]>()
-const COMPILE_CACHE_MAX = 32
+const COMPILE_CACHE_MAX = 16
 
-/** Compile the rules of the active sets, memoized: the same content returns
- * the same array instance, so callers can detect rule changes by identity. */
-export function compileRuleSets(sets: HighlightRuleSet[]): HighlightRule[] {
-  const key = JSON.stringify(sets.map(s => s.rules))
+/** Compile a rule list in order, skipping disabled/invalid rules. Memoized:
+ * the same content returns the same array instance, so callers can detect
+ * rule changes by identity. */
+export function compileRules(rules: UserHighlightRule[]): HighlightRule[] {
+  const key = JSON.stringify(rules)
   const hit = compileCache.get(key)
   if (hit) return hit
   const out: HighlightRule[] = []
-  for (const set of sets) {
-    for (const rule of set.rules) {
-      const compiled = compileUserRule(rule)
-      if (compiled) out.push(compiled)
-    }
+  for (const rule of rules) {
+    const compiled = compileUserRule(rule)
+    if (compiled) out.push(compiled)
   }
   compileCache.set(key, out)
   if (compileCache.size > COMPILE_CACHE_MAX) {

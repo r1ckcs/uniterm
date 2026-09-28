@@ -4,16 +4,15 @@ import { matchTextSpans } from './highlightRules'
 import {
   validateRule,
   compileUserRule,
-  compileRuleSets,
-  activeRuleSets,
+  compileRules,
   type UserHighlightRule,
-  type HighlightRuleSet,
 } from './userHighlightRules'
 import {
   getLineHighlightColors,
   resolveTerminalRules,
-  setHighlightRuleSetsProvider,
+  setHighlightRulesProvider,
 } from './overlayHighlight'
+import { migrateLegacy } from '../stores/highlightRuleStore'
 
 // Settings store stand-in (the real one needs a browser `window`).
 const settings = { terminal: { highlightEnabled: true } }
@@ -29,12 +28,6 @@ const rule = (over: Partial<UserHighlightRule>): UserHighlightRule => ({
   ...over,
 })
 
-const set = (id: string, global: boolean, rules: UserHighlightRule[]): HighlightRuleSet => ({
-  id,
-  name: id,
-  global,
-  rules,
-})
 
 function spansOf(text: string, r: UserHighlightRule) {
   const compiled = compileUserRule(r)
@@ -107,21 +100,41 @@ function spans2(text: string, r: UserHighlightRule) {
   return spansOf(text, r)
 }
 
-describe('rule sets', () => {
-  const g = set('global', true, [rule({ id: 'a', pattern: 'error' })])
-  const olt = set('olt', false, [rule({ id: 'b', pattern: 'DyingGasp' })])
-
-  it('applies global sets everywhere and session sets only when picked', () => {
-    expect(activeRuleSets([g, olt]).map(s => s.id)).toEqual(['global'])
-    expect(activeRuleSets([g, olt], ['olt']).map(s => s.id)).toEqual(['global', 'olt'])
+describe('compileRules', () => {
+  it('memoizes by content and keeps order', () => {
+    const list = [rule({ id: 'a', pattern: 'error' }), rule({ id: 'b', pattern: 'DyingGasp' })]
+    const a = compileRules(list)
+    expect(compileRules(structuredClone(list))).toBe(a)
+    expect(compileRules([list[1], list[0]])).not.toBe(a)
+    expect(a).toHaveLength(2)
   })
 
-  it('memoizes compilation by content', () => {
-    const a = compileRuleSets([g, olt])
-    const b = compileRuleSets([structuredClone(g), structuredClone(olt)])
-    expect(b).toBe(a)
-    const c = compileRuleSets([g])
-    expect(c).not.toBe(a)
+  it('honors trimLead for rules with a guard group', () => {
+    const r = compileUserRule(rule({ kind: 'regex', pattern: '(^|\\s)(/\\S+)', trimLead: true }))!
+    const text = 'see /etc/hosts'
+    const [span] = matchTextSpans(text, [r]).spans
+    expect(text.slice(span.start, span.end)).toBe('/etc/hosts')
+  })
+
+  it('accepts theme colors', () => {
+    expect(validateRule(rule({ color: 'theme:red' })).ok).toBe(true)
+    expect(validateRule(rule({ color: 'theme:' })).code).toBe('badColor')
+  })
+})
+
+describe('legacy migration', () => {
+  it('puts old set rules first, disabling per-connection ones', () => {
+    const out = migrateLegacy({
+      version: 1,
+      sets: [
+        { name: 'Global', global: true, rules: [rule({ id: 'g', pattern: 'foo' })] },
+        { name: 'OLT', global: false, rules: [rule({ id: 'o', pattern: 'bar' })] },
+      ],
+    })
+    expect(out[0]).toMatchObject({ pattern: 'foo', group: 'Global' })
+    expect(out[0].enabled).not.toBe(false)
+    expect(out[1]).toMatchObject({ pattern: 'bar', group: 'OLT', enabled: false })
+    expect(out.length).toBeGreaterThan(50) // defaults appended
   })
 })
 
@@ -142,32 +155,27 @@ function fakeLine(text: string, coloredCols: number[] = []): IBufferLine {
 describe('terminal rule resolution', () => {
   beforeEach(() => {
     settings.terminal.highlightEnabled = true
-    setHighlightRuleSetsProvider(() => [])
+    setHighlightRulesProvider(() => [])
   })
 
-  it('puts user rules before built-ins so they win overlaps', () => {
-    setHighlightRuleSetsProvider(() => [set('g', true, [rule({ pattern: 'error', color: '#123456' })])])
-    const colors = getLineHighlightColors(fakeLine('fatal error here'), 16, {})
-    expect(colors[6]).toBe('#123456') // "error" → user color, not theme red
-  })
-
-  it('keeps user rules when built-in categories are switched off', () => {
+  it('returns the compiled list, or nothing when highlighting is off', () => {
+    const compiled = compileRules([rule({})])
+    setHighlightRulesProvider(() => compiled)
+    expect(resolveTerminalRules()).toBe(compiled)
     settings.terminal.highlightEnabled = false
     expect(resolveTerminalRules()).toEqual([])
-    setHighlightRuleSetsProvider(() => [set('g', true, [rule({})])])
-    expect(resolveTerminalRules()).toHaveLength(1)
   })
 
-  it('only applies session sets to terminals that opted in', () => {
-    settings.terminal.highlightEnabled = false
-    setHighlightRuleSetsProvider(() => [set('olt', false, [rule({ pattern: 'LOS' })])])
-    expect(resolveTerminalRules()).toHaveLength(0)
-    expect(resolveTerminalRules(['olt'])).toHaveLength(1)
+  it('resolves theme colors from the terminal palette', () => {
+    const compiled = compileRules([rule({ pattern: 'LOS', color: 'theme:red' })])
+    setHighlightRulesProvider(() => compiled)
+    expect(getLineHighlightColors(fakeLine('LOS'), 3, { red: '#aa0000' })[0]).toBe('#aa0000')
+    expect(getLineHighlightColors(fakeLine('LOS'), 3, {})[0]).toBe('#cd3131') // xterm default
   })
 
   it('does not paint over text the remote side already colored', () => {
-    setHighlightRuleSetsProvider(() => [set('g', true, [rule({ pattern: 'LOS', color: '#ff0000' })])])
-    settings.terminal.highlightEnabled = false
+    const compiled = compileRules([rule({ pattern: 'LOS', color: '#ff0000' })])
+    setHighlightRulesProvider(() => compiled)
     // "LOS" at cols 4-6; the remote colored col 5.
     const colors = getLineHighlightColors(fakeLine('onu LOS', [5]), 7, {})
     expect(colors.slice(4, 7)).toEqual(['#ff0000', undefined, '#ff0000'])

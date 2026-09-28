@@ -12,18 +12,16 @@ func TestHighlightRulesStoreRoundTrip(t *testing.T) {
 	s := NewHighlightRulesStore(dir)
 
 	empty, err := s.Load()
-	if err != nil || empty.Version != 1 || empty.Sets == nil || len(empty.Sets) != 0 {
-		t.Fatalf("Load on missing file = %+v, %v", empty, err)
+	if err != nil || empty.Rules != nil {
+		t.Fatalf("Load on missing file = %+v, %v (want nil rules so the UI seeds defaults)", empty, err)
 	}
 
 	off := false
-	data := HighlightRulesData{Sets: []HighlightRuleSet{{
-		ID: "olt", Name: "OLT", Global: false,
-		Rules: []HighlightRule{
-			{ID: "r1", Pattern: "LOS", Kind: "keyword", Color: "#ff0000", WholeWord: true},
-			{ID: "r2", Pattern: `-2[7-9]\.\d+`, Kind: "regex", Color: "#ffaa00", Enabled: &off},
-		},
-	}}}
+	data := HighlightRulesData{Rules: []HighlightRule{
+		{ID: "r1", Pattern: "LOS", Kind: "keyword", Color: "#ff0000", WholeWord: true, Group: "OLT ZTE"},
+		{ID: "r2", Pattern: `-2[7-9]\.\d+`, Kind: "regex", Color: "#ffaa00", Enabled: &off},
+		{ID: "r3", Pattern: `(^|\s)(/\S+)`, Kind: "regex", Color: "theme:magenta", TrimLead: true},
+	}}
 	if err := s.Save(data); err != nil {
 		t.Fatal(err)
 	}
@@ -35,11 +33,23 @@ func TestHighlightRulesStoreRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Version != 1 || len(got.Sets) != 1 || len(got.Sets[0].Rules) != 2 {
+	if got.Version != 2 || len(got.Rules) != 3 || got.Rules[0].Group != "OLT ZTE" || !got.Rules[2].TrimLead {
 		t.Fatalf("round trip = %+v", got)
 	}
-	if r := got.Sets[0].Rules[1]; r.Enabled == nil || *r.Enabled {
+	if r := got.Rules[1]; r.Enabled == nil || *r.Enabled {
 		t.Errorf("enabled=false lost: %+v", r)
+	}
+}
+
+func TestHighlightRulesLegacyFileLoads(t *testing.T) {
+	dir := t.TempDir()
+	legacy := `{"version":1,"sets":[{"id":"s","name":"Old","global":true,"rules":[{"id":"a","pattern":"x","kind":"keyword","color":"#010203"}]}]}`
+	if err := os.WriteFile(filepath.Join(dir, highlightRulesFileName), []byte(legacy), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := NewHighlightRulesStore(dir).Load()
+	if err != nil || got.Version != 1 || got.Rules != nil || len(got.Sets) != 1 {
+		t.Fatalf("legacy load = %+v, %v", got, err)
 	}
 }
 
@@ -47,27 +57,25 @@ func TestHighlightRulesValidate(t *testing.T) {
 	rule := func(mut func(*HighlightRule)) HighlightRulesData {
 		r := HighlightRule{ID: "r", Pattern: "x", Kind: "keyword", Color: "#010203"}
 		mut(&r)
-		return HighlightRulesData{Sets: []HighlightRuleSet{{ID: "s", Name: "s", Rules: []HighlightRule{r}}}}
+		return HighlightRulesData{Rules: []HighlightRule{r}}
 	}
 	cases := map[string]HighlightRulesData{
-		"bad kind":    rule(func(r *HighlightRule) { r.Kind = "glob" }),
-		"empty":       rule(func(r *HighlightRule) { r.Pattern = "" }),
-		"too long":    rule(func(r *HighlightRule) { r.Pattern = strings.Repeat("a", 501) }),
-		"bad color":   rule(func(r *HighlightRule) { r.Color = "red" }),
-		"no set id":   {Sets: []HighlightRuleSet{{Name: "x"}}},
-		"dup set ids": {Sets: []HighlightRuleSet{{ID: "a"}, {ID: "a"}}},
-		"reserved id": {Sets: []HighlightRuleSet{{ID: "preset:x"}}},
-		"bad preset":  {PresetGlobals: map[string]bool{"zte": true}},
+		"bad kind":   rule(func(r *HighlightRule) { r.Kind = "glob" }),
+		"empty":      rule(func(r *HighlightRule) { r.Pattern = "" }),
+		"too long":   rule(func(r *HighlightRule) { r.Pattern = strings.Repeat("a", 501) }),
+		"bad color":  rule(func(r *HighlightRule) { r.Color = "red" }),
+		"bad theme":  rule(func(r *HighlightRule) { r.Color = "theme:" }),
+		"long group": rule(func(r *HighlightRule) { r.Group = strings.Repeat("g", 61) }),
+		"too many":   {Rules: make([]HighlightRule, 2001)},
 	}
 	for name, d := range cases {
 		if err := d.Validate(); err == nil {
 			t.Errorf("%s: expected error", name)
 		}
 	}
-	if err := (HighlightRulesData{PresetGlobals: map[string]bool{"preset:zte-olt": true}}).Validate(); err != nil {
-		t.Errorf("valid preset override rejected: %v", err)
-	}
-	if err := rule(func(*HighlightRule) {}).Validate(); err != nil {
-		t.Errorf("valid data rejected: %v", err)
+	for _, c := range []string{"#010203", "theme:red", "theme:brightMagenta"} {
+		if err := rule(func(r *HighlightRule) { r.Color = c }).Validate(); err != nil {
+			t.Errorf("color %q rejected: %v", c, err)
+		}
 	}
 }

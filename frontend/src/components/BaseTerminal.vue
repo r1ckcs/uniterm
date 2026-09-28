@@ -151,7 +151,6 @@ import type { ShortcutAction } from '../types/settings'
 import { useSessionStore } from '../stores/sessionStore'
 import { useTabStore } from '../stores/tabStore'
 import { usePanelStore } from '../stores/panelStore'
-import { useConnectionStore } from '../stores/connectionStore'
 import { useTerminalMenu } from '../composables/useTerminalMenu'
 import { writeClipboard, readClipboardText } from '../composables/useClipboardWrite'
 import { filterTerminalInput } from '../utils/terminalInputFilter'
@@ -218,7 +217,6 @@ function menuShortcut(action: ShortcutAction): string {
 const sessionStore = useSessionStore()
 const tabStore = useTabStore()
 const panelStore = usePanelStore()
-const connectionStore = useConnectionStore()
 const zmodemStore = useZmodemStore()
 const localStateStore = useLocalStateStore()
 const { t } = useI18n()
@@ -1176,16 +1174,7 @@ onMounted(() => {
   // Keyword highlighting scans the parsed buffer and overlays decorations;
   // the enable switch is re-read on every refresh, so toggling the setting
   // takes effect live. Applies to every terminal type.
-  attachOverlayHighlighter(terminal, {
-    // Read the live connection (not the panel's snapshot) so picking rule
-    // sets in the connection form applies to already-open terminals.
-    getSessionSetIds: () => {
-      const cfg = props.panelId ? panelStore.getPanel(props.panelId)?.config : undefined
-      if (!cfg) return []
-      const liveCfg = cfg.id ? connectionStore.connections.find(c => c.id === cfg.id) : undefined
-      return (liveCfg ?? cfg).highlightSets ?? []
-    },
-  })
+  attachOverlayHighlighter(terminal)
 
   // Load WebLinksAddon per-component (has custom callbacks)
   let hoverEl: HTMLDivElement | null = null

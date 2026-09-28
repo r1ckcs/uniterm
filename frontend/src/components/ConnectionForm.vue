@@ -541,23 +541,6 @@
                 <el-option label="VT220 Delete (ESC[3~)" value="vt220" />
               </el-select>
             </el-form-item>
-            <el-form-item v-if="supportsHighlight" :label="t('hl.connectionSets')">
-              <el-select
-                v-model="form.highlightSets"
-                multiple
-                clearable
-                :placeholder="t('hl.connectionSetsPlaceholder')"
-                style="width: 100%"
-              >
-                <el-option
-                  v-for="s in highlightChoices"
-                  :key="s.id"
-                  :label="s.builtin ? `${s.name} (${t('hl.preset')})` : s.name"
-                  :value="s.id"
-                />
-              </el-select>
-              <div class="field-hint">{{ t('hl.connectionSetsDesc') }}</div>
-            </el-form-item>
             <el-form-item v-if="form.type === 'ssh'" :label="t('conn.fileTransferProto')">
               <el-radio-group v-model="form.fileTransferProto">
                 <el-radio-button value="sftp">SFTP</el-radio-button>
@@ -732,7 +715,6 @@ import { useConnectionStore } from '../stores/connectionStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useIdentityStore } from '../stores/identityStore'
 import { useProxyStore } from '../stores/proxyStore'
-import { useHighlightRuleStore } from '../stores/highlightRuleStore'
 import { useI18n } from '../i18n'
 import type { ConnectionConfig, PostLoginExpectStep, SSHAlgoConfig } from '../types/session'
 import { OpenFileDialog, OpenPrivateKeyFile, OpenKubeconfigFile, GetPlatform, ListSerialPorts, TestConnection, GetDefaultSSHKeyPaths } from '../../bindings/github.com/ys-ll/uniterm/app'
@@ -757,15 +739,6 @@ const connectionStore = useConnectionStore()
 const settingsStore = useSettingsStore()
 const identityStore = useIdentityStore()
 const proxyStore = useProxyStore()
-const highlightRuleStore = useHighlightRuleStore()
-// Terminal-type connections get keyword highlighting; only non-global sets
-// are offered (global ones already apply everywhere).
-const supportsHighlight = computed(() =>
-  ['ssh', 'telnet', 'serial', 'mosh', 'tcp', 'local'].includes(form.type as string),
-)
-const highlightChoices = computed(() =>
-  [...highlightRuleStore.sets, ...highlightRuleStore.presets].filter(s => !s.global || form.highlightSets?.includes(s.id)),
-)
 
 // Gates the keyText paste area: the private key stays hidden behind a single
 // "show" button until the user reveals it. Declared early (top of setup) so
@@ -1095,7 +1068,6 @@ const form = reactive<ConnectionConfig>({
   vncRepeaterID: '',
   encoding: 'utf-8',
   backspaceKey: 'del',
-  highlightSets: [] as string[],
   telnetNegotiationMode: 'active' as 'active' | 'passive',
   telnetSendMode: 'character' as 'character' | 'line',
   localEcho: false,
@@ -1293,11 +1265,7 @@ watch(() => props.editConfig, (config) => {
     // merge the config over the clean defaults.
     resetForm()
     hydrating.value = true
-    Object.assign(form, {
-      ...config,
-      postLoginExpectSteps: cloneExpectSteps(config.postLoginExpectSteps || []),
-      highlightSets: [...(config.highlightSets ?? [])],
-    })
+    Object.assign(form, { ...config, postLoginExpectSteps: cloneExpectSteps(config.postLoginExpectSteps || []) })
     // Backfill legacy ES auth: older versions stored the auth type in a dedicated
     // `esAuthType` ('basic'|'apikey') and the key in `esApiKey`. Both now live in
     // the shared `authType` ('password'|'apikey') and `password` fields.
@@ -1475,7 +1443,6 @@ function resetForm() {
   form.vncRepeaterID = ''
   form.encoding = 'utf-8'
   form.backspaceKey = 'del'
-  form.highlightSets = []
   form.telnetNegotiationMode = 'active'
   form.telnetSendMode = 'character'
   form.localEcho = false

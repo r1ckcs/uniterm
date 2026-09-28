@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { matchTextSpans } from './highlightRules'
-import { compileRuleSets, validateRule } from './userHighlightRules'
-import { HIGHLIGHT_PRESETS, presetsWithState } from './highlightPresets'
+import { matchTextSpans, HIGHLIGHT_RULES } from './highlightRules'
+import { compileRules, validateRule } from './userHighlightRules'
+import { buildDefaultRules } from './highlightDefaults'
 
 const RED = '#ff4d4f'
 const ORANGE = '#fa8c16'
@@ -12,11 +12,17 @@ const GRAY = '#8c8c8c'
 const PURPLE = '#b37feb'
 const TEAL = '#36cfc9'
 
-const preset = (id: string) => HIGHLIGHT_PRESETS.find(p => p.id === `preset:${id}`)!
+const SLUG: Record<string, string> = {
+  generic: 'macVlan', 'zte-olt': 'zteOlt', mikrotik: 'mikrotik', 'cisco-huawei': 'ciscoHuawei',
+}
+const DEFAULTS = buildDefaultRules(slug => slug)
 
-/** Colored substrings of a line under the given presets, in order. */
+/** Colored substrings of a line under the given default groups (plus the
+ * optical group, shared by the network groups), in order. Disabled rules
+ * are switched on so every rule is exercised. */
 function paint(line: string, ...ids: string[]): Array<[string, string]> {
-  const rules = compileRuleSets(ids.map(preset))
+  const wanted = new Set(['optical', ...ids.map(i => SLUG[i])])
+  const rules = compileRules(DEFAULTS.filter(r => wanted.has(r.group!)).map(r => ({ ...r, enabled: true })))
   return matchTextSpans(line, rules).spans.map(s => [line.slice(s.start, s.end), s.color!])
 }
 
@@ -25,21 +31,50 @@ function colorOf(line: string, text: string, ...ids: string[]): string | undefin
   return paint(line, ...ids).find(([t]) => t === text)?.[1]
 }
 
-describe('presets are valid', () => {
-  for (const p of HIGHLIGHT_PRESETS) {
-    it(`${p.name}: every rule passes validation`, () => {
-      for (const r of p.rules) {
-        expect(validateRule(r), `${p.id} ${r.pattern}`).toEqual({ ok: true })
-      }
-      expect(compileRuleSets([p])).toHaveLength(p.rules.length)
-    })
-  }
+describe('default list', () => {
+  it('every default rule passes validation', () => {
+    for (const r of DEFAULTS) {
+      expect(validateRule(r), `${r.group} ${r.pattern}`).toEqual({ ok: true })
+    }
+  })
 
-  it('only MAC/VLAN is global by default; state overrides apply', () => {
-    expect(HIGHLIGHT_PRESETS.filter(p => p.global).map(p => p.id)).toEqual(['preset:generic'])
-    const s = presetsWithState({ 'preset:generic': false, 'preset:zte-olt': true })
-    expect(s.find(p => p.id === 'preset:generic')!.global).toBe(false)
-    expect(s.find(p => p.id === 'preset:zte-olt')!.global).toBe(true)
+  it('has stable ids and translated group labels', () => {
+    const a = buildDefaultRules(s => `L:${s}`)
+    const b = buildDefaultRules(s => `L:${s}`)
+    expect(a.map(r => r.id)).toEqual(b.map(r => r.id))
+    expect(new Set(a.map(r => r.id)).size).toBe(a.length)
+    expect(a.every(r => r.group!.startsWith('L:'))).toBe(true)
+  })
+
+  it('keeps words that are noisy in every terminal disabled', () => {
+    const off = DEFAULTS.filter(r => r.enabled === false).map(r => r.pattern).sort()
+    expect(off).toEqual(['connected', 'down', 'up'])
+  })
+
+  it('network rules come before the general categories', () => {
+    const firstCat = DEFAULTS.findIndex(r => r.group!.startsWith('cat.'))
+    expect(DEFAULTS.slice(firstCat).every(r => r.group!.startsWith('cat.'))).toBe(true)
+  })
+
+  it('converted categories color exactly what the hard-wired rules did', () => {
+    const cats = compileRules(DEFAULTS.filter(r => r.group!.startsWith('cat.')))
+    const lines = [
+      'Last login: Mon Sep 28 17:52:21 2026 from 10.0.0.1',
+      'ERROR: connection refused (permission denied) at /var/log/app.log',
+      'warning: disk low memory, deprecated option "foo bar" => false',
+      'Starting nginx ... success; see https://example.com/docs?q=1',
+      'fe80::1a2b:3c4d  2026-09-28T17:52:21Z  {{[[ ==== ]]}}  ~/src/g++',
+    ]
+    for (const line of lines) {
+      const old = matchTextSpans(line, HIGHLIGHT_RULES).spans.map(s => [s.start, s.end])
+      const now = matchTextSpans(line, cats).spans.map(s => [s.start, s.end])
+      expect(now, line).toEqual(old)
+    }
+  })
+
+  it('categories follow the theme palette', () => {
+    const err = DEFAULTS.find(r => r.group === 'cat.error')!
+    expect(err.color).toBe('theme:red')
   })
 })
 
