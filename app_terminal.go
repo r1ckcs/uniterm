@@ -336,7 +336,9 @@ func (a *App) launchConnectGoroutine(s session.Session, sessionType string, conf
 
 		if err := s.Connect(config); err != nil {
 			a.failSessionConnect(s, err)
+			return
 		}
+		a.maybeOfferPasswordSave(s, config)
 	}()
 }
 

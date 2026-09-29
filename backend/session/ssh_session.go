@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -48,17 +49,21 @@ type SSHSession struct {
 	// outputRouteMu makes the binary/text routing decision atomic with
 	// EndZmodem. Without it, readLoop could observe binary mode, get paused,
 	// then emit post-transfer shell output as binary after EndZmodem returned.
-	outputRouteMu       sync.Mutex
-	client              *ssh.Client
-	session             *ssh.Session
-	stdin               io.WriteCloser
-	stdout              io.Reader
-	stderr              io.Reader
-	quit                chan struct{}
-	quitOnce            sync.Once
-	authAnswerCh        chan []byte
-	expectOutput        *postLoginOutputBuffer
-	x11Forwarder        *x11Forwarder
+	outputRouteMu sync.Mutex
+	client        *ssh.Client
+	session       *ssh.Session
+	stdin         io.WriteCloser
+	stdout        io.Reader
+	stderr        io.Reader
+	quit          chan struct{}
+	quitOnce      sync.Once
+	authAnswerCh  chan []byte
+	// authPassword is the password the user typed during this Connect (the
+	// "Password:" prompt or a password-like keyboard-interactive question),
+	// exposed after a successful login so the app can offer to save it.
+	authPassword string
+	expectOutput *postLoginOutputBuffer
+	x11Forwarder *x11Forwarder
 
 	// osc7 extracts OSC-7 cwd reports emitted by the remote shell or tools.
 	// Only used from the readLoop goroutine.
@@ -195,6 +200,13 @@ func (s *SSHSession) keyboardInteractiveChallenge(config ConnectionConfig, autoA
 			}
 			s.emitData([]byte("\r\n"))
 			answers[i] = answer
+			// Remember a typed password (hidden single "password" question),
+			// never an OTP / verification code.
+			if len(questions) == 1 && !echos[i] && passwordPromptRe.MatchString(q) {
+				s.mu.Lock()
+				s.authPassword = answer
+				s.mu.Unlock()
+			}
 		}
 		return answers, nil
 	}
@@ -359,6 +371,9 @@ func (s *SSHSession) Connect(config ConnectionConfig) error {
 		}
 		s.emitData([]byte("\r\n"))
 		config.Password = answer
+		s.mu.Lock()
+		s.authPassword = answer
+		s.mu.Unlock()
 	}
 
 	// Auto-answer keyboard-interactive challenges with the saved password on
@@ -1020,4 +1035,16 @@ func encodingByName(name string) encoding.Encoding {
 	default: // "", "utf-8"
 		return nil
 	}
+}
+
+// passwordPromptRe recognizes keyboard-interactive password questions
+// ("Password:", "user@host's password:", "Senha:") as opposed to one-time
+// codes ("Verification code:", "OTP:").
+var passwordPromptRe = regexp.MustCompile(`(?i)(pass(word|wd|phrase)?|senha|contrase(ñ|n)a|mot de passe|kennwort|密码)\s*:?\s*$`)
+
+// AuthPassword returns the password typed during the last Connect, or "".
+func (s *SSHSession) AuthPassword() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.authPassword
 }

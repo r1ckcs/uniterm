@@ -54,6 +54,10 @@ export interface ConnectionConfig {
   // "DOMAIN\user" prefix in user is used as a fallback.
   rdpDomain?: string
   rdpAdminSession?: boolean
+  // MobaXterm-style password saving (SSH family): never offer to save.
+  passwordSaveNever?: boolean
+  // Per-attempt: save the password once the login succeeds (not persisted).
+  savePasswordOnSuccess?: boolean
   // Local terminal shell path (for WSL, `wsl://<distro>` carries the distro)
   shellPath?: string
   // Working directory for local terminal (defaults to user home)

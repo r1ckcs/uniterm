@@ -153,6 +153,7 @@
     <DataDirDialog v-model:visible="dataDirVisible" :first-run="credStore.firstRun || credStore.dataDirInfo.firstRun" @done="onDataDirDone" />
     <EncryptionModeDialog v-model:visible="encryptVisible" :existing-secrets="credStore.status.existingSecrets" @done="onEncryptDone" />
     <CredentialUnlockDialog v-model:visible="unlockVisible" @done="onUnlockDone" @reset="onReset" />
+    <PasswordSaveOffer />
     <KeychainLostDialog v-model:visible="keychainLostVisible" @done="onKeychainLostDone" />
     <MobileKeyBar v-if="keyBarSessionId" :session-id="keyBarSessionId" />
   </div>
@@ -217,6 +218,7 @@ import { useCompanionStore } from './stores/companionStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { useQuickCommandStore } from './stores/quickCommandStore'
 import { useHighlightRuleStore } from './stores/highlightRuleStore'
+import PasswordSaveOffer from './components/PasswordSaveOffer.vue'
 import { useSkillStore } from './stores/skillStore'
 import { useCommandStore } from './stores/commandStore'
 import { useTunnelStore } from './stores/tunnelStore'

@@ -67,6 +67,7 @@ func (s *ConnectionStore) Save(data session.ConnectionStoreData) error {
 	// Encrypt password fields in place before writing JSON.
 	for i := range connections {
 		conn := &connections[i]
+		conn.SavePasswordOnSuccess = false // per-attempt flag, never persisted
 		if conn.AuthType == "identity" {
 			// Identity connections obtain both username and credentials solely
 			// from the referenced identity (MaterializeIdentity overrides User

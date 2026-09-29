@@ -112,8 +112,20 @@
                 </el-select>
               </el-form-item>
             </template>
-            <el-form-item v-if="form.type !== 'local' && form.type !== 'wsl' && form.type !== 'serial' && form.type !== 'tcp' && form.type !== 'k8s' && form.type !== 'container' && form.authType !== 'identity' && ((form.authType === 'password' && form.type !== 'rdp') || (form.type === 'rdp' && !form.rdpEnableNLA) || form.type === 'vnc' || form.type === 'spice' || form.type === 'database' || form.type === 'telnet' || form.type === 'ftp' || form.type === 'smb' || form.type === 'webdav' || form.type === 's3') && !(form.type === 'database' && form.dbType === 'rqlite')" :label="form.type === 's3' ? 'Secret Key' : (isEsApiKey ? t('conn.esApiKey') : t('conn.password'))">
+            <el-form-item v-if="form.type !== 'local' && form.type !== 'wsl' && form.type !== 'serial' && form.type !== 'tcp' && form.type !== 'k8s' && form.type !== 'container' && form.authType !== 'identity' && ((form.authType === 'password' && form.type !== 'rdp') || (form.type === 'rdp' && !form.rdpEnableNLA) || form.type === 'vnc' || form.type === 'spice' || form.type === 'database' || form.type === 'telnet' || form.type === 'ftp' || form.type === 'smb' || form.type === 'webdav' || form.type === 's3') && !(form.type === 'database' && form.dbType === 'rqlite') && !loginPromptsPassword" :label="form.type === 's3' ? 'Secret Key' : (isEsApiKey ? t('conn.esApiKey') : t('conn.password'))">
               <el-input v-model="form.password" type="password" show-password :key="passwordInputKey" :placeholder="form.type === 's3' ? 'Secret Access Key' : (isEsApiKey ? t('conn.esApiKeyPlaceholder') : '')" />
+            </el-form-item>
+            <!-- SSH-family password auth (MobaXterm-style): the password is
+                 typed at login and, once the login succeeds, the app asks
+                 whether to save it. -->
+            <el-form-item v-if="loginPromptsPassword" :label="t('conn.password')">
+              <div class="login-password">
+                <span class="field-hint">{{ form.password ? t('pwsave.savedHint') : t('pwsave.askHint') }}</span>
+                <el-checkbox
+                  :model-value="!form.passwordSaveNever"
+                  @update:model-value="(v: boolean | string | number) => { form.passwordSaveNever = !v }"
+                >{{ t('pwsave.offerToggle') }}</el-checkbox>
+              </div>
             </el-form-item>
             <el-form-item v-if="form.authType === 'kerberos'" :label="t('conn.kerberos')">
               <div class="field-hint">{{ t('conn.kerberosHint') }}</div>
@@ -739,6 +751,11 @@ const connectionStore = useConnectionStore()
 const settingsStore = useSettingsStore()
 const identityStore = useIdentityStore()
 const proxyStore = useProxyStore()
+// SSH-family password logins ask for the password at login time instead of
+// in this form (MobaXterm-style); key passphrases keep their field.
+const loginPromptsPassword = computed(() =>
+  ['ssh', 'sftp', 'scp', 'mosh'].includes(form.type as string) && (!form.authType || form.authType === 'password'),
+)
 
 // Gates the keyText paste area: the private key stays hidden behind a single
 // "show" button until the user reveals it. Declared early (top of setup) so
@@ -1443,6 +1460,7 @@ function resetForm() {
   form.vncRepeaterID = ''
   form.encoding = 'utf-8'
   form.backspaceKey = 'del'
+  form.passwordSaveNever = false
   form.telnetNegotiationMode = 'active'
   form.telnetSendMode = 'character'
   form.localEcho = false
@@ -2205,4 +2223,5 @@ function onConnect() {
 :deep(.el-dialog__body) {
   padding: 1rem 1.25rem;
 }
+.login-password { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; }
 </style>

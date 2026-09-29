@@ -1775,5 +1775,17 @@
   "hl.group.ciscoHuawei": "Cisco / Huawei",
   "hl.group.mobaStandard": "MobaXterm (Standard + Shell)",
   "hl.group.ipv6": "IPv6",
-  "hl.group.juniper": "Juniper"
+  "hl.group.juniper": "Juniper",
+  "pwsave.title": "Salvar senha?",
+  "pwsave.updateTitle": "Atualizar a senha salva?",
+  "pwsave.text": "Login realizado. Salvar a senha de {target}?",
+  "pwsave.updateText": "A senha salva de {target} não funcionou, mas a que você acabou de digitar sim. Substituir a senha salva?",
+  "pwsave.save": "Salvar",
+  "pwsave.update": "Substituir",
+  "pwsave.no": "Agora não",
+  "pwsave.never": "Nunca para esta conexão",
+  "pwsave.saved": "Senha salva",
+  "pwsave.askHint": "Pedida no login; depois que o login der certo, você escolhe se quer salvar.",
+  "pwsave.savedHint": "Há uma senha salva. Se ela deixar de funcionar, digite a nova no login e o app oferece substituir.",
+  "pwsave.offerToggle": "Oferecer salvar a senha após o login"
 }

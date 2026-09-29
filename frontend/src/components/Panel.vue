@@ -488,6 +488,8 @@ async function repromptCredentials() {
   if (!result) return
   config.user = result.user || config.user
   config.password = result.password
+  // "Save & connect": saved by the backend only if this login succeeds.
+  config.savePasswordOnSuccess = result.action === 'save_and_connect'
   retryAttempt = 0
   await retryConnection()
 }
@@ -571,6 +573,7 @@ async function retryConnection() {
     }
     props.panel.config.user = result.user || props.panel.config.user
     props.panel.config.password = result.password
+    props.panel.config.savePasswordOnSuccess = result.action === 'save_and_connect'
   }
 
   const now = new Date()

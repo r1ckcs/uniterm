@@ -1775,5 +1775,17 @@
   "hl.group.ciscoHuawei": "Cisco / Huawei",
   "hl.group.mobaStandard": "MobaXterm（标准 + Shell）",
   "hl.group.ipv6": "IPv6",
-  "hl.group.juniper": "Juniper"
+  "hl.group.juniper": "Juniper",
+  "pwsave.title": "保存密码？",
+  "pwsave.updateTitle": "更新已保存的密码？",
+  "pwsave.text": "登录成功。是否保存 {target} 的密码？",
+  "pwsave.updateText": "{target} 已保存的密码无效，但刚输入的密码有效。是否替换已保存的密码？",
+  "pwsave.save": "保存",
+  "pwsave.update": "替换",
+  "pwsave.no": "暂不",
+  "pwsave.never": "此连接不再询问",
+  "pwsave.saved": "密码已保存",
+  "pwsave.askHint": "登录时输入；登录成功后可选择是否保存。",
+  "pwsave.savedHint": "已保存密码。若失效，登录时输入新密码即可选择替换。",
+  "pwsave.offerToggle": "登录后询问是否保存密码"
 }

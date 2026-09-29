@@ -1775,5 +1775,17 @@
   "hl.group.ciscoHuawei": "Cisco / Huawei",
   "hl.group.mobaStandard": "MobaXterm (Standard + Shell)",
   "hl.group.ipv6": "IPv6",
-  "hl.group.juniper": "Juniper"
+  "hl.group.juniper": "Juniper",
+  "pwsave.title": "Save password?",
+  "pwsave.updateTitle": "Update saved password?",
+  "pwsave.text": "Login succeeded. Save the password for {target}?",
+  "pwsave.updateText": "The saved password for {target} did not work, but the one you just typed did. Replace the saved password?",
+  "pwsave.save": "Save",
+  "pwsave.update": "Replace",
+  "pwsave.no": "Not now",
+  "pwsave.never": "Never for this connection",
+  "pwsave.saved": "Password saved",
+  "pwsave.askHint": "Asked at login; after a successful login you choose whether to save it.",
+  "pwsave.savedHint": "A password is saved. If it stops working, type the new one at login and you will be offered to replace it.",
+  "pwsave.offerToggle": "Offer to save the password after login"
 }

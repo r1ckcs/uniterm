@@ -15,11 +15,17 @@ type ShowCredentialDialog = (
 // 判断一条连接是否缺账密、需要弹凭据对话框。key/identity/kerberos/agent 认证
 // 由后端解析凭据，无需补全提示（identity 连接的临时/旧密码若误弹窗，会压过后端
 // 从密钥库解析出的正确值，因此必须排除）。
+// Types whose password is saved only after a successful login.
+const LOGIN_SAVE_TYPES = ['ssh', 'sftp', 'scp', 'mosh']
+
 export function needsCredentialCheck(config: ConnectionConfig): boolean {
   const inScope = ['ssh', 'mosh', 'sftp', 'scp', 'ftp'].includes(config.type)
   if (!inScope) return false
   if ((config.type === 'ssh' || config.type === 'mosh' || config.type === 'scp' || config.type === 'sftp') && (config.authType === 'key' || config.authType === 'keyText')) return false
   if (config.authType === 'identity' || config.authType === 'kerberos' || config.authType === 'agent') return false
+  // SSH terminals ask for the password in the terminal itself (MobaXterm-
+  // style); only a missing user name needs the dialog.
+  if (config.type === 'ssh') return !config.user
   return !config.user || !config.password
 }
 
@@ -88,7 +94,15 @@ export function useTunnelCredentials(showCredentialDialogOverride?: ShowCredenti
       password: result.password || config.password
     }
     if (result.action === 'save_and_connect') {
-      await connectionStore.update(config.id, { user: config.user, password: config.password })
+      if (LOGIN_SAVE_TYPES.includes(config.type)) {
+        // Persist only after the login succeeds (the backend saves it then),
+        // so a mistyped password is never stored. The user name is not a
+        // secret and is saved right away.
+        config.savePasswordOnSuccess = true
+        if (config.user) await connectionStore.update(config.id, { user: config.user })
+      } else {
+        await connectionStore.update(config.id, { user: config.user, password: config.password })
+      }
     }
     return config
   }

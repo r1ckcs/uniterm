@@ -70,6 +70,13 @@ type ConnectionConfig struct {
 	IdentityId string `json:"identityId,omitempty"`
 	// Password is stored in plaintext JSON. Will be migrated to OS keychain in a future iteration.
 	Password string `json:"password,omitempty"`
+	// PasswordSaveNever: the user answered "never" to the post-login
+	// "save password?" offer for this connection (MobaXterm-style).
+	PasswordSaveNever bool `json:"passwordSaveNever,omitempty"`
+	// SavePasswordOnSuccess is a transient per-attempt flag ("Save & connect"
+	// in the credential dialog): persist the password only once the login
+	// succeeds. Never stored (ConnectionStore.Save clears it).
+	SavePasswordOnSuccess bool `json:"savePasswordOnSuccess,omitempty"`
 	KeyPath  string `json:"keyPath,omitempty"`
 	// KeyContent holds the inline private-key text (PEM) for authType "keyText".
 	// When set, the connection authenticates from the text directly instead of
