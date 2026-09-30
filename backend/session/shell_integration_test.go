@@ -99,9 +99,10 @@ func TestBuildStartupCwdHook(t *testing.T) {
 			wantOK: true,
 			mustHave: []string{
 				"__uniterm_osc7",
-				`printf '\r\033[2K'`,
-				`printf '\033]7777;uniterm-ok\007'`,
+				"stty -echo",
+				`\033[6n`,
 				"stty echo",
+				`printf '\033]7777;uniterm-ok\007'`,
 			},
 		},
 		{
@@ -111,9 +112,10 @@ func TestBuildStartupCwdHook(t *testing.T) {
 			mustHave: []string{
 				"__uniterm_osc7",
 				"precmd_functions",
-				`printf '\r\033[2K'`,
-				`printf '\033]7777;uniterm-ok\007'`,
+				"stty -echo",
+				`\033[6n`,
 				"stty echo",
+				`printf '\033]7777;uniterm-ok\007'`,
 			},
 		},
 		{
@@ -146,6 +148,11 @@ func TestBuildStartupCwdHook(t *testing.T) {
 			}
 			if !strings.Contains(got, "__uniterm_osc7") {
 				t.Fatalf("snippet must define the __uniterm_osc7 hook: %q", got)
+			}
+			// bash/zsh inject two lines: the echo-off line must come first so
+			// the hook line itself never renders.
+			if tt.shell != "/usr/bin/fish" && !strings.HasPrefix(got, " stty -echo;") {
+				t.Fatalf("bash/zsh snippet must start with the echo-off line: %q", got)
 			}
 			for _, want := range tt.mustHave {
 				if !strings.Contains(got, want) {

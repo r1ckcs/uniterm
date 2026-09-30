@@ -182,34 +182,62 @@ func buildWSLShellBootstrap(shell string) (files map[string]string, ok bool) {
 	return nil, false
 }
 
-// buildStartupCwdHook returns the one-line hook typed into a freshly started
-// SSH login shell (typed, never executed as a remote command, so sshd's
-// native login flow and banner are untouched). The pty is requested with ECHO
-// off so the line never renders; the hook ends by restoring echo, clearing
-// the current line (so a prompt printed before the injection landed is
-// overwritten by the one the shell prints after the hook — the prompt renders
-// exactly once), and then printing the ready marker last — a missing stty
-// must leave the marker unsent so the session's blind echo-restore fallback
-// fires. ok=false for unsupported shells, which get a plain ECHO-on shell and
-// no injection.
+// cwdHookEchoOffLine is the first line typed into a bash/zsh login shell. It
+// turns the pty echo off itself so the long hook line that follows never
+// renders even when the remote rc files re-enable echo or the server ignores
+// the pty-req ECHO mode (the visible-command leak of the old single-line
+// injection), then clears the first-prompt row — which may hold an echo of
+// this short line — and advances one row. Everything the injection renders
+// from here on is deterministic: the shell prints its second prompt on the
+// fresh row, the hook line is read silently, and the cleanup below knows
+// exactly how many rows the injection produced.
+const cwdHookEchoOffLine = " stty -echo; printf '\\r\\033[2K\\n'\n"
+
+// buildStartupCwdHook returns the keystrokes typed into a freshly started SSH
+// login shell (typed, never executed as a remote command, so sshd's native
+// login flow and banner are untouched). The hook ends by restoring echo,
+// clearing the rows the injection produced (so exactly one prompt remains on
+// screen), and printing the ready marker last — a missing stty must leave the
+// marker unsent so the session's blind echo-restore fallback fires.
+// ok=false for unsupported shells, which get a plain ECHO-on shell and no
+// injection.
+//
+// Row accounting for bash/zsh: shells differ in whether accepting a line
+// moves the cursor to a fresh row (zsh yes, bash no — the old fixed one-line
+// clear left a duplicate prompt on fresh-row shells). The cleanup therefore
+// asks the terminal for the cursor position (ESC[6n, answered by xterm.js)
+// and distinguishes the two layouts: column 1 means the shell started command
+// output on a fresh row and four rows belong to the injection (prompt #1, the
+// row cleared by the echo-off line, prompt #2, the cursor row); any other
+// column means the shell reused the prompt row and two rows suffice. A
+// missing or late CPR reply falls back to the two-row clear — still correct
+// for prompt-reusing shells and no worse than the old behavior for fresh-row
+// shells.
+const cwdHookCleanup = `printf '\033[6n'; if IFS=';' read -rs -d R -t 1 __u7y __u7x < /dev/tty && [ "${__u7x-}" = 1 ]; then printf '\033[2K\033[1A\033[2K\033[1A\033[2K\033[1A\033[2K\r'; else printf '\r\033[2K\033[1A\033[2K\r'; fi;`
+
 func buildStartupCwdHook(shell string) (string, bool) {
 	base := shellBasename(shell)
 	const oscFn = `__uniterm_osc7() { printf '\033]7;file://%s\033\\' "$PWD" 2>/dev/null; }`
 	switch base {
 	case "bash":
-		return " " + oscFn + "; " +
+		return cwdHookEchoOffLine +
+			" " + oscFn + "; " +
 			`case "$(declare -p PROMPT_COMMAND 2>/dev/null)" in` + " " +
 			`"declare -a"*) [[ "${PROMPT_COMMAND[*]}" == *__uniterm_osc7* ]] || PROMPT_COMMAND+=("__uniterm_osc7") ;;` + " " +
 			// ${PROMPT_COMMAND-} keeps the guard from erroring under set -u
 			// when the variable is unset.
 			`*) [[ "${PROMPT_COMMAND-}" == *__uniterm_osc7* ]] || PROMPT_COMMAND="__uniterm_osc7${PROMPT_COMMAND:+;$PROMPT_COMMAND}" ;;` + " " +
-			"esac" + `; stty echo; printf '\r\033[2K'; printf '\033]7777;uniterm-ok\007'` + "\n", true
+			"esac; stty echo; " + cwdHookCleanup + ` printf '\033]7777;uniterm-ok\007'` + "\n", true
 	case "zsh":
 		// -0 default guards against set -u when precmd_functions is unset.
-		return " " + oscFn + "; " +
+		return cwdHookEchoOffLine +
+			" " + oscFn + "; " +
 			`(( ${precmd_functions[(I)__uniterm_osc7]-0} )) || precmd_functions+=(__uniterm_osc7)` +
-			`; stty echo; printf '\r\033[2K'; printf '\033]7777;uniterm-ok\007'` + "\n", true
+			`; stty echo; ` + cwdHookCleanup + ` printf '\033]7777;uniterm-ok\007'` + "\n", true
 	case "fish":
+		// fish has no read-until-delimiter for the CPR probe, so it keeps the
+		// old single-line injection: echo can still leak on fish and the
+		// prompt may render twice on fresh-row fish setups.
 		return " if not functions -q __uniterm_osc7; " +
 			"functions -c fish_prompt __uniterm_orig_prompt; " +
 			"function fish_prompt; __uniterm_osc7; __uniterm_orig_prompt; end; " +

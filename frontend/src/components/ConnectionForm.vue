@@ -570,6 +570,12 @@
               <el-switch v-model="form.x11Forwarding" />
               <span v-if="x11HintKey" class="field-hint" style="margin-left: 0.75rem;">{{ t(x11HintKey) }}</span>
             </el-form-item>
+            <el-form-item v-if="form.type === 'ssh'" :label="t('conn.cwdHookMode')">
+              <el-select v-model="form.cwdHookMode">
+                <el-option :label="t('conn.cwdHookModeStartup')" value="startup" />
+                <el-option :label="t('conn.cwdHookModeFollow')" value="follow" />
+              </el-select>
+            </el-form-item>
             <el-form-item v-if="isSSHAlgoType" :label="t('conn.sshAlgoMode')">
               <el-radio-group v-model="sshAlgoMode">
                 <el-radio-button value="compatible">{{ t('conn.sshAlgoModeCompatible') }}</el-radio-button>
@@ -1077,6 +1083,7 @@ const form = reactive<ConnectionConfig>({
   fileTransferProto: 'sftp' as 'sftp' | 'scp',
   x11Forwarding: false,
   agentForwarding: false,
+  cwdHookMode: 'startup' as 'startup' | 'follow',
   ftpEncryption: 'none',
   ftpPassive: true,
   ftpEncoding: 'utf-8',
@@ -1303,6 +1310,8 @@ watch(() => props.editConfig, (config) => {
     form.rdpAdminSession = config.rdpAdminSession ?? false
     form.x11Forwarding = config.x11Forwarding ?? false
     form.agentForwarding = config.agentForwarding ?? false
+    // Old connections without the field default to startup injection.
+    form.cwdHookMode = config.cwdHookMode === 'follow' ? 'follow' : 'startup'
     // Existing SSH connections without the field default to SFTP (old behavior).
     form.fileTransferProto = config.fileTransferProto ?? 'sftp'
     // Redis key separator defaults to ":" (empty from old connections = ":").
@@ -1452,6 +1461,7 @@ function resetForm() {
   form.fileTransferProto = 'sftp'
   form.x11Forwarding = false
   form.agentForwarding = false
+  form.cwdHookMode = 'startup'
   form.ftpEncryption = 'none'
   form.ftpPassive = true
   form.ftpEncoding = 'utf-8'
@@ -1670,6 +1680,11 @@ function normalizeForm(): ConnectionConfig {
     normalized.password = ''
     normalized.user = ''
   }
+  // Directory-follow hook: only SSH carries it; "startup" is the default and
+  // is stored as empty so old connection JSON stays clean.
+  normalized.cwdHookMode = normalized.type === 'ssh' && normalized.cwdHookMode === 'follow'
+    ? 'follow'
+    : undefined
   // key 相关字段只在对应认证方式下有效；切走后清掉，避免把残留的路径/密钥
   // 文本原样带进仓库（同 #711 语义）。
   if (normalized.authType !== 'key') normalized.keyPath = ''

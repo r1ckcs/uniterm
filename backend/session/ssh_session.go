@@ -95,6 +95,16 @@ type SSHSession struct {
 	// re-injection still fires.
 	cwdHookInstalled atomic.Bool
 
+	// cwdHookFollow marks connections with CwdHookMode "follow": the hook is
+	// not injected at attach time; InjectCwdHook types it into the running
+	// shell on demand when the frontend enables directory follow.
+	cwdHookFollow bool
+
+	// cwdHookTriggered guards the on-demand injection against repeated
+	// toggle clicks. Session objects are recreated on reconnect, so the
+	// guard re-arms naturally.
+	cwdHookTriggered atomic.Bool
+
 	// clientRef wraps the shared *ssh.Client with reference counting so a
 	// channel clone (issue #983, Xshell-style "duplicate channel") can hold
 	// the authenticated connection open after the source tab closes.
@@ -457,7 +467,15 @@ func (s *SSHSession) attach(client *ssh.Client, config ConnectionConfig) error {
 	// on OpenWrt CPEs) kill the whole connection when an exec channel runs
 	// while another session channel is open — the later pty-req then fails
 	// with EOF. Detect first, close the probe, then open the shell channel.
-	injectHook, injectShell := startupCwdHook(client)
+	// CwdHookMode "follow" skips both the detection and the startup
+	// injection entirely: InjectCwdHook re-detects on demand.
+	s.cwdHookFollow = config.CwdHookMode == CwdHookModeFollow
+	injectHook, injectShell := "", ""
+	if !s.cwdHookFollow {
+		injectHook, injectShell = startupCwdHook(client)
+	} else {
+		log.Writef("ssh: cwd hook deferred to directory-follow toggle")
+	}
 
 	session, err := client.NewSession()
 	if err != nil {
@@ -568,11 +586,15 @@ func (s *SSHSession) attach(client *ssh.Client, config ConnectionConfig) error {
 		}
 	}
 
+	// Publish the channels under the session mutex: the on-demand
+	// InjectCwdHook path reads them from a frontend-triggered goroutine.
+	s.mu.Lock()
 	s.client = client
 	s.session = session
 	s.stdin = stdinPipe
 	s.stdout = stdoutPipe
 	s.stderr = stderrPipe
+	s.mu.Unlock()
 	s.setStatus(StatusConnected)
 
 	// Apply pending terminal size if one was set before connection.
@@ -892,6 +914,42 @@ func (s *SSHSession) watchCwdHookConfirm() {
 		// Leading space keeps it out of bash history (HISTCONTROL=ignorespace).
 		_, _ = stdin.Write([]byte(" stty echo\n"))
 	}
+}
+
+// InjectCwdHook types the OSC-7 cwd hook into the running login shell on
+// demand, for connections with CwdHookMode "follow" (attach skipped the
+// startup injection and shell detection). Called from the frontend when
+// directory follow is first enabled for the session's file panel. Repeated
+// calls are no-ops; a transiently failed attempt re-arms so a later call can
+// retry.
+func (s *SSHSession) InjectCwdHook() error {
+	if !s.cwdHookTriggered.CompareAndSwap(false, true) {
+		return nil
+	}
+	if s.Status() != StatusConnected {
+		s.cwdHookTriggered.Store(false)
+		return fmt.Errorf("ssh session not connected")
+	}
+	s.mu.RLock()
+	client, stdin := s.client, s.stdin
+	s.mu.RUnlock()
+	if client == nil || stdin == nil {
+		s.cwdHookTriggered.Store(false)
+		return fmt.Errorf("ssh session not attached")
+	}
+	snippet, shell := startupCwdHook(client)
+	if snippet == "" {
+		// Unsupported shell or failed detection — definitive for this
+		// session object. Keep the guard set so later toggles don't re-probe.
+		return fmt.Errorf("cwd hook unavailable (shell %q)", shell)
+	}
+	if _, err := stdin.Write(s.encodeInput([]byte(snippet))); err != nil {
+		s.cwdHookTriggered.Store(false)
+		return fmt.Errorf("cwd hook write: %w", err)
+	}
+	log.Writef("ssh: cwd hook injected on demand (shell=%s)", shell)
+	go s.watchCwdHookConfirm()
+	return nil
 }
 
 func (s *SSHSession) Resize(cols, rows int) error {
