@@ -325,7 +325,7 @@ function toggleFollow() {
 // session:status handler below (the session object resets on reconnect).
 function injectCwdHookIfNeeded(pid: string) {
   const panel = panelStore.getPanel(pid)
-  if (!panel || panel.type !== 'ssh') return
+  if (!panel || (panel.type !== 'ssh' && panel.type !== 'wsl')) return
   if ((panel.config as any)?.cwdHookMode !== 'follow') return
   const sid = panel.sessionId
   if (!sid) return

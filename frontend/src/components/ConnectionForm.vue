@@ -570,7 +570,7 @@
               <el-switch v-model="form.x11Forwarding" />
               <span v-if="x11HintKey" class="field-hint" style="margin-left: 0.75rem;">{{ t(x11HintKey) }}</span>
             </el-form-item>
-            <el-form-item v-if="form.type === 'ssh'" :label="t('conn.cwdHookMode')">
+            <el-form-item v-if="form.type === 'ssh' || form.type === 'wsl'" :label="t('conn.cwdHookMode')">
               <el-select v-model="form.cwdHookMode">
                 <el-option :label="t('conn.cwdHookModeStartup')" value="startup" />
                 <el-option :label="t('conn.cwdHookModeFollow')" value="follow" />
@@ -1680,9 +1680,9 @@ function normalizeForm(): ConnectionConfig {
     normalized.password = ''
     normalized.user = ''
   }
-  // Directory-follow hook: only SSH carries it; "startup" is the default and
+  // Directory-follow hook: SSH and WSL carry it; "startup" is the default and
   // is stored as empty so old connection JSON stays clean.
-  normalized.cwdHookMode = normalized.type === 'ssh' && normalized.cwdHookMode === 'follow'
+  normalized.cwdHookMode = (normalized.type === 'ssh' || normalized.type === 'wsl') && normalized.cwdHookMode === 'follow'
     ? 'follow'
     : undefined
   // key 相关字段只在对应认证方式下有效；切走后清掉，避免把残留的路径/密钥
