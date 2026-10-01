@@ -70,6 +70,9 @@ function defaultFgRuns(
 // xterm.js default palette values, used when the active theme doesn't
 // define the expected key.
 const FALLBACK_COLORS: Record<string, string> = {
+  // The terminal's default text color: lets a rule claim text (so later
+  // rules skip it) without visibly coloring it.
+  foreground: '#cccccc',
   black: '#000000',
   red: '#cd3131',
   green: '#0dbc79',

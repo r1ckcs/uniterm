@@ -251,3 +251,57 @@ describe('Juniper', () => {
     expect(paint('hello0 system1 fe-male stem0', 'juniper')).toEqual([])
   })
 })
+
+// Huawei S5732 output reported on 01/10/2026 (screenshots): table-style
+// optical readings, 40GE/MEth/Vlanif/NULL names and the brief status columns.
+describe('Huawei display output', () => {
+  const all = Object.keys(SLUG)
+  const full = (line: string) => {
+    const rules = compileRules(DEFAULTS.map(r => ({ ...r })))
+    return matchTextSpans(line, rules).spans.map(s => [line.slice(s.start, s.end), s.color!])
+  }
+
+  it('colors only the current RX reading of the transceiver table', () => {
+    const rx = 'RxPower(dBm)       -21.74         -26.02          1.00       normal'
+    expect(paint(rx, ...all)).toEqual([['-21.74', GREEN]])
+    expect(paint('RX Power(dBm): -27.50', ...all)).toEqual([['-27.50', RED]])
+  })
+
+  it('leaves transmit power uncolored', () => {
+    // Claimed in the terminal's own text color, so no range color applies.
+    const FG = 'theme:foreground'
+    expect(paint('TxPower(dBm)       -5.94          -10.00          -2.00      normal', ...all)).toEqual([['-5.94', FG]])
+    expect(paint('Tx Power: -5.94dBm, Warning range: [-10.00, -2.00]dBm', ...all)).toEqual([['-5.94', FG]])
+    expect(colorOf('Rx Power: -21.74dBm', '-21.74', ...all)).toBe(GREEN)
+  })
+
+  it('does not paint negative numbers as command-line options', () => {
+    const line = 'Temp.(C)        45.78          -45.00          90.00      normal'
+    expect(full(line).filter(([t]) => t.includes('45'))).toEqual([])
+    expect(full('ls -la /tmp').some(([t]) => t.includes('-la'))).toBe(true)
+  })
+
+  it('knows Huawei interface names', () => {
+    for (const name of ['40GE0/0/1', '100GE1/0/2', 'XGE0/0/1', 'GE0/0/44', 'MEth0/0/1', 'Vlanif2099', 'NULL0', 'LoopBack0', 'Eth-Trunk10']) {
+      expect(colorOf(`${name}   up   up   x`, name, 'cisco-huawei'), name).toBe(BLUE)
+    }
+    expect(colorOf('display transceiver diagnosis interface GigabitEthernet 0/0/21', 'GigabitEthernet 0/0/21', 'cisco-huawei')).toBe(BLUE)
+  })
+
+  it('colors the PHY and protocol columns of interface brief', () => {
+    const p = (l: string) => paint(l, 'cisco-huawei').filter(([, c]) => c !== BLUE)
+    expect(p('MEth0/0/1                 down    down')).toEqual([['down', RED], ['down', RED]])
+    expect(p('NULL0                     up      up(s)')).toEqual([['up', GREEN], ['up(s)', GREEN]])
+    expect(p('Vlanif1                   up      down')).toEqual([['up', GREEN], ['down', RED]])
+    expect(p('40GE0/0/5                 down    down     SJM-VILAR-S6730-PE')).toEqual([['down', RED], ['down', RED]])
+    expect(p('GE0/0/2                   *down   down')).toEqual([['*down', GRAY], ['down', RED]])
+    expect(p('GigabitEthernet0/1     10.0.0.1        YES manual up                    up')).toEqual([['up', GREEN], ['up', GREEN]])
+  })
+
+  it('keeps bare up/down outside the status columns uncolored', () => {
+    const rules = compileRules(DEFAULTS)
+    const spans = (l: string) => matchTextSpans(l, rules).spans.map(s => l.slice(s.start, s.end))
+    expect(spans('sudo ip link set eth0 up')).not.toContain('up')
+    expect(spans('the link went down yesterday')).not.toContain('down')
+  })
+})

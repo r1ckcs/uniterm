@@ -5,7 +5,9 @@
 // - Case-insensitive, like MobaXterm.
 // Only two regex dialect fixes were needed: "[^\]" (not-a-backslash in
 // MobaXterm) became "[^\\]", and a "]" opening a character class ("[]…]",
-// "[^]]") is escaped. Underline has no equivalent (text color only), so the
+// "[^]]") is escaped. One deliberate change: Cyan's command-line option
+// ("-x", "--flag") must start with a letter, so negative numbers ("-5.94",
+// "-26.02" in device tables) are not painted as options. Underline has no equivalent (text color only), so the
 // URL rule uses blue; Blinking is empty in this profile.
 import type { UserHighlightRule } from './userHighlightRules'
 
@@ -19,7 +21,7 @@ export const MOBAXTERM_STANDARD: Array<[string, string, string]> = [
   ["Yellow", "([^A-Za-z_&-](\\[\\-w[A-Za-z-]+\\]|unassigned|shutdown|discarded|discarding|warn|caught signal [0-9]+|cannot|(connection (to (remote host|[a-z0-9.]+) )?)?(closed|terminated|stopped|not responding)|exited|no more [A-Za-z] available|unexpected|(command |binary |file )?not found|ooo?o?o?ps|out of (space|memory)|low (memory|disk)|(user )?unknown( user)?|disabled|disconnected|deprecated|refused|disconnect(ion)?|advertencia|avvertimento|attention|warnings?|achtung|exclamation|alerts?|warnungs?|advarsel|pedwarn|aviso|varoitus|upozorenje|peringatan|uyari|varning|avertissement|\\(ww\\)|\\(\\?\\?\\)|could not|unable to)[^A-Za-z_-])|([^\\\\](\\$[\\?@\\$][^¨]|\\$\\(\\([^(\\))]+\\)\\)[^¨]|\\$\\{[^\\}]+\\}[^¨]|\\$\\[[^\\]]+\\][^¨]|\\$[A-Za-z_0-9]+[^A-Za-z_0-9]))", "theme:yellow"],
   ["Blue", "[^\\\\](\\\\(033|e)(\\[(1;)?(0|30|31|32|33|34|35|36)?m|\\((0|b))|\\[[0-9.:,]+\\]|/dev/null|\\|\\||\\&\\&)[^¨]", "theme:blue"],
   ["Magenta", "([^0-9A-Za-z_&-]([0-9a-f][0-9a-f](:|-)[0-9a-f][0-9a-f](:|-)[0-9a-f][0-9a-f](:|-)[0-9a-f][0-9a-f](:|-)[0-9a-f][0-9a-f](:|-)[0-9a-f][0-9a-f]|localhost|([1-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-4])\\.[0-9]+\\.[0-9]+\\.[0-9]+|null|none)[^0-9A-Za-z_-])|([;¨|°¤\\$\\>][ \\(]*(for(each)?|while|done|if|then|else|elif|fi|case|esac|endif|exit|eval|shift|read|continue|return)[ ;¨\\)])|[^A-Za-z_&-](interface )?(Fa[0-9/]+|Gi[0-9/]+|GigabitEthernet[0-9/]+|FastEthernet[0-9/]+|vlan[0-9]+|Dot11Radio[0-9\\\\.]+|dot[0-9][A-Za-z0-9\\\\.]+|bvi[0-9]+)[^A-Za-z_&-]", "theme:magenta"],
-  ["Cyan", "(( |\\(|\"|'|\\[|\\])-(-)?[a-zA-Z0-9_-]+( |=|,|\\.|\\)|\"|'|\\[|\\]))|([^A-Za-z_&-](last (failed )?login:|launching|checking|loading|creating|building|important|booting|starting|notice|informational|informationen|informazioni|informação|oplysninger|informations?|info|información|informasi|note|\\(ii\\)|\\(\\!\\!\\))[^A-Za-z_-])|([ ;¨](builtin )?(setenv|export|unset|builtin|shopt|unalias|echo|printf|alias|function|bindkey|setopt|unsetopt|user access verification|switchport|logging event|no ip address|service-policy|vlan-range|spanning-tree|access-list|description|running-config|startup-config|radius-server|class-map|policy-map|media-type|ip address)[ ;¨])", "theme:cyan"],
+  ["Cyan", "(( |\\(|\"|'|\\[|\\])-(-)?[a-zA-Z_][a-zA-Z0-9_-]*( |=|,|\\.|\\)|\"|'|\\[|\\]))|([^A-Za-z_&-](last (failed )?login:|launching|checking|loading|creating|building|important|booting|starting|notice|informational|informationen|informazioni|informação|oplysninger|informations?|info|información|informasi|note|\\(ii\\)|\\(\\!\\!\\))[^A-Za-z_-])|([ ;¨](builtin )?(setenv|export|unset|builtin|shopt|unalias|echo|printf|alias|function|bindkey|setopt|unsetopt|user access verification|switchport|logging event|no ip address|service-policy|vlan-range|spanning-tree|access-list|description|running-config|startup-config|radius-server|class-map|policy-map|media-type|ip address)[ ;¨])", "theme:cyan"],
 ]
 
 export function mobaxtermStandardRules(): UserHighlightRule[] {

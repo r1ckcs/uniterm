@@ -30,16 +30,38 @@ function re(pattern: string, color: string, extra: Partial<UserHighlightRule> = 
   return { id: `p${++seq}`, pattern, kind: 'regex', color, ...extra }
 }
 
-// Optical power readings followed by a dBm unit ("-23.768(dbm)",
-// "-27.1 dBm"). Ranges follow the NOC's GPON RX limits: -8..-25 good,
-// -25..-27 attention, below -27 critical, above -8 saturated. Positive
-// readings are transmit powers (normal) and stay uncolored.
+// Optical power readings, in two layouts:
+// - value followed by a dBm unit ("-23.768(dbm)", "Rx Power: -27.1dBm");
+// - Huawei transceiver table, unit in the label ("RxPower(dBm)  -21.74
+//   -26.02  1.00"): only the first value after the label (the current
+//   reading) is colored, never the alarm thresholds.
+// Ranges follow the NOC's GPON RX limits: -8..-25 good, -25..-27 attention,
+// below -27 critical, above -8 saturated. They describe received power, so
+// transmit readings stay uncolored: positive ones naturally, and negative
+// SFP TX values ("Tx Power: -5.94dBm", "TxPower(dBm) -5.94") are claimed
+// first in the terminal's own text color. No lookbehind (old WebKit), so the
+// table form paints capture group 1.
 const DBM = '(?=\\s?\\(?dbm\\)?)'
+const optical = (value: string) => `${value}${DBM}|\\brx[ _-]?power\\s*\\(dbm\\)[\\s:]*(${value})(?![\\d.])`
 const opticalRules: UserHighlightRule[] = [
-  re(`-[0-7](?:\\.\\d+)?${DBM}`, C.red),                         // saturated
-  re(`-(?:[89]|1\\d|2[0-4])(?:\\.\\d+)?${DBM}`, C.green),         // -8 .. -24.99
-  re(`-2[56](?:\\.\\d+)?${DBM}`, C.yellow),                        // -25 .. -26.99
-  re(`-(?:2[7-9]|[3-9]\\d)(?:\\.\\d+)?${DBM}`, C.red),             // <= -27
+  re('\\btx[ _-]?power\\s*(?:\\(dbm\\))?\\s*:?\\s*(-?\\d+(?:\\.\\d+)?)', C.theme('foreground'), { colorGroup1: true }),
+  re(optical('-[0-7](?:\\.\\d+)?'), C.red, { colorGroup1: true }),                 // saturated
+  re(optical('-(?:[89]|1\\d|2[0-4])(?:\\.\\d+)?'), C.green, { colorGroup1: true }), // -8 .. -24.99
+  re(optical('-2[56](?:\\.\\d+)?'), C.yellow, { colorGroup1: true }),                // -25 .. -26.99
+  re(optical('-(?:2[7-9]|[3-9]\\d)(?:\\.\\d+)?'), C.red, { colorGroup1: true }),     // <= -27
+]
+
+// "display interface brief" (Huawei) and "show ip interface brief" (Cisco):
+// the PHY/Protocol status columns right after an interface name (a token
+// with a digit), so bare up/down elsewhere stays uncolored. One rule per
+// column (anchored at line start, group 1 painted). Huawei's "*down"/
+// "^down" and Cisco's "administratively down" have their own rules;
+// "up(s)" is a spoofing loopback.
+const IF_PREFIX = '^[a-z][\\w./:-]*\\d[\\w./:-]*\\s+(?:(?:unassigned|[\\d.]+)\\s+(?:yes|no)\\s+\\S+\\s+)?'
+const STATUS = (word: string) => `(${word}(?:\\([a-z]+\\))?)(?=\\s|$)`
+const statusCols = (word: string, color: string): UserHighlightRule[] => [
+  re(`${IF_PREFIX}${STATUS(word)}`, color, { colorGroup1: true }),
+  re(`${IF_PREFIX}(?:administratively\\s+)?[*^]?(?:up|down)(?:\\([a-z]+\\))?\\s+${STATUS(word)}`, color, { colorGroup1: true }),
 ]
 
 /** Label resolver for default group names (translated at seed time). */
@@ -109,6 +131,8 @@ function networkRules(): Array<[string, UserHighlightRule[]]> {
       kw('notconnect', C.yellow),
       kw('connected', C.green, off),
       re('\\b(?:DOWN|UP) state\\b', C.yellow),
+      ...statusCols('down', C.red),
+      ...statusCols('up', C.green),
       kw('down', C.red, off),
       kw('up', C.green, off),
       // Syslog severities: Cisco %FAC-SEV-MNEMONIC, Huawei %%01FAC/SEV/MNEMONIC
@@ -118,7 +142,10 @@ function networkRules(): Array<[string, UserHighlightRule[]]> {
       re('%%\\d*[A-Z0-9_]+/[0-3]/[A-Z0-9_]+', C.red, { caseSensitive: true }),
       re('%%\\d*[A-Z0-9_]+/4/[A-Z0-9_]+', C.orange, { caseSensitive: true }),
       re('%%\\d*[A-Z0-9_]+/[5-7]/[A-Z0-9_]+', C.blue, { caseSensitive: true }),
-      re('\\b(?:(?:Ten|Forty|Hundred|Twenty[Ff]ive)?GigabitEthernet|FastEthernet|Ethernet|XGigabitEthernet|GE|XGE|Eth-Trunk|Port-channel|Gi|Te|Fa|Po)\\d+(?:/\\d+)*(?:\\.\\d+)?\\b', C.blue),
+      // Cisco and Huawei interface names, including Huawei's 10GE/25GE/40GE/
+      // 100GE ports, MEth, Vlanif, LoopBack and NULL; "GigabitEthernet 0/0/21"
+      // (with a space, as typed in commands) only in slot/port form.
+      re('\\b(?:(?:Ten|Forty|Hundred|Twenty[Ff]ive)?GigabitEthernet|FastEthernet|Ethernet|XGigabitEthernet|\\d+GE|MultiGE|GE|XGE|Eth-Trunk|Port-channel|MEth|Vlanif|Vbdif|LoopBack|NULL|Tunnel|Gi|Te|Fa|Po)(?: ?\\d+(?:/\\d+)+|\\d+)(?:\\.\\d+)?\\b', C.blue),
     ]],
   ]
 }
