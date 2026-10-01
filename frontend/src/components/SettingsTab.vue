@@ -614,7 +614,7 @@
               <div class="setting-desc">{{ t('settings.aiTranscriptionDesc') }}</div>
             </div>
             <div class="setting-control">
-              <el-switch :model-value="settingsStore.settings.terminal.aiTranscription ?? true" @update:model-value="(v: boolean) => { settingsStore.settings.terminal.aiTranscription = v; settingsStore.save() }" />
+              <el-switch :model-value="settingsStore.settings.terminal.aiTranscription ?? false" @update:model-value="(v: boolean) => { settingsStore.settings.terminal.aiTranscription = v; settingsStore.save() }" />
             </div>
           </div>
         </div>

@@ -363,7 +363,7 @@ export function useSuggestions() {
       const historyItems = getHistorySuggestions(token)
       const quickCommandItems = getQuickCommandSuggestions(token)
       const items: SuggestionItem[] = [...quickCommandItems, ...historyItems]
-      if (aiTranscriptionEnabled !== false) {
+      if (aiTranscriptionEnabled === true) {
         items.push({
           type: 'ai-preview',
           label: t('terminal.aiTranscribing'),

@@ -345,7 +345,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     middleClickAction: 'paste',
     maxHistoryLines: 2500,
     smartCompletion: true,
-    aiTranscription: true,
+    aiTranscription: false,
     highlightEnabled: true,
     cursorBlink: true,
     ctrlWheelZoom: true,

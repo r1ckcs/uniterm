@@ -1401,7 +1401,7 @@ onMounted(() => {
           const isPrintable = data.length === 1 && data >= ' '
           if (!wasVisible && !isPrintable) return
           if (terminalInput.isAtLineEnd() && terminalInput.currentToken.value && !terminalInput.isPasswordMode()) {
-            suggestions.updateSuggestions(terminalInput.currentToken.value, settingsStore.settings.terminal.aiTranscription)
+            suggestions.updateSuggestions(terminalInput.currentToken.value, settingsStore.settings.terminal.aiTranscription === true)
           } else {
             suggestions.close()
           }
