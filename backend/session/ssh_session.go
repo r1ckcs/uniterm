@@ -983,7 +983,11 @@ func probeCwdShellSeparately(config ConnectionConfig) string {
 			User:            config.User,
 			Auth:            authMethods,
 			Timeout:         cwdProbeDialTimeout,
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+			// Never prompt here (the main dial asks), and never skip the
+			// check: this connection sends the same credentials. On a first
+			// visit the key is not trusted yet, so the probe fails and the
+			// hook is simply skipped for this session.
+			HostKeyCallback: hostKeyCallbackNoPrompt(),
 		}, cleanup, nil
 	}
 	sets, err := resolveSSHDialAlgorithms(config.SSHAlgorithms)

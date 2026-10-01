@@ -12,6 +12,7 @@ package session
 
 import (
 	"net"
+	"path/filepath"
 	"strconv"
 	"sync/atomic"
 	"testing"
@@ -113,6 +114,23 @@ func startProbeTrackingServer(t *testing.T, killOnExec bool) (addr string, conns
 	return ln.Addr().String(), conns
 }
 
+// trustProbeTestHost points the app known_hosts at a temp file that already
+// trusts the test server's key, so Connect neither prompts nor (for the
+// probe connection, which never prompts) skips the shell probe.
+func trustProbeTestHost(t *testing.T, addr string) {
+	t.Helper()
+	signer, err := ssh.ParsePrivateKey([]byte(testHostKeyPEM))
+	if err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(t.TempDir(), "known_hosts")
+	if err := appendKnownHost(file, addr, signer.PublicKey()); err != nil {
+		t.Fatal(err)
+	}
+	SetKnownHostsPath(file)
+	t.Cleanup(func() { SetKnownHostsPath("") })
+}
+
 func probeTestConfig(addr string) ConnectionConfig {
 	host, portStr, _ := net.SplitHostPort(addr)
 	port, _ := strconv.Atoi(portStr)
@@ -162,6 +180,7 @@ func waitForProbeConns(t *testing.T, conns chan *probeConnActivity, n int) []*pr
 // carries an exec.
 func TestSSHConnectSurvivesExecKillingServer(t *testing.T) {
 	addr, conns := startProbeTrackingServer(t, true)
+	trustProbeTestHost(t, addr)
 	s := NewSSHSession("probe-killer-" + t.Name())
 	if err := s.Connect(probeTestConfig(addr)); err != nil {
 		t.Fatalf("connect: %v", err)
@@ -202,6 +221,7 @@ func TestSSHConnectSurvivesExecKillingServer(t *testing.T) {
 // the exec probe rides a second TCP connection of its own.
 func TestSSHShellProbeRunsOnSeparateConnection(t *testing.T) {
 	addr, conns := startProbeTrackingServer(t, false)
+	trustProbeTestHost(t, addr)
 	s := NewSSHSession("probe-separate-" + t.Name())
 	if err := s.Connect(probeTestConfig(addr)); err != nil {
 		t.Fatalf("connect: %v", err)
