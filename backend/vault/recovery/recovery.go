@@ -242,28 +242,57 @@ func anchors(s vault.Store, k *Key) ([]vault.TrustState, error) {
 // user confirms the words. An existing recovery key is revoked (with key
 // rotation) once the new one is in place: an old paper copy stops working.
 func Setup(s vault.Store, v *vault.Vault) ([]string, error) {
-	words, k, err := Generate()
+	words, _, err := Generate()
 	if err != nil {
 		return nil, err
 	}
-	var old []string
-	for _, m := range v.Roster().Members {
-		if IsRecoveryMember(m) {
-			old = append(old, m.DeviceID)
-		}
-	}
-	if err := v.AddMember(vault.MemberOf(k, "", RecoveryName, vault.RoleAdmin)); err != nil {
-		return nil, err
-	}
-	for _, id := range old {
-		if err := v.Revoke(id); err != nil {
-			return nil, fmt.Errorf("recovery: new key added, but revoking the old one failed: %w", err)
-		}
-	}
-	if err := writeAnchor(s, k, v.Trust()); err != nil {
+	if err := SetupWithWords(s, v, words); err != nil {
 		return nil, err
 	}
 	return words, nil
+}
+
+// SetupWithWords is Setup with a phrase generated earlier (Generate), so the
+// words can be shown and confirmed before anything is written: an existing
+// recovery key keeps working until the user confirmed the new one. It is
+// safe to run again with the same words after a partial failure. The new
+// key's anchor is written as soon as it is a member, and again after the
+// old key is revoked, so no failure in between leaves the vault without a
+// working phrase; the newest anchor is the one after every revocation done
+// so far (a revoked admin can fork from older ones).
+func SetupWithWords(s vault.Store, v *vault.Vault, words []string) error {
+	k, err := KeyFromWords(words)
+	if err != nil {
+		return err
+	}
+	id := k.DeviceID()
+	var old []string
+	present := false
+	for _, m := range v.Roster().Members {
+		switch {
+		case m.DeviceID == id:
+			present = true
+		case IsRecoveryMember(m):
+			old = append(old, m.DeviceID)
+		}
+	}
+	if !present {
+		if err := v.AddMember(vault.MemberOf(k, "", RecoveryName, vault.RoleAdmin)); err != nil {
+			return err
+		}
+	}
+	if err := writeAnchor(s, k, v.Trust()); err != nil {
+		return err
+	}
+	for _, oid := range old {
+		if err := v.Revoke(oid); err != nil {
+			return fmt.Errorf("recovery: new key added, but revoking the old one failed: %w", err)
+		}
+	}
+	if len(old) == 0 {
+		return nil
+	}
+	return writeAnchor(s, k, v.Trust())
 }
 
 // Recover lets dev into the vault in s with the recovery phrase: it opens

@@ -386,3 +386,134 @@ func TestRevokingAdminMarksRecoveryStale(t *testing.T) {
 		t.Fatal("revoking an admin should suggest a new recovery key")
 	}
 }
+
+func recoveryMember(t *testing.T, d *device) string {
+	t.Helper()
+	devs, err := d.Devices()
+	must(t, err)
+	id := ""
+	for _, x := range devs {
+		if x.IsRecovery {
+			if id != "" {
+				t.Fatalf("two recovery members: %+v", devs)
+			}
+			id = x.ID
+		}
+	}
+	if id == "" {
+		t.Fatal("no recovery member")
+	}
+	return id
+}
+
+func confirmShown(t *testing.T, d *device) []string {
+	t.Helper()
+	words, err := d.RecoveryWords()
+	must(t, err)
+	idx := d.Status().RecoveryCheck
+	answers := make([]string, len(idx))
+	for i, p := range idx {
+		answers[i] = words[p]
+	}
+	must(t, d.ConfirmRecovery(idx, answers))
+	return words
+}
+
+func TestRegenerateRecoveryAfterRevokingAdmin(t *testing.T) {
+	shared := t.TempDir()
+	a := newDevice(t, shared, "mac-a")
+	b := newDevice(t, shared, "mac-b")
+	a.bridge.put(t, conn{ID: "c1", Name: "olt", Host: "h", Password: "p"})
+	oldWords := create(t, a)
+	_, err := a.Sync()
+	must(t, err)
+	approve(t, a, b, vault.RoleAdmin)
+	oldRecov := recoveryMember(t, a)
+	res, err := a.Revoke(b.Status().Device.ID)
+	must(t, err)
+	if !res.RecoveryStale {
+		t.Fatal("RecoveryStale not set")
+	}
+	revokedAt := a.v.Trust().Counter
+
+	// Non-admins can't; outside ready it's the wrong phase.
+	if err := b.RegenerateRecovery(); code(err) != CodeRevoked || b.Status().Phase != PhaseRevoked {
+		t.Fatalf("revoked device regenerate = %v, %+v", err, b.Status().Phase)
+	}
+
+	// Cancel: nothing written, the old key stays.
+	must(t, a.RegenerateRecovery())
+	if st := a.Status(); st.Phase != PhaseShowRecovery || !st.RecoveryRegen || len(st.RecoveryCheck) != 3 {
+		t.Fatalf("regen status = %+v", st)
+	}
+	trust := a.v.Trust()
+	must(t, a.CancelRecovery())
+	if a.Status().Phase != PhaseReady || a.v.Trust() != trust || recoveryMember(t, a) != oldRecov {
+		t.Fatal("cancel changed the vault")
+	}
+
+	// Wrong words: still nothing written.
+	must(t, a.RegenerateRecovery())
+	idx := a.Status().RecoveryCheck
+	if err := a.ConfirmRecovery(idx, []string{"zoo", "zoo", "zoo"}); code(err) != CodeRecoveryMismatch {
+		t.Fatalf("wrong words = %v", err)
+	}
+	if a.v.Trust() != trust {
+		t.Fatal("wrong words wrote something")
+	}
+	newWords := confirmShown(t, a)
+	if a.Status().Phase != PhaseReady || a.Status().RecoveryRegen {
+		t.Fatalf("after confirm: %+v", a.Status())
+	}
+	if recoveryMember(t, a) == oldRecov || strings.Join(newWords, " ") == strings.Join(oldWords, " ") {
+		t.Fatal("recovery key not replaced")
+	}
+
+	// The old phrase no longer opens the vault; the new one does, from an
+	// anchor after the admin's revocation.
+	c := newDevice(t, shared, "mac-c")
+	must(t, c.SignIn())
+	waitFor(t, "awaitingApproval", func() bool { return c.Status().Phase == PhaseAwaitingApproval })
+	if err := c.RecoverWithWords(oldWords); err == nil {
+		t.Fatal("old phrase still works")
+	}
+	must(t, c.RecoverWithWords(newWords))
+	if c.Status().Phase != PhaseReady {
+		t.Fatalf("c = %+v", c.Status())
+	}
+	if got := c.v.Trust().Counter; got <= revokedAt {
+		t.Fatalf("recovered at %d, not after the revocation at %d", got, revokedAt)
+	}
+	_, err = c.Sync()
+	must(t, err)
+	if got, ok := c.bridge.get(t, "c1"); !ok || got.Password != "p" {
+		t.Fatalf("c c1 = %+v", got)
+	}
+}
+
+func TestRegenerateNeedsReadyAdmin(t *testing.T) {
+	shared := t.TempDir()
+	a := newDevice(t, shared, "mac-a")
+	if err := a.RegenerateRecovery(); code(err) != CodeWrongPhase {
+		t.Fatalf("before the vault = %v", err)
+	}
+	if err := a.CancelRecovery(); code(err) != CodeWrongPhase {
+		t.Fatalf("cancel without regen = %v", err)
+	}
+	b := newDevice(t, shared, "mac-b")
+	create(t, a)
+	approve(t, a, b, vault.RoleWriter)
+	if err := b.RegenerateRecovery(); code(err) != CodeNotAdmin {
+		t.Fatalf("writer = %v", err)
+	}
+	// Creation's showRecovery can't be cancelled as a replacement.
+	n := newDevice(t, t.TempDir(), "mac-n")
+	must(t, n.SignIn())
+	waitFor(t, "showRecovery", func() bool { return n.Status().Phase == PhaseShowRecovery })
+	if n.Status().RecoveryRegen {
+		t.Fatal("creation flagged as regen")
+	}
+	if err := n.CancelRecovery(); code(err) != CodeWrongPhase {
+		t.Fatalf("cancel during creation = %v", err)
+	}
+}

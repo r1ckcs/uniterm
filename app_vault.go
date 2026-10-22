@@ -287,6 +287,26 @@ func (a *App) VaultConfirmRecovery(idx []int, words []string) error {
 	return v.ConfirmRecovery(idx, words)
 }
 
+// VaultRegenerateRecovery (admin) starts replacing the recovery phrase:
+// phase showRecovery with recoveryRegen; confirm with VaultConfirmRecovery.
+func (a *App) VaultRegenerateRecovery() error {
+	v, err := a.vault()
+	if err != nil {
+		return err
+	}
+	return v.RegenerateRecovery()
+}
+
+// VaultCancelRecovery abandons a replacement started by
+// VaultRegenerateRecovery (the old phrase keeps working).
+func (a *App) VaultCancelRecovery() error {
+	v, err := a.vault()
+	if err != nil {
+		return err
+	}
+	return v.CancelRecovery()
+}
+
 func (a *App) VaultRecoverWithWords(words []string) error {
 	v, err := a.vault()
 	if err != nil {
