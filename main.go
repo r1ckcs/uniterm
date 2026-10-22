@@ -409,6 +409,10 @@ func windowBackgroundColour(theme string) application.RGBA {
 		return application.RGBA{Red: 16, Green: 23, Blue: 40, Alpha: 255} // #101728
 	case "light":
 		return application.RGBA{Red: 255, Green: 255, Blue: 255, Alpha: 255} // #ffffff
+	case "flexterm":
+		return application.RGBA{Red: 10, Green: 17, Blue: 32, Alpha: 255} // #0a1120
+	case "flexterm-light":
+		return application.RGBA{Red: 244, Green: 246, Blue: 251, Alpha: 255} // #f4f6fb
 	default:
 		return application.RGBA{Red: 27, Green: 31, Blue: 39, Alpha: 255} // #1b1f27
 	}
