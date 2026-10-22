@@ -37,10 +37,12 @@ export interface VaultApi {
   cancelJoin(): Promise<void>
   rejectJoin(requestId: string): Promise<void>
   syncNow(): Promise<VaultSyncResult>
-  // New recovery key: phase → showRecovery (same 24-word flow as the first
-  // device). Binding planned for the next round (CONTRATO v4); until it exists
-  // the UI shows only the warning.
+  // New recovery key: nothing is written; phase → showRecovery with
+  // recoveryRegen, then the same 24-word flow as the first device (CONTRATO v6).
+  // Optional so a build without the binding shows only the warning.
   regenerateRecovery?: () => Promise<void>
+  // Gives up a regeneration: back to ready, the old phrase stays valid.
+  cancelRecovery(): Promise<void>
   signOut(): Promise<void>
   changedMap(): Promise<Record<string, VaultChange>>
   onStatus(cb: (s: VaultStatus) => void): () => void
@@ -88,6 +90,7 @@ function realVaultApi(): VaultApi | null {
     cancelJoin: () => call('VaultCancelJoin'),
     syncNow: () => call('VaultSyncNow'),
     regenerateRecovery: typeof B.VaultRegenerateRecovery === 'function' ? () => call('VaultRegenerateRecovery') : undefined,
+    cancelRecovery: () => call('VaultCancelRecovery'),
     signOut: () => call('VaultSignOut'),
     changedMap: async () => (await call<Record<string, VaultChange> | null>('VaultChangedMap')) ?? {},
     onStatus: (cb) => on('vault:status', cb),
@@ -218,7 +221,7 @@ export function createMockVaultApi(scenario: string, delayMs = 1500, connectionI
     async confirmRecovery(positions, words) {
       const ok = positions.every((p, i) => MOCK_WORDS[p] === words[i]?.trim().toLowerCase())
       if (!ok) throw new VaultError('vault.recovery.mismatch')
-      set({ phase: 'ready', recoveryCheck: undefined, lastSyncAt: new Date().toISOString() })
+      set({ phase: 'ready', recoveryCheck: undefined, recoveryRegen: false, lastSyncAt: new Date().toISOString() })
     },
     async recoverWithWords(words) {
       if (words.length !== MOCK_WORDS.length) throw new VaultError('vault.recovery.badWords')
@@ -293,7 +296,12 @@ export function createMockVaultApi(scenario: string, delayMs = 1500, connectionI
       return { pulled: 2, pushed: 0, rejected: 0, warnings: [] }
     },
     async regenerateRecovery() {
-      set({ phase: 'showRecovery', recoveryCheck: MOCK_CHECK })
+      if (status.phase !== 'ready') throw new VaultError('vault.state.wrongPhase')
+      set({ phase: 'showRecovery', recoveryCheck: MOCK_CHECK, recoveryRegen: true })
+    },
+    async cancelRecovery() {
+      if (!status.recoveryRegen) throw new VaultError('vault.state.wrongPhase')
+      set({ phase: 'ready', recoveryCheck: undefined, recoveryRegen: false })
     },
     async signOut() {
       clearTimeout(timer)

@@ -37,12 +37,14 @@
         <li v-for="(w, i) in words" :key="i"><span class="vault-word-n">{{ i + 1 }}</span><span class="vault-word">{{ w }}</span></li>
       </ol>
       <div class="vault-warn"><TriangleAlert class="vi-sm" /><span>{{ t('vault.recovery.warn') }}</span></div>
+      <p v-if="regen" class="vault-muted">{{ t('vault.recovery.regenNote') }}</p>
       <el-checkbox v-model="wroteDown">{{ t('vault.recovery.wroteDown') }}</el-checkbox>
     </div>
 
     <!-- Confirm 3 words -->
     <div v-else-if="step === 'confirm'" class="vault-step">
       <p class="vault-lead">{{ t('vault.confirm.lead') }}</p>
+      <p v-if="regen" class="vault-muted">{{ t('vault.recovery.regenNote') }}</p>
       <div class="vault-confirm">
         <label v-for="(pos, i) in checkPositions" :key="pos" class="vault-confirm-row">
           <span class="vault-confirm-label">{{ t('vault.confirm.word', { n: pos + 1 }) }}</span>
@@ -133,10 +135,14 @@
         </el-button>
       </template>
       <el-button v-else-if="step === 'browser'" @click="vault.cancelSignIn()">{{ t('common.cancel') }}</el-button>
-      <el-button v-else-if="step === 'words'" type="primary" :disabled="!wroteDown" @click="goConfirm">{{ t('vault.recovery.next') }}</el-button>
+      <template v-else-if="step === 'words'">
+        <el-button v-if="regen" @click="onCancelRegen">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" :disabled="!wroteDown" @click="goConfirm">{{ t('vault.recovery.next') }}</el-button>
+      </template>
       <template v-else-if="step === 'confirm'">
+        <el-button v-if="regen" @click="onCancelRegen">{{ t('common.cancel') }}</el-button>
         <el-button @click="step = 'words'">{{ t('vault.confirm.back') }}</el-button>
-        <el-button type="primary" :loading="vault.busy" :disabled="confirmWords.some((w) => !w.trim())" @click="onConfirm">{{ t('vault.confirm.submit') }}</el-button>
+        <el-button type="primary" :loading="vault.busy" :disabled="confirmWords.some((w) => !w.trim())" @click="onConfirm">{{ regen ? t('vault.confirm.submitRegen') : t('vault.confirm.submit') }}</el-button>
       </template>
       <template v-else-if="step === 'approval'">
         <el-button @click="vault.cancelJoin()">{{ t('vault.approval.cancel') }}</el-button>
@@ -182,6 +188,7 @@ const tick = setInterval(() => { now.value = Date.now() }, 1000)
 onUnmounted(() => clearInterval(tick))
 
 const pending = computed(() => vault.status.pendingJoin)
+const regen = computed(() => !!vault.status.recoveryRegen)
 const checkPositions = computed(() => vault.status.recoveryCheck ?? [])
 const recoverWords = computed(() => parseRecoveryWords(recoverText.value))
 const expiresIn = computed(() => (pending.value ? formatCountdown(pending.value.expiresAt, now.value) : ''))
@@ -192,7 +199,7 @@ const title = computed(() => ({
   welcome: t('vault.welcome.title'),
   browser: t('vault.browser.title'),
   creating: t('vault.browser.title'),
-  words: t('vault.recovery.title'),
+  words: regen.value ? t('vault.recovery.regenTitle') : t('vault.recovery.title'),
   confirm: t('vault.confirm.title'),
   approval: t('vault.approval.title'),
   recover: t('vault.recover.title'),
@@ -217,7 +224,8 @@ watch(() => vault.status.phase, async (p) => {
     case 'awaitingApproval': if (step.value !== 'recover') step.value = 'approval'; break
     case 'revoked': step.value = 'revoked'; break
     case 'error': step.value = 'error'; break
-    case 'ready': wipeSecrets(); break
+    // Reset the sub-step too: a later regeneration must fetch fresh words.
+    case 'ready': wipeSecrets(); step.value = 'welcome'; break
   }
 }, { immediate: true })
 
@@ -236,6 +244,11 @@ async function onComplete() {
   if (code4.value.length !== 4) return
   if (await vault.completeJoin(code4.value)) wipeSecrets()
   else code4.value = ''
+}
+
+async function onCancelRegen() {
+  await vault.cancelRecovery()
+  wipeSecrets()
 }
 
 async function onRecover() {

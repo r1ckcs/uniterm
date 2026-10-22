@@ -126,6 +126,17 @@ describe('vault store (mock backend)', () => {
     expect(vault.canRegenerateRecovery).toBe(true)
     expect(await vault.regenerateRecovery()).toBe(true)
     expect(vault.phase).toBe('showRecovery')
+    expect(vault.status.recoveryRegen).toBe(true)
+    // Cancel keeps the old phrase: the warning stays.
+    await vault.cancelRecovery()
+    expect(vault.phase).toBe('ready')
+    expect(vault.lastRevoke!.recoveryStale).toBe(true)
+    // Confirming the new phrase is what clears it.
+    await vault.regenerateRecovery()
+    const words = await vault.recoveryWords()
+    expect(await vault.confirmRecovery(vault.status.recoveryCheck!.map((i) => words[i]))).toBe(true)
+    expect(vault.phase).toBe('ready')
+    expect(vault.status.recoveryRegen).toBe(false)
     expect(vault.lastRevoke!.recoveryStale).toBe(false)
   })
 

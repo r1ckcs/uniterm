@@ -23,6 +23,9 @@ export interface VaultStatus {
   // means the approver accepted it and now shows the 4 digits to type here.
   pendingJoin?: { code6?: string; fingerprint: string; expiresAt: string; approved: boolean; attemptsLeft: number }
   recoveryCheck?: number[] // 0-based positions to confirm, only in showRecovery
+  // showRecovery is replacing the phrase of an open vault (Cancel allowed, the
+  // old phrase stays valid until confirm), not creating the vault (CONTRATO v6).
+  recoveryRegen?: boolean
   lastSyncAt?: string
   syncing: boolean
   offline: boolean
