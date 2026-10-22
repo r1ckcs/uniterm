@@ -1176,3 +1176,28 @@ func TestClientOnAttackerForkReturns(t *testing.T) {
 		t.Fatalf("victim stayed on the fork: %+v (admin at %+v)", victim.Trust(), tm.va.Trust())
 	}
 }
+
+func TestRosterFloodFailsClosed(t *testing.T) {
+	old := maxRosterNodes
+	maxRosterNodes = 8
+	defer func() { maxRosterNodes = old }()
+	s := &driveLike{MemStore: NewMemStore()}
+	tm := newTeam(t, s)
+	r := newKey(t)
+	must(t, tm.va.AddMember(MemberOf(r, "henrique", "mac-roubado", RoleAdmin)))
+	before, k := tm.va.Roster(), tm.va.Trust()
+	must(t, tm.va.Revoke(IDOf(r)))
+	// The revoked admin floods valid children of k, backdated before the
+	// real revocation.
+	s.created = map[string]int64{}
+	for i := range 10 {
+		f := cloneRoster(before)
+		f.Counter, f.Prev = k.Counter+1, k.Hash
+		f.Members = append(f.Members, MemberOf(newKey(t), "x", fmt.Sprint("x", i), RoleReader))
+		_, err := writeRoster(s, r, &f)
+		must(t, err)
+	}
+	if _, err := openAt(s, tm.w, k); !errors.Is(err, ErrRosterFlood) || !errors.Is(err, ErrFork) {
+		t.Fatalf("open from k = %v, want ErrRosterFlood", err)
+	}
+}

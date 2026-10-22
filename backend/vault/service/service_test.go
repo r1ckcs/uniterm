@@ -271,6 +271,9 @@ func TestFlowCreateApproveSyncRevoke(t *testing.T) {
 	}
 	res, err := a.Revoke(bID)
 	must(t, err)
+	if res.RecoveryStale {
+		t.Fatal("revoking a writer marked the recovery key stale")
+	}
 	if len(res.Exposed) != 2 {
 		t.Fatalf("exposed = %+v", res.Exposed)
 	}
@@ -368,5 +371,18 @@ func TestQueueRewritesOpRefusedAfterRotation(t *testing.T) {
 	must(t, err)
 	if got, ok := a.bridge.get(t, "late"); !ok || got.Name != "tardia" {
 		t.Fatalf("a did not get the rewritten op: %+v %v", got, ok)
+	}
+}
+
+func TestRevokingAdminMarksRecoveryStale(t *testing.T) {
+	shared := t.TempDir()
+	a := newDevice(t, shared, "mac-a")
+	b := newDevice(t, shared, "mac-b")
+	create(t, a)
+	approve(t, a, b, vault.RoleAdmin)
+	res, err := a.Revoke(b.Status().Device.ID)
+	must(t, err)
+	if !res.RecoveryStale {
+		t.Fatal("revoking an admin should suggest a new recovery key")
 	}
 }

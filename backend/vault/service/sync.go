@@ -315,7 +315,8 @@ func (s *Service) Revoke(id string) (RevokeResult, error) {
 	if id == vault.IDOf(s.dev) {
 		return RevokeResult{}, newError(CodeRevokeSelf, "a device can't revoke itself")
 	}
-	if m, ok := s.memberLocked(id); ok && recovery.IsRecoveryMember(m) {
+	target, _ := s.memberLocked(id)
+	if recovery.IsRecoveryMember(target) {
 		return RevokeResult{}, newError(CodeInternal, "the recovery key is replaced, not revoked")
 	}
 	var err error
@@ -332,7 +333,7 @@ func (s *Service) Revoke(id string) (RevokeResult, error) {
 	if err != nil {
 		return RevokeResult{}, asError(err)
 	}
-	res := RevokeResult{Exposed: []Exposed{}}
+	res := RevokeResult{Exposed: []Exposed{}, RecoveryStale: target.Role == vault.RoleAdmin}
 	for k, r := range s.replayLocked(log.Ops).Records {
 		if k.Kind != records.Connection {
 			continue
@@ -481,8 +482,14 @@ func (s *Service) ApproveJoin(id, code6 string, role vault.Role) (string, error)
 		s.o.Emit("vault:joinRequest", s.requestLocked(a.Request(), a))
 		return "", asError(err)
 	}
-	if err != nil {
+	if errors.Is(err, join.ErrTooManyAttempts) || errors.Is(err, join.ErrExpired) || errors.Is(err, join.ErrRefused) {
 		delete(s.approvals, id)
+		return "", asError(err)
+	}
+	if err != nil {
+		// Transient (network, lost race): keep the approval. The new device
+		// already answered this offer, so a new one would never be ready;
+		// retrying with the same code works.
 		return "", asError(err)
 	}
 	delete(s.approvals, id)

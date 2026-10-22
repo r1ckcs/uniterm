@@ -185,7 +185,7 @@ func (s *Service) deviceName() string {
 	if s.o.DeviceName != "" {
 		return s.o.DeviceName
 	}
-	return "uniTerm"
+	return "FlexTerm"
 }
 
 // Start resumes a saved sign-in (no browser) in the background.
@@ -674,10 +674,11 @@ func (s *Service) RecoverWithWords(words []string) error {
 	if err != nil {
 		return asError(err)
 	}
+	// Withdraw the pending join request (join/<req> is not left behind).
+	s.stopLocked()
 	if err := (vault.FileState{Path: s.path("state.json")}).Save(vault.State{Trust: t, NextSeq: 1}); err != nil {
 		return asError(err)
 	}
-	s.stopLocked()
 	if err := s.openLocked(); err != nil {
 		return s.failLocked(err)
 	}

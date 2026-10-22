@@ -510,9 +510,15 @@ func loadRoster(s Store, trust TrustState) (*rosterChain, error) {
 				return nil, err
 			}
 			child := validChild(data, trust.VaultID, frontier)
-			if child == nil || nodes >= maxRosterNodes {
+			if child == nil {
 				invalid++
 				continue
+			}
+			if nodes >= maxRosterNodes {
+				// Which versions would be left out depends on the listing
+				// order, which a revoked admin can steer (backdated
+				// createdTime): never choose among the rest.
+				return nil, ErrRosterFlood
 			}
 			child.created = e.Created
 			child.parent.children = append(child.parent.children, child)
@@ -552,9 +558,9 @@ func loadRoster(s Store, trust TrustState) (*rosterChain, error) {
 	return ch, nil
 }
 
-// maxRosterNodes bounds the tree of valid versions loadRoster builds (each
+// maxRosterNodes (a variable for tests) bounds the tree of valid versions loadRoster builds (each
 // costs a valid admin signature, so only admins can grow it).
-const maxRosterNodes = 4096
+var maxRosterNodes = 4096
 
 type rosterNode struct {
 	vr       *verifiedRoster
@@ -617,6 +623,10 @@ func (n *rosterNode) subtree() (revoked, signers map[string]bool) {
 	n.revoked, n.signers = revoked, signers
 	return revoked, signers
 }
+
+// ErrRosterFlood: more valid roster versions than maxRosterNodes (only
+// admins, current or revoked, can sign them): fail closed.
+var ErrRosterFlood = fmt.Errorf("%w: too many valid roster versions; resolve it from a trusted device", ErrFork)
 
 // ErrConflict: two branches of the roster revoke each other's signers.
 var ErrConflict = fmt.Errorf("%w: conflicting roster history (branches revoke each other); resolve it from a trusted device", ErrFork)

@@ -107,6 +107,10 @@ type Exposed struct {
 
 type RevokeResult struct {
 	Exposed []Exposed `json:"exposed"`
+	// RecoveryStale: an admin was revoked. The recovery anchor predates the
+	// revocation, so the revoked admin could fork from it (recovery then
+	// fails closed): suggest generating a new recovery key.
+	RecoveryStale bool `json:"recoveryStale"`
 }
 
 // Bridge connects the vault to the app's stores.
