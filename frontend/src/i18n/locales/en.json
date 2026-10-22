@@ -1950,5 +1950,10 @@
   "vault.join.confirmHint": "Without it the new device does not join, even with the code accepted.",
   "vault.approval.leadConfirm": "Approved on the other device. Type the 4-digit number it is showing:",
   "vault.approval.finish": "Finish",
-  "vault.approval.onlyOther": "Only type here the number your other device showed."
+  "vault.approval.onlyOther": "Only type here the number your other device showed.",
+  "vault.role.adminHint": "Admin can approve and revoke devices.",
+  "vault.role.writerHint": "Can edit connections; cannot approve or revoke devices.",
+  "vault.role.readerHint": "Can use connections and read their passwords; cannot change them.",
+  "vault.revoke.recoveryStale": "Generate a new recovery key: the current one was created before this revocation.",
+  "vault.revoke.newRecovery": "New recovery key"
 }

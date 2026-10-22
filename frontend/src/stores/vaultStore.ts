@@ -184,6 +184,14 @@ export const useVaultStore = defineStore('vault', () => {
   function closeConfirmation() {
     confirmation.value = null
   }
+  const canRegenerateRecovery = computed(() => !!getVaultApi().regenerateRecovery)
+  async function regenerateRecovery() {
+    const fn = getVaultApi().regenerateRecovery
+    if (!fn) return false
+    const r = await run(() => fn())
+    if (r.ok && lastRevoke.value) lastRevoke.value = { ...lastRevoke.value, recoveryStale: false }
+    return r.ok
+  }
   const syncNow = () => run(() => api().syncNow())
   async function signOut() {
     await run(() => api().signOut())
@@ -208,6 +216,6 @@ export const useVaultStore = defineStore('vault', () => {
     phase, isAdmin, integrityAlert, onboardingVisible, joinRequest, visibleJoinRequests, snoozeJoin, unsnoozeJoins,
     start, refresh, clearError, signIn, cancelSignIn, skip, recoveryWords, confirmRecovery,
     recoverWithWords, revokeDevice, renameThisDevice, beginApproval, approveJoin, rejectJoin,
-    completeJoin, cancelJoin, closeConfirmation, syncNow, signOut, openOnboarding, closeOnboarding, changeFor,
+    completeJoin, cancelJoin, closeConfirmation, canRegenerateRecovery, regenerateRecovery, syncNow, signOut, openOnboarding, closeOnboarding, changeFor,
   }
 })

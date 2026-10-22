@@ -144,6 +144,13 @@
             </li>
           </ul>
           <p v-else class="vault-muted">{{ t('vault.revoke.exposedNone') }}</p>
+          <div v-if="vault.lastRevoke.recoveryStale" class="vault-stale">
+            <TriangleAlert class="vi-md" />
+            <span>{{ t('vault.revoke.recoveryStale') }}</span>
+            <el-button v-if="vault.canRegenerateRecovery" size="small" type="primary" :loading="vault.busy" @click="vault.regenerateRecovery()">
+              {{ t('vault.revoke.newRecovery') }}
+            </el-button>
+          </div>
         </div>
       </div>
 
@@ -155,7 +162,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { Cloud, KeyRound, Laptop, ShieldAlert, ShieldOff } from '@lucide/vue'
+import { Cloud, KeyRound, Laptop, ShieldAlert, ShieldOff, TriangleAlert } from '@lucide/vue'
 import { useI18n, locale } from '../i18n'
 import { useVaultStore } from '../stores/vaultStore'
 import type { VaultDevice } from '../types/vault'
@@ -291,6 +298,20 @@ async function onSignOut() {
 .vault-device-meta { display: flex; gap: 0.375rem; flex-wrap: wrap; font-size: 0.75rem; color: var(--text-muted); }
 
 .vault-exposed { border-color: var(--warning); }
+.vault-stale {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.875rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--warning-subtle);
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+}
+.vault-stale svg { color: var(--warning); flex-shrink: 0; }
+.vault-stale span { flex: 1; min-width: 12rem; }
 .vault-exposed-list { margin: 0.625rem 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8125rem; color: var(--text-primary); }
 .vault-exposed-list li { display: flex; gap: 0.75rem; }
 /* Icon sizes in rem so they follow the UI scale. */

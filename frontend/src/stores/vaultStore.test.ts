@@ -120,6 +120,13 @@ describe('vault store (mock backend)', () => {
     expect(await vault.revokeDevice('dev-mac-noc')).toBe(true)
     expect(vault.devices.some((d) => d.id === 'dev-mac-noc')).toBe(false)
     expect(vault.lastRevoke).not.toBeNull()
+    // Revoking an admin makes the recovery key stale; a new one goes through
+    // the same 24-word flow.
+    expect(vault.lastRevoke!.recoveryStale).toBe(true)
+    expect(vault.canRegenerateRecovery).toBe(true)
+    expect(await vault.regenerateRecovery()).toBe(true)
+    expect(vault.phase).toBe('showRecovery')
+    expect(vault.lastRevoke!.recoveryStale).toBe(false)
   })
 
   it('changed-by map is keyed by connection id', async () => {

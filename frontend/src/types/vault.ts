@@ -63,6 +63,9 @@ export interface VaultSyncResult { pulled: number; pushed: number; rejected: num
 
 export interface VaultRevokeResult {
   exposed: { connectionId: string; name: string; host: string }[]
+  // An admin was revoked, so the recovery key predates the revocation and a
+  // new one should be generated (CONTRATO v4).
+  recoveryStale: boolean
 }
 
 export const RECOVERY_WORD_COUNT = 24

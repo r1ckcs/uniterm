@@ -1950,5 +1950,10 @@
   "vault.join.confirmHint": "Sem ele o aparelho novo não entra, mesmo com o código aceito.",
   "vault.approval.leadConfirm": "Aprovado no outro aparelho. Digite o número de 4 dígitos que aparece nele:",
   "vault.approval.finish": "Concluir",
-  "vault.approval.onlyOther": "Só digite aqui o número que o seu outro aparelho mostrou."
+  "vault.approval.onlyOther": "Só digite aqui o número que o seu outro aparelho mostrou.",
+  "vault.role.adminHint": "Administrador pode aprovar e revogar aparelhos.",
+  "vault.role.writerHint": "Pode editar conexões; não aprova nem revoga aparelhos.",
+  "vault.role.readerHint": "Usa as conexões e lê as senhas; não altera nada.",
+  "vault.revoke.recoveryStale": "Gere uma nova chave de recuperação: a atual foi criada antes desta revogação.",
+  "vault.revoke.newRecovery": "Nova chave de recuperação"
 }

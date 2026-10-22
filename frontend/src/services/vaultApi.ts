@@ -37,6 +37,10 @@ export interface VaultApi {
   cancelJoin(): Promise<void>
   rejectJoin(requestId: string): Promise<void>
   syncNow(): Promise<VaultSyncResult>
+  // New recovery key: phase → showRecovery (same 24-word flow as the first
+  // device). Binding planned for the next round (CONTRATO v4); until it exists
+  // the UI shows only the warning.
+  regenerateRecovery?: () => Promise<void>
   signOut(): Promise<void>
   changedMap(): Promise<Record<string, VaultChange>>
   onStatus(cb: (s: VaultStatus) => void): () => void
@@ -83,6 +87,7 @@ function realVaultApi(): VaultApi | null {
     completeJoin: (code4) => call('VaultCompleteJoin', code4),
     cancelJoin: () => call('VaultCancelJoin'),
     syncNow: () => call('VaultSyncNow'),
+    regenerateRecovery: typeof B.VaultRegenerateRecovery === 'function' ? () => call('VaultRegenerateRecovery') : undefined,
     signOut: () => call('VaultSignOut'),
     changedMap: async () => (await call<Record<string, VaultChange> | null>('VaultChangedMap')) ?? {},
     onStatus: (cb) => on('vault:status', cb),
@@ -223,10 +228,12 @@ export function createMockVaultApi(scenario: string, delayMs = 1500, connectionI
     async listDevices() { return [me(), ...others.map((d) => ({ ...d }))] },
     async revokeDevice(id) {
       if (id === status.device.id) throw new VaultError('vault.revoke.self')
+      const wasAdmin = others.find((d) => d.id === id)?.role === 'admin'
       others = others.filter((d) => d.id !== id)
       const conns = useConnectionStore().connections as { id: string; name?: string; host?: string }[]
       return {
         exposed: conns.slice(0, 3).map((c) => ({ connectionId: c.id, name: c.name ?? c.id, host: c.host ?? '' })),
+        recoveryStale: wasAdmin,
       }
     },
     async renameThisDevice(name) {
@@ -284,6 +291,9 @@ export function createMockVaultApi(scenario: string, delayMs = 1500, connectionI
       await new Promise((r) => setTimeout(r, Math.min(delayMs, 900)))
       set({ syncing: false, lastSyncAt: new Date().toISOString(), pendingOps: 0, offline: false })
       return { pulled: 2, pushed: 0, rejected: 0, warnings: [] }
+    },
+    async regenerateRecovery() {
+      set({ phase: 'showRecovery', recoveryCheck: MOCK_CHECK })
     },
     async signOut() {
       clearTimeout(timer)

@@ -52,6 +52,7 @@
             <el-option value="reader" :label="t('vault.role.reader')" />
           </el-select>
         </div>
+        <p class="vault-muted vault-role-hint">{{ t(`vault.role.${role}Hint`) }}</p>
         <p class="vault-muted">{{ t('vault.join.attemptsLeft', { n: req.attemptsLeft }) }}</p>
       </template>
 
@@ -172,4 +173,5 @@ function onLater() {
 }
 .vault-role-row { display: flex; align-items: center; gap: 0.75rem; }
 .vault-role { width: 9rem; }
+.vault-role-hint { margin-top: -0.375rem; font-size: 0.75rem; }
 </style>
