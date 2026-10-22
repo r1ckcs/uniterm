@@ -8,10 +8,12 @@ package connstatus
 
 import (
 	"context"
+	"errors"
 	"net"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/ys-ll/uniterm/backend/session"
@@ -31,6 +33,7 @@ const (
 	ReasonPending  = "pending"
 	ReasonType     = "type"
 	ReasonHost     = "host"
+	ReasonLimit    = "limit"
 )
 
 // Status is one connection's reachability.
@@ -49,6 +52,10 @@ var (
 	Concurrency = 16
 	MaxBackoff  = 10 * time.Minute
 	MinManual   = 10 * time.Second
+	// MaxTargets caps the distinct host:port checked: connections also
+	// arrive from the vault and imports, and a flood of them must not turn
+	// every device into a scanner. The rest are unchecked/limit.
+	MaxTargets = 256
 )
 
 // defaultPorts mirrors defaultPort in frontend/src/utils/connectionTypes.ts.
@@ -117,6 +124,22 @@ func validHost(h string) bool {
 	return !strings.HasPrefix(h, "-") && !strings.HasPrefix(h, ".")
 }
 
+// refuseOddAddr runs after name resolution: a name that resolves to an
+// unspecified, multicast or broadcast address is not dialed.
+func refuseOddAddr(network, address string, _ syscall.RawConn) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return err
+	}
+	ip := net.ParseIP(host)
+	if ip == nil || ip.IsUnspecified() || ip.IsMulticast() || ip.Equal(net.IPv4bcast) {
+		return errRefused
+	}
+	return nil
+}
+
+var errRefused = errors.New("connstatus: address not checked")
+
 // Dialer opens a TCP connection (net.Dialer.DialContext in production).
 type Dialer func(ctx context.Context, network, addr string) (net.Conn, error)
 
@@ -160,7 +183,7 @@ type Monitor struct {
 // New starts a Monitor (idle until SetActive(true)).
 func New(opt Options) *Monitor {
 	if opt.Dial == nil {
-		d := &net.Dialer{}
+		d := &net.Dialer{Control: refuseOddAddr}
 		opt.Dial = d.DialContext
 	}
 	if opt.Now == nil {
@@ -312,6 +335,7 @@ func (m *Monitor) sync() (due []string, changed bool) {
 	now := m.opt.Now()
 	seen := map[string]bool{}
 	dueSet := map[string]bool{}
+	targets := map[string]bool{}
 	for _, c := range conns {
 		if c.ID == "" || c.Type == "workspace" {
 			continue
@@ -324,6 +348,13 @@ func (m *Monitor) sync() (due []string, changed bool) {
 			changed = true
 		}
 		tg := TargetOf(c, proxyActive)
+		if tg.Addr != "" && !targets[tg.Addr] {
+			if len(targets) >= MaxTargets {
+				tg = Target{State: StateUnchecked, Reason: ReasonLimit}
+			} else {
+				targets[tg.Addr] = true
+			}
+		}
 		var want Status
 		switch {
 		case tg.Addr == "":

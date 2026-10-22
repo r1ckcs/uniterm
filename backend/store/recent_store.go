@@ -199,7 +199,8 @@ func (s *RecentStore) flush(syncWrite bool) error {
 	if err != nil {
 		return err
 	}
-	if err := atomicWriteFile(s.filePath, data, 0644); err != nil {
+	// 0600: the list of what was opened names customers.
+	if err := atomicWriteFile(s.filePath, data, 0600); err != nil {
 		return err
 	}
 	data, err = json.Marshal(at)

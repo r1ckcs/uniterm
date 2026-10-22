@@ -145,3 +145,21 @@ func TestRecentStore_AccessFileNullOrCorrupt(t *testing.T) {
 		s.Close()
 	}
 }
+
+func TestRecentStore_FilesArePrivate(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "recent.json"), []byte(`["x"]`), 0644) // older build
+	s := NewRecentStore(dir)
+	s.Load()
+	s.Record("a")
+	s.Close()
+	for _, name := range []string{"recent.json", "recent-access.json"} {
+		fi, err := os.Stat(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fi.Mode().Perm() != 0o600 {
+			t.Errorf("%s: %v", name, fi.Mode().Perm())
+		}
+	}
+}

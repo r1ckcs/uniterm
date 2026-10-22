@@ -327,3 +327,49 @@ func TestTargetOf(t *testing.T) {
 		}
 	}
 }
+
+func TestTargetCapMarksTheRestLimit(t *testing.T) {
+	old := MaxTargets
+	MaxTargets = 5
+	t.Cleanup(func() { MaxTargets = old })
+	var total atomic.Int32
+	dial := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		total.Add(1)
+		return nil, &net.OpError{Op: "dial"}
+	}
+	var conns []session.ConnectionConfig
+	for i := 0; i < 8; i++ {
+		conns = append(conns, ssh("c"+strconv.Itoa(i), 1000+i))
+	}
+	conns = append(conns, ssh("dup", 1000)) // same target as c0: not over the cap
+	h := newHarness(t, conns, dial)
+	h.m.SetActive(true)
+	s := h.waitFor(t, func(s map[string]Status) bool { return s["c0"].State == StateDown })
+	limited := 0
+	for _, st := range s {
+		if st.Reason == ReasonLimit {
+			limited++
+		}
+	}
+	if limited != 3 || s["dup"].State != StateDown || total.Load() != 5 {
+		t.Fatalf("limited %d, dup %+v, dialed %d", limited, s["dup"], total.Load())
+	}
+}
+
+func TestResolvedOddAddressIsRefused(t *testing.T) {
+	for _, a := range []string{"0.0.0.0:22", "[::]:22", "224.0.0.1:22", "255.255.255.255:22", "[ff02::1]:22"} {
+		if refuseOddAddr("tcp4", a, nil) == nil {
+			t.Errorf("%s dialed", a)
+		}
+	}
+	for _, a := range []string{"127.0.0.1:22", "10.1.2.3:23", "[::1]:22"} {
+		if err := refuseOddAddr("tcp", a, nil); err != nil {
+			t.Errorf("%s: %v", a, err)
+		}
+	}
+	// The real dialer applies it after resolving a name.
+	d := &net.Dialer{Control: refuseOddAddr, Timeout: time.Second}
+	if _, err := d.Dial("tcp", "0.0.0.0:9"); err == nil {
+		t.Fatal("dialed 0.0.0.0")
+	}
+}
