@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
@@ -21,6 +22,11 @@ export default defineConfig({
   // no syntax downleveling, so TLA in deps passes through untouched; the old
   // optimizeDeps.esbuildOptions.target is deprecated and has no rolldown
   // equivalent).
+  // Vitest blanks stylesheets by default; theme.test.ts reads style.css
+  // (?raw) to check the theme tokens' contrast.
+  test: {
+    css: { include: [/style\.css/] }
+  },
   server: {
     host: '127.0.0.1',
     port: 34115,

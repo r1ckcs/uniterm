@@ -274,7 +274,7 @@ function onRemove(id: string) {
 }
 
 .suggestion-item.ai-preview {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .ai-fixed {
@@ -315,7 +315,7 @@ function onRemove(id: string) {
 }
 
 .match-char {
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 600;
 }
 

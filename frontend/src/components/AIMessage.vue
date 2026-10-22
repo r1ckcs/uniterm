@@ -753,7 +753,7 @@ function escapeHtml(text: string): string {
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: 0.6875rem;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* Headings */
@@ -1080,7 +1080,7 @@ function escapeHtml(text: string): string {
 .copy-md-btn:hover {
   gap: 0.25rem;
   padding: 0.125rem 0.5rem;
-  color: var(--accent);
+  color: var(--accent-text);
   border-color: var(--accent-glow);
   background: var(--accent-subtle);
 }
@@ -1105,7 +1105,7 @@ function escapeHtml(text: string): string {
   font-size: 0.625rem;
   font-weight: 600;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--accent-text);
   margin-bottom: 0.25rem;
 }
 .question-text {
@@ -1163,7 +1163,7 @@ function escapeHtml(text: string): string {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--accent);
+  color: var(--accent-text);
   transition: border-color 0.15s, background 0.15s;
 }
 .question-option.selected .option-check {

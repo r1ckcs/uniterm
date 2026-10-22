@@ -198,7 +198,7 @@ function onMoreClick(e: MouseEvent, conn: ConnectionConfig) {
 }
 .group-header.drag-over {
   background: var(--accent-subtle);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-ring);
 }
 /* Insertion line for reordering (siblings) */
 .group-header,
@@ -271,10 +271,10 @@ function onMoreClick(e: MouseEvent, conn: ConnectionConfig) {
 }
 .connection-item.active {
   background: var(--accent-subtle);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-ring);
 }
 .connection-item.active .name {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* Connection has an open session → highlight its icon with the AI-lock amber */

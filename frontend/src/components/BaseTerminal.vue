@@ -2045,7 +2045,7 @@ function toggleSearchOption(key: 'caseSensitive' | 'regex' | 'wholeWord') {
 function applyXtermTheme(themeName: string) {
   if (!terminal) return
   const theme = resolveXtermBackground(
-    getXtermTheme(resolveTerminalThemeName(themeName, settingsStore.resolvedAppTheme), settingsStore.settings.customTerminalThemes),
+    getXtermTheme(resolveTerminalThemeName(themeName, settingsStore.concreteAppTheme), settingsStore.settings.customTerminalThemes),
     localStateStore.state.backgroundEnabled,
     localStateStore.state.backgroundImage
   )
@@ -2096,7 +2096,7 @@ watch(
 
 // Re-apply when the app theme flips so FOLLOW_APP_THEME tracks it live.
 watch(
-  () => settingsStore.resolvedAppTheme,
+  () => settingsStore.concreteAppTheme,
   () => applyXtermTheme(settingsStore.settings.terminal.theme || 'dark')
 )
 
@@ -2464,7 +2464,7 @@ defineExpose({
   color: var(--text-primary);
 }
 .search-btn.active {
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-subtle);
 }
 .terminal-area :deep(.xterm) {

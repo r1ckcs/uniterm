@@ -1159,7 +1159,7 @@ function applyBandSelection() {
   color: var(--text-muted);
 }
 .filter-icon-btn.active {
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-subtle);
 }
 .clipboard-bar {
@@ -1222,7 +1222,7 @@ function applyBandSelection() {
   color: var(--text-primary);
 }
 .file-name.selected {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .file-mode {
   font-size: 0.6875rem;
@@ -1337,7 +1337,7 @@ function applyBandSelection() {
 }
 .conn-context-menu .menu-item.checkable.checked::before {
   content: '✓';
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 500;
 }
 

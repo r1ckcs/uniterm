@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { contrastRatio } from '../utils/contrast'
 import { matchTextSpans } from './highlightRules'
 import { compileRules, validateRule } from './userHighlightRules'
 import { buildDefaultRules, DEFAULTS_VERSION, NEXT_DEFAULT_ID } from './highlightDefaults'
@@ -73,20 +74,12 @@ describe('default list', () => {
   })
 
   // Every default color, resolved the way the terminal paints it, must read
-  // on both built-in uniTerm themes (WCAG ratio >= 3:1, the bar for large or
+  // on every built-in FlexTerm theme (WCAG ratio >= 3:1, the bar for large or
   // bold text — terminal highlights are short tokens).
-  it('every default color reads at >= 3:1 on uniterm-dark and uniterm-light', () => {
-    const channel = (v: number) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
-    const lum = (hex: string) => {
-      const [r, g, b] = [1, 3, 5].map(i => channel(parseInt(hex.slice(i, i + 2), 16) / 255))
-      return 0.2126 * r + 0.7152 * g + 0.0722 * b
-    }
-    const ratio = (a: string, b: string) => {
-      const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x)
-      return (hi + 0.05) / (lo + 0.05)
-    }
+  it('every default color reads at >= 3:1 on the built-in FlexTerm themes', () => {
+    const ratio = contrastRatio
     const colors = new Set(DEFAULTS.map(r => r.color))
-    for (const name of ['uniterm-dark', 'uniterm-light']) {
+    for (const name of ['flexterm-dark', 'flexterm-light', 'uniterm-dark', 'uniterm-light']) {
       const theme = getXtermTheme(name)
       const categories = resolveHighlightColors(theme)
       for (const c of colors) {

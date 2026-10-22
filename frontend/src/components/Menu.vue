@@ -345,7 +345,7 @@ watch(() => props.visible, (v) => {
 /* Selected / highlighted row — accent + semibold (same look as the settings
    submenus). */
 .conn-context-menu .menu-item.active {
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 500;
 }
 .conn-context-menu .menu-item.iconic {
@@ -420,7 +420,7 @@ watch(() => props.visible, (v) => {
   color: var(--text-primary);
 }
 .conn-context-menu .menu-submenu .menu-item.active {
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 500;
 }
 </style>

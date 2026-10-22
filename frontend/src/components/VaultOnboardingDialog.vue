@@ -305,15 +305,15 @@ function onClose() {
   padding: 0.625rem;
   border-radius: var(--radius-md);
   background: var(--accent-subtle);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .vault-lead { margin: 0; color: var(--text-primary); font-size: 0.875rem; line-height: 1.55; }
 .vault-muted { margin: 0; color: var(--text-secondary); font-size: 0.8125rem; line-height: 1.5; }
 .vault-points { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
 .vault-points li { display: flex; gap: 0.5rem; align-items: flex-start; color: var(--text-secondary); font-size: 0.8125rem; line-height: 1.45; }
-.vault-points li svg { flex-shrink: 0; margin-top: 0.125rem; color: var(--accent); }
+.vault-points li svg { flex-shrink: 0; margin-top: 0.125rem; color: var(--accent-text); }
 .vault-error { margin: 0; color: var(--error); font-size: 0.8125rem; }
-.vault-spin { color: var(--accent); animation: vault-rotate 1s linear infinite; margin-top: 0.5rem; }
+.vault-spin { color: var(--accent-text); animation: vault-rotate 1s linear infinite; margin-top: 0.5rem; }
 @keyframes vault-rotate { to { transform: rotate(360deg); } }
 
 .vault-words {

@@ -114,7 +114,7 @@ const props = defineProps<{ sessionId: string }>()
 .key-btn.sticky {
   font-family: var(--font-ui);
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-text);
   border-color: var(--accent);
 }
 </style>

@@ -391,7 +391,7 @@ function onBookmarkClick(path: string) {
   color: var(--text-disabled);
 }
 .breadcrumb-label {
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 600;
   margin-right: 0.5rem;
   flex-shrink: 0;
@@ -421,7 +421,7 @@ function onBookmarkClick(path: string) {
   color: var(--text-primary);
 }
 .bookmark-btn .bookmark-active {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 </style>
 
@@ -429,7 +429,7 @@ function onBookmarkClick(path: string) {
 /* Bookmark accent / remove-button specifics. */
 .bookmark-save,
 .bookmark-saved-hint {
-  color: var(--accent);
+  color: var(--accent-text);
   font-family: var(--font-ui);
 }
 .bookmark-path-item {

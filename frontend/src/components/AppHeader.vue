@@ -193,6 +193,8 @@ const settingsMenuRef = ref<InstanceType<typeof Menu> | null>(null)
 
 const themeOptions = computed(() => [
   { value: 'system' as const, label: t('settings.themeSystem') },
+  { value: 'flexterm' as const, label: t('settings.themeFlexterm') },
+  { value: 'flexterm-light' as const, label: t('settings.themeFlextermLight') },
   { value: 'dark' as const, label: t('settings.themeDark') },
   { value: 'deep-blue' as const, label: t('settings.themeDeepBlue') },
   { value: 'light' as const, label: t('settings.themeLight') },

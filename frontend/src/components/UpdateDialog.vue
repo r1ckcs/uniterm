@@ -161,7 +161,7 @@ function fmtSize(bytes: number): string {
   margin: 0.1875rem 0;
 }
 .update-dialog-changelog :deep(a) {
-  color: var(--accent);
+  color: var(--accent-text);
   text-decoration: none;
 }
 .update-dialog-changelog :deep(a:hover) {

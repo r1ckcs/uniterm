@@ -839,7 +839,7 @@ defineExpose({
   color: var(--text-muted);
 }
 .search-icon-btn.active {
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-subtle);
 }
 </style>

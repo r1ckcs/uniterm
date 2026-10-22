@@ -755,7 +755,7 @@ watch(() => props.panel.outputLog, (val) => {
   color: var(--text-muted);
 }
 .panel-active .panel-type-icon {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 /* Locked wins over the active accent: the AI state must stay visible when the
    panel is focused (mirrors the tab icon treatment). */
@@ -811,7 +811,7 @@ watch(() => props.panel.outputLog, (val) => {
   background: var(--bg-hover);
 }
 .panel-broadcast.active {
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-subtle);
 }
 .broadcast-icon {

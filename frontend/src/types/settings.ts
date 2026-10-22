@@ -7,11 +7,12 @@ export const SUPPORTED_LOCALES = [
 
 export type Locale = typeof SUPPORTED_LOCALES[number]
 export type Language = Locale | 'system'
-export type Theme = 'dark' | 'deep-blue' | 'light' | 'system'
-export type TerminalTheme = 'uniterm-dark' | 'uniterm-light' | 'solarized-dark' | 'solarized-light' | 'monokai' | 'dracula' | 'molokai' | 'tomorrow-night' | 'tomorrow-night-bright' | 'tomorrow' | 'one-dark' | 'one-light' | 'github-dark' | 'github-light' | 'gotham' | 'hybrid' | 'nord' | 'gruvbox-dark' | 'gruvbox-light' | 'catppuccin-mocha' | 'catppuccin-latte' | 'tokyo-night' | 'tokyo-day' | 'rose-pine' | 'rose-pine-dawn' | 'everforest-dark' | 'everforest-light' | 'xshell-xterm' | 'xshell-ansi-black' | 'xshell-new-black' | 'mobaxterm-default' | 'mobaxterm-ubuntu' | 'finalshell-dark' | 'finalshell-light'
+export type Theme = 'flexterm' | 'flexterm-light' | 'dark' | 'deep-blue' | 'light' | 'system'
+export type TerminalTheme = 'flexterm-dark' | 'flexterm-light' | 'uniterm-dark' | 'uniterm-light' | 'solarized-dark' | 'solarized-light' | 'monokai' | 'dracula' | 'molokai' | 'tomorrow-night' | 'tomorrow-night-bright' | 'tomorrow' | 'one-dark' | 'one-light' | 'github-dark' | 'github-light' | 'gotham' | 'hybrid' | 'nord' | 'gruvbox-dark' | 'gruvbox-light' | 'catppuccin-mocha' | 'catppuccin-latte' | 'tokyo-night' | 'tokyo-day' | 'rose-pine' | 'rose-pine-dawn' | 'everforest-dark' | 'everforest-light' | 'xshell-xterm' | 'xshell-ansi-black' | 'xshell-new-black' | 'mobaxterm-default' | 'mobaxterm-ubuntu' | 'finalshell-dark' | 'finalshell-light'
 
 // Magic value for `AppSettings.terminal.theme`: the effective built-in theme
-// is derived from the current app theme (dark / deep-blue -> uniterm-dark,
+// is derived from the current app theme (flexterm -> flexterm-dark,
+// flexterm-light -> flexterm-light, dark / deep-blue -> uniterm-dark,
 // light -> uniterm-light) instead of being fixed. Kept out of TERMINAL_THEMES
 // because it has no color palette of its own.
 export const FOLLOW_APP_THEME = 'follow-app'
@@ -288,6 +289,10 @@ export interface AppSettings {
   // Whether the per-tab numeric shortcut hint (e.g. Ctrl+1) is drawn on the
   // tab itself; the hover tooltips elsewhere are unaffected.
   showTabShortcutHints: boolean
+  // Start screen reachability probe (CONTRATO-status): a TCP connect to each
+  // saved host every minute while the start screen is visible. Absent means
+  // on; must stay in this type or a frontend Save would drop a saved false.
+  connStatusCheck?: boolean
   // How the host list opens the connection menu: hover "⋯"/star buttons
   // ("button") or right-click only, with the hover buttons hidden
   // ("rightclick"). The right-click menu works in both modes.
@@ -330,7 +335,7 @@ export const SIDEBAR_TAB_ORDER: { key: string; labelKey: string }[] = [
 export const DEFAULT_UI_FONT_SIZE = /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? 14 : 12
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  theme: 'system',
+  theme: 'flexterm',
   language: 'system',
   uiFontSize: DEFAULT_UI_FONT_SIZE,
   terminal: {
@@ -393,8 +398,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
 export interface TerminalThemeEntry { label: string; value: string; type: 'dark' | 'light' }
 export const TERMINAL_THEMES: TerminalThemeEntry[] = [
-  { label: 'FlexTerm Dark', value: 'uniterm-dark', type: 'dark' },
-  { label: 'FlexTerm Light', value: 'uniterm-light', type: 'light' },
+  { label: 'FlexTerm', value: 'flexterm-dark', type: 'dark' },
+  { label: 'FlexTerm Light', value: 'flexterm-light', type: 'light' },
+  { label: 'FlexTerm Classic Dark', value: 'uniterm-dark', type: 'dark' },
+  { label: 'FlexTerm Classic Light', value: 'uniterm-light', type: 'light' },
   { label: 'Solarized Dark', value: 'solarized-dark', type: 'dark' },
   { label: 'Solarized Light', value: 'solarized-light', type: 'light' },
   { label: 'Monokai', value: 'monokai', type: 'dark' },

@@ -84,6 +84,53 @@ export function getXtermTheme(name: string, customThemes?: CustomTerminalTheme[]
     brightWhite: '#d0d0d8'
   }
   switch (name) {
+    // FlexTerm (D1c): page color #0a1120, brand-orange cursor, solid selection.
+    case 'flexterm-dark':
+      return {
+        background: '#0a1120',
+        foreground: '#eef2ff',
+        cursor: '#f46414',
+        selectionBackground: '#24335c',
+        black: '#24335c',
+        red: '#ff7b84',
+        green: '#6ff0a8',
+        yellow: '#ffc96b',
+        blue: '#8fa2ff',
+        magenta: '#d7a8ff',
+        cyan: '#6fe3f0',
+        white: '#c7d0ee',
+        brightBlack: '#7884ad',
+        brightRed: '#ffb0b0',
+        brightGreen: '#a6f7c9',
+        brightYellow: '#ffe0a3',
+        brightBlue: '#c3ccff',
+        brightMagenta: '#e8ccff',
+        brightCyan: '#a8f0f7',
+        brightWhite: '#ffffff'
+      }
+    case 'flexterm-light':
+      return {
+        background: '#ffffff',
+        foreground: '#0f2351',
+        cursor: '#d9520b',
+        selectionBackground: '#dfe4f0',
+        black: '#0f2351',
+        red: '#b4232a',
+        green: '#17703f',
+        yellow: '#8f5a00',
+        blue: '#2b3dbc',
+        magenta: '#6b4bbd',
+        cyan: '#0b6e7a',
+        white: '#56607d',
+        brightBlack: '#4a5470',
+        brightRed: '#9a1c22',
+        brightGreen: '#105430',
+        brightYellow: '#7a4a00',
+        brightBlue: '#22309a',
+        brightMagenta: '#553a9e',
+        brightCyan: '#075a63',
+        brightWhite: '#2a3550'
+      }
     case 'uniterm-dark':
       return base
     case 'uniterm-light':
@@ -425,7 +472,7 @@ export function useTerminal(
   function getTerminalOptions() {
     const ts = settingsStore.settings.terminal
     const ls = useLocalStateStore()
-    const themeName = resolveTerminalThemeName(ts.theme, settingsStore.resolvedAppTheme)
+    const themeName = resolveTerminalThemeName(ts.theme, settingsStore.concreteAppTheme)
     const theme = resolveXtermBackground(
       getXtermTheme(themeName, settingsStore.settings.customTerminalThemes),
       ls.state.backgroundEnabled,
@@ -766,7 +813,7 @@ export function useTerminal(
     if (!terminal) return
     const ls = useLocalStateStore()
     const theme = resolveXtermBackground(
-      getXtermTheme(resolveTerminalThemeName(themeName, settingsStore.resolvedAppTheme), settingsStore.settings.customTerminalThemes),
+      getXtermTheme(resolveTerminalThemeName(themeName, settingsStore.concreteAppTheme), settingsStore.settings.customTerminalThemes),
       ls.state.backgroundEnabled,
       ls.state.backgroundImage
     )
@@ -798,7 +845,7 @@ export function useTerminal(
 
   // Re-apply when the app theme flips so FOLLOW_APP_THEME tracks it live.
   watch(
-    () => settingsStore.resolvedAppTheme,
+    () => settingsStore.concreteAppTheme,
     () => applyXtermTheme(settingsStore.settings.terminal.theme || 'dark')
   )
 

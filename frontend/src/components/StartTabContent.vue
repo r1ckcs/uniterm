@@ -1,8 +1,58 @@
 <template>
   <div ref="startTabRef" class="start-tab">
     <div class="start-content" :style="contentStyle">
-      <!-- Branding -->
-      <div class="start-brand" v-show="!searchQuery.trim()">FlexTerm</div>
+      <!-- Head: title, site filter and the actions -->
+      <div class="sites-head">
+        <h1 class="sites-title">
+          <span v-if="tab.viewMode === 'group'" class="sites-title-link" @click="goHome">{{ t('startTab.sites') }}</span>
+          <template v-else>{{ t('startTab.sites') }}</template>
+        </h1>
+        <div v-if="showSites" class="sites-seg" role="tablist" :aria-label="t('startTab.sitesFilter')">
+          <button
+            v-for="f in siteFilterOptions"
+            :key="f.value"
+            role="tab"
+            class="sites-seg-btn"
+            :class="{ active: siteFilter === f.value }"
+            :aria-selected="siteFilter === f.value"
+            @click="siteFilter = f.value"
+          >
+            {{ f.label }}<span v-if="f.count" class="sites-seg-count">{{ f.count }}</span>
+          </button>
+        </div>
+        <div class="sites-head-spacer"></div>
+        <div class="start-action-btns">
+          <button class="start-action-btn" @click="emit('new-workspace')">
+            <el-icon><LayoutDashboard :size="'0.875rem'" /></el-icon>
+            {{ t('workspace.newWorkspace') }}
+          </button>
+          <div v-if="!isMobile" class="start-action-btn-group">
+            <button class="start-action-btn" @click="handleDefaultLocalTerminal">
+              <el-icon><Laptop :size="'0.875rem'" /></el-icon>
+              {{ t('conn.startLocalTerminal') }}
+            </button>
+            <button class="start-action-btn-dropdown-arrow" :aria-label="t('conn.startLocalTerminal')" @click.stop="shellMenuRef?.toggle($event.currentTarget)">
+              <el-icon><ChevronDown :size="'0.75rem'" /></el-icon>
+            </button>
+            <Menu ref="shellMenuRef" v-model:visible="shellMenuVisible">
+              <MenuItem
+                v-for="sh in settingsStore.availableShells"
+                :key="sh"
+                @click="onShellPick(sh, $event)"
+              >
+                {{ getShellLabel(sh) }}
+              </MenuItem>
+              <MenuItem v-if="settingsStore.availableShells.length === 0" class="disabled">
+                {{ t('conn.noShells') }}
+              </MenuItem>
+            </Menu>
+          </div>
+          <button class="start-action-btn primary" @click="emit('new-connection', { groupId: tab.viewMode === 'group' ? tab.groupId : undefined, host: (searchQuery || '').trim() || undefined })">
+            <el-icon><Plus :size="'0.875rem'" /></el-icon>
+            {{ t('header.newConnection') }}
+          </button>
+        </div>
+      </div>
 
       <!-- Search row -->
     <div class="start-search-row">
@@ -21,40 +71,6 @@
       />
     </div>
 
-    <!-- Action buttons -->
-    <div class="start-action-btns">
-      <button class="start-action-btn primary" @click="emit('new-connection', { groupId: tab.viewMode === 'group' ? tab.groupId : undefined, host: (searchQuery || '').trim() || undefined })">
-        <el-icon><Plus :size="'0.875rem'" /></el-icon>
-        {{ t('header.newConnection') }}
-      </button>
-      <button class="start-action-btn" @click="emit('new-workspace')">
-        <el-icon><LayoutDashboard :size="'0.875rem'" /></el-icon>
-        {{ t('workspace.newWorkspace') }}
-      </button>
-      <div v-if="!isMobile" class="start-action-btn-group">
-        <button class="start-action-btn" @click="handleDefaultLocalTerminal">
-          <el-icon><Laptop :size="'0.875rem'" /></el-icon>
-          {{ t('conn.startLocalTerminal') }}
-        </button>
-        <button class="start-action-btn-dropdown-arrow" @click.stop="shellMenuRef?.toggle($event.currentTarget)">
-          <el-icon><ChevronDown :size="'0.75rem'" /></el-icon>
-        </button>
-        <Menu ref="shellMenuRef" v-model:visible="shellMenuVisible">
-          <MenuItem
-            v-for="sh in settingsStore.availableShells"
-            :key="sh"
-            @click="onShellPick(sh, $event)"
-          >
-            {{ getShellLabel(sh) }}
-          </MenuItem>
-          <MenuItem v-if="settingsStore.availableShells.length === 0" class="disabled">
-            {{ t('conn.noShells') }}
-          </MenuItem>
-        </Menu>
-      </div>
-
-    </div>
-
     <!-- Breadcrumb for group view -->
     <div v-if="tab.viewMode === 'group'" class="start-breadcrumb">
       <span class="link" @click="goHome">{{ t('startTab.backToStart') }}</span>
@@ -68,8 +84,69 @@
       </span>
     </div>
 
-    <!-- Home view sections -->
-    <template v-if="tab.viewMode === 'home'">
+    <!-- Home view: sites (one card per top-level group) -->
+    <template v-if="showSites">
+      <div v-if="siteCards.length > 0" class="sites-grid">
+        <section
+          v-for="site in siteCards"
+          :key="site.id"
+          class="site-card"
+          :class="{ alert: site.down > 0 }"
+        >
+          <header class="site-card-head" @contextmenu.prevent="site.id !== UNGROUPED && onGroupContextMenu($event, site.id, site.name)">
+            <button
+              class="site-name"
+              :class="{ focused: isCardFocused('group:' + site.id) }"
+              :title="t('startTab.openSite', { name: site.name })"
+              @click="enterGroup(site.id)"
+            >{{ site.name }}</button>
+            <span class="site-badge" :class="site.badgeKind">{{ site.badge }}</span>
+          </header>
+          <div
+            v-for="config in site.rows"
+            :key="config.id"
+            class="site-row"
+            :class="{ focused: isCardFocused('site:' + config.id), selected: selectedIds.has('site:' + config.id), down: connStatus.stateOf(config.id) === 'down' }"
+            @click="onCardClick(config, $event, 'site:')"
+            @dblclick="onCardDblClick(config, $event)"
+            @contextmenu.prevent="onContextMenu($event, config, 'site:')"
+          >
+            <span class="site-tag" :class="'tag-' + tagKind(config)">{{ tagLabel(config) }}</span>
+            <span class="site-row-name">{{ config.name }}</span>
+            <span v-if="connStatus.stateOf(config.id) === 'down'" class="site-row-down">{{ t('startTab.noResponse') }}</span>
+            <span v-else class="site-row-host">{{ rowDetail(config) }}</span>
+            <button class="row-fav-btn" :class="{ on: favoriteStore.isFavorite(config.id) }" :title="favoriteStore.isFavorite(config.id) ? t('sidebar.removeFromFavorites') : t('sidebar.addToFavorites')" @click.stop="favoriteStore.toggle(config.id)"><Star class="row-icon" /></button>
+            <button class="row-more-btn" :title="t('terminal.more')" @click.stop="onCardMoreClick($event, config, 'site:')"><MoreHorizontal class="row-icon" /></button>
+          </div>
+          <div v-if="site.rows.length === 0" class="site-empty">{{ t('startTab.emptyGroup') }}</div>
+          <button v-if="site.total > site.rows.length" class="site-more" @click="enterGroup(site.id)">
+            {{ t('startTab.seeAll', { count: site.total }) }}
+          </button>
+        </section>
+      </div>
+      <div v-else-if="connectionStore.connections.length > 0" class="start-empty-hint">
+        {{ siteFilter === 'alert' ? (connStatus.available ? t('startTab.noAlerts') : t('startTab.noStatus')) : t('startTab.noFavorites') }}
+      </div>
+
+      <section v-if="recentConfigs.length > 0" class="recent-strip">
+        <h2 class="recent-title">{{ t('startTab.recentConnections') }}</h2>
+        <div class="recent-chips">
+          <button
+            v-for="config in recentConfigs"
+            :key="config.id"
+            class="recent-chip"
+            :class="{ focused: isCardFocused('recent:' + config.id), selected: selectedIds.has('recent:' + config.id) }"
+            :title="recentTitle(config)"
+            @click="onCardClick(config, $event, 'recent:')"
+            @dblclick="onCardDblClick(config, $event)"
+            @contextmenu.prevent="onContextMenu($event, config, 'recent:')"
+          >{{ config.name }} · {{ typeShort(config) }}</button>
+        </div>
+      </section>
+    </template>
+
+    <!-- Home view while searching -->
+    <template v-if="tab.viewMode === 'home' && !showSites">
       <!-- Favorites -->
       <template v-if="favoriteConfigs.length > 0">
         <div class="start-section-label">{{ t('startTab.favorites') }}</div>
@@ -333,7 +410,8 @@ import { useI18n } from '../i18n'
 import { isMobilePlatform } from '../utils/platform'
 import { GetRecentConnections } from '../../bindings/github.com/ys-ll/uniterm/app'
 import { formatConnSubtitle, formatTypeFilterLabel, matchTypeFilter } from '../utils/quickConnect'
-import { connectionTypeIcon as connTypeIcon, connectionTypeLabel as connTypeLabel } from '../utils/connectionTypes'
+import { connectionTypeIcon as connTypeIcon, connectionTypeLabel as connTypeLabel, connectionTypeInfo } from '../utils/connectionTypes'
+import { useConnStatusStore } from '../stores/connStatusStore'
 import { getShellLabel as getShellLabelBase } from '../utils/shellLabel'
 import MenuItem from './MenuItem.vue'
 import { Filter, Plus, Laptop, Server, Folder, FolderOpen, Zap, MoreHorizontal, ChevronDown, Star, LayoutDashboard } from '@lucide/vue'
@@ -360,6 +438,7 @@ const connectionStore = useConnectionStore()
 const favoriteStore = useFavoriteStore()
 const tabStore = useTabStore()
 const settingsStore = useSettingsStore()
+const connStatus = useConnStatusStore()
 
 // ── Default local shell ──
 const effectiveDefaultShell = computed(() => {
@@ -396,6 +475,11 @@ const lastClickId = ref<string | null>(null)
 
 function getAllVisibleIds(): string[] {
   const ids: string[] = []
+  if (showSites.value) {
+    for (const site of siteCards.value) for (const c of site.rows) ids.push('site:' + c.id)
+    for (const c of recentConfigs.value) ids.push('recent:' + c.id)
+    return ids
+  }
   if (props.tab.viewMode === 'home') {
     for (const c of favoriteConfigs.value) ids.push('fav:' + c.id)
     for (const c of recentConfigs.value) ids.push('recent:' + c.id)
@@ -468,9 +552,12 @@ watch(
   () => loadRecent()
 )
 
+const recentAt = computed(() => new Map((connStatus.recent ?? []).map(r => [r.id, r.at])))
+
 const recentConfigs = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
-  return recentConnectionIds.value
+  const ids = connStatus.recent ? connStatus.recent.map(r => r.id) : recentConnectionIds.value
+  return ids
     .map(id => connectionStore.connections.find(c => c.id === id))
     .filter((c): c is ConnectionConfig => !!c)
     .filter(c => matchTypeFilter(c, selectedTypeFilter.value))
@@ -566,6 +653,94 @@ const groupCards = computed(() => {
   return { groups, ungroupedCount, isGroupView, currentGroupId: props.tab.groupId }
 })
 
+
+// ── Sites (D1c home): one card per top-level group ──
+const UNGROUPED = '__ungrouped__'
+const SITE_ROWS = 5
+type SiteFilter = 'all' | 'alert' | 'favorites'
+const siteFilter = ref<SiteFilter>('all')
+const showSites = computed(() => props.tab.viewMode === 'home' && !searchQuery.value.trim())
+
+function subtreeIds(groupId: string): Set<string> {
+  const ids = new Set([groupId])
+  let grew = true
+  while (grew) {
+    grew = false
+    for (const g of connectionStore.groups) {
+      if (g.parentId && ids.has(g.parentId) && !ids.has(g.id)) { ids.add(g.id); grew = true }
+    }
+  }
+  return ids
+}
+
+const siteCards = computed(() => {
+  const isDown = (c: ConnectionConfig) => connStatus.stateOf(c.id) === 'down'
+  const byFilter = (c: ConnectionConfig) =>
+    siteFilter.value === 'alert' ? isDown(c)
+      : siteFilter.value === 'favorites' ? favoriteStore.isFavorite(c.id)
+        : true
+  const sites = [...connectionStore.groups]
+    .filter(g => !g.parentId)
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(g => {
+      const ids = subtreeIds(g.id)
+      return { id: g.id, name: g.name, conns: connectionStore.connections.filter(c => !!c.groupId && ids.has(c.groupId)) }
+    })
+  const ungrouped = connectionStore.connections.filter(c => !c.groupId)
+  if (ungrouped.length > 0) sites.push({ id: UNGROUPED, name: t('conn.noGroup'), conns: ungrouped })
+
+  return sites
+    .map(site => {
+      const typed = site.conns.filter(c => matchTypeFilter(c, selectedTypeFilter.value))
+      const shown = typed.filter(byFilter)
+        .sort((a, b) => Number(isDown(b)) - Number(isDown(a)) || a.name.localeCompare(b.name))
+      const down = typed.filter(isDown).length
+      const ok = typed.filter(c => connStatus.stateOf(c.id) === 'ok').length
+      let badge: string
+      let badgeKind = ''
+      if (connStatus.available && down > 0) { badge = t('startTab.siteDown', { count: down }); badgeKind = 'alert' }
+      else if (connStatus.available && ok > 0) { badge = t('startTab.siteOk', { count: ok }); badgeKind = 'ok' }
+      else badge = t('startTab.connectionsCount', { count: typed.length })
+      return { id: site.id, name: site.name, rows: shown.slice(0, SITE_ROWS), total: shown.length, down, badge, badgeKind }
+    })
+    .filter(site => siteFilter.value === 'all' ? true : site.total > 0)
+})
+
+const siteFilterOptions = computed(() => {
+  const alerts = connectionStore.connections.filter(c => connStatus.stateOf(c.id) === 'down').length
+  return [
+    { value: 'all' as const, label: t('startTab.filterAll'), count: 0 },
+    { value: 'alert' as const, label: t('startTab.withAlert'), count: alerts },
+    { value: 'favorites' as const, label: t('startTab.favorites'), count: 0 },
+  ]
+})
+
+// Type tag of a row: the protocol, colored by family.
+function typeShort(config: ConnectionConfig): string {
+  if (config.type === 'database') return config.dbType || config.type
+  if (config.type === 'container') return config.containerRuntime || config.type
+  return config.type
+}
+function tagLabel(config: ConnectionConfig): string {
+  return typeShort(config).toUpperCase().slice(0, 6)
+}
+function tagKind(config: ConnectionConfig): string {
+  if (config.type === 'telnet' || config.type === 'serial' || config.type === 'tcp') return 'olt'
+  const cat = connectionTypeInfo(config.type)?.category
+  if (cat === 'terminal') return 'pe'
+  if (cat === 'remote') return 'sw'
+  if (cat === 'filetransfer' || cat === 'sql' || cat === 'nosql') return 'mk'
+  return 'other'
+}
+function rowDetail(config: ConnectionConfig): string {
+  if (config.type === 'local') return getShellLabel(config.shellPath || '')
+  return config.host || getCardSubtitle(config)
+}
+function recentTitle(config: ConnectionConfig): string {
+  const at = recentAt.value.get(config.id)
+  const d = at ? new Date(at) : null
+  return d && !isNaN(d.getTime()) ? `${getCardSubtitle(config)} · ${d.toLocaleString()}` : getCardSubtitle(config)
+}
 
 // ── Navigation ──
 function onCardClick(config: ConnectionConfig, e: MouseEvent, prefix = 'conn:') {
@@ -708,10 +883,9 @@ function updateContentWidth() {
   el.style.setProperty('--start-cols', String(cols))
 }
 
-const contentStyle = computed(() => ({
-  width: contentWidth.value + 'px',
-  margin: '0 auto'
-}))
+const contentStyle = computed(() => showSites.value
+  ? { width: '100%', maxWidth: '90rem', margin: '0 auto' }
+  : { width: contentWidth.value + 'px', margin: '0 auto' })
 
 let resizeObserver: ResizeObserver | null = null
 
@@ -720,6 +894,7 @@ const focusedCardIndex = ref(-1)
 const focusInGrid = ref(false)
 
 type FocusableItem =
+  | { kind: 'site'; config: ConnectionConfig }
   | { kind: 'favorite'; config: ConnectionConfig }
   | { kind: 'recent'; config: ConnectionConfig }
   | { kind: 'group'; groupId: string; name: string }
@@ -735,6 +910,11 @@ const focusableItems = computed<FocusableItem[]>(() => {
     return items
   }
   const items: FocusableItem[] = []
+  if (showSites.value) {
+    for (const site of siteCards.value) for (const config of site.rows) items.push({ kind: 'site', config })
+    for (const config of recentConfigs.value) items.push({ kind: 'recent', config })
+    return items
+  }
   for (const config of favoriteConfigs.value) items.push({ kind: 'favorite', config })
   for (const config of recentConfigs.value) items.push({ kind: 'recent', config })
   for (const group of groupCards.value.groups) items.push({ kind: 'group', groupId: group.id, name: group.name })
@@ -747,7 +927,8 @@ const focusableItems = computed<FocusableItem[]>(() => {
 const focusableIndexMap = computed(() => {
   const map = new Map<string, number>()
   focusableItems.value.forEach((item, idx) => {
-    if (item.kind === 'favorite') map.set('fav:' + item.config.id, idx)
+    if (item.kind === 'site') map.set('site:' + item.config.id, idx)
+    else if (item.kind === 'favorite') map.set('fav:' + item.config.id, idx)
     else if (item.kind === 'recent') map.set('recent:' + item.config.id, idx)
     else if (item.kind === 'connection') map.set('conn:' + item.config.id, idx)
     else if (item.kind === 'group') map.set('group:' + item.groupId, idx)
@@ -763,6 +944,8 @@ function isCardFocused(key: string): boolean {
 }
 
 function getGridColumns(): number {
+  // Sites and recent chips are lists: arrows walk them one by one.
+  if (showSites.value) return 1
   if (contentWidth.value === 0) return 3
   return contentCols.value
 }
@@ -884,7 +1067,7 @@ function onKeydown(e: KeyboardEvent) {
     } else {
       const item = focusableItems.value[focusedCardIndex.value]
       if (!item) return
-      if (item.kind === 'recent' || item.kind === 'favorite' || item.kind === 'connection') {
+      if (item.kind === 'site' || item.kind === 'recent' || item.kind === 'favorite' || item.kind === 'connection') {
         onCardDblClick(item.config, e)
       } else if (item.kind === 'group') {
         enterGroup(item.groupId)
@@ -1005,7 +1188,24 @@ async function confirmDeleteGroup(action: 'delete-connections' | 'move-out') {
   deleteGroupTarget.value = null
 }
 
+// Reachability probing runs only while a start screen is on screen and the
+// window has focus (CONTRATO-status §1).
+const windowFocused = ref(document.hasFocus() && document.visibilityState === 'visible')
+const syncWindowFocus = () => { windowFocused.value = document.hasFocus() && document.visibilityState === 'visible' }
+const probing = computed(() => tabStore.activeTabId === props.tab.id && windowFocused.value)
+let holdsProbe = false
+watch(probing, (on) => {
+  if (on === holdsProbe) return
+  holdsProbe = on
+  if (on) connStatus.acquire()
+  else connStatus.release()
+}, { immediate: true })
+
 onMounted(() => {
+  connStatus.start(() => connectionStore.connections.map(c => c.id))
+  window.addEventListener('focus', syncWindowFocus)
+  window.addEventListener('blur', syncWindowFocus)
+  document.addEventListener('visibilitychange', syncWindowFocus)
   window.addEventListener('keydown', onKeydown)
   updateContentWidth()
   if (startTabRef.value) {
@@ -1016,6 +1216,11 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (holdsProbe) connStatus.release()
+  holdsProbe = false
+  window.removeEventListener('focus', syncWindowFocus)
+  window.removeEventListener('blur', syncWindowFocus)
+  document.removeEventListener('visibilitychange', syncWindowFocus)
   window.removeEventListener('keydown', onKeydown)
   resizeObserver?.disconnect()
 })
@@ -1091,14 +1296,301 @@ function doEditConnection(config: ConnectionConfig | null) {
   margin: 0 auto;
 }
 
-.start-brand {
-  text-align: center;
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--accent);
-  margin-top: 4rem;
-  margin-bottom: 2.25rem;
+.sites-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+.sites-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
   user-select: none;
+}
+.sites-title-link {
+  cursor: pointer;
+}
+.sites-title-link:hover {
+  color: var(--accent-text);
+}
+.sites-head-spacer {
+  flex: 1;
+}
+/* Segmented control: the active segment is a solid inverted pill. */
+.sites-seg {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-btn);
+}
+.sites-seg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 1.75rem;
+  padding: 0 0.875rem;
+  border: none;
+  border-radius: var(--radius-badge);
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sites-seg-btn:hover {
+  background: var(--bg-hover);
+}
+.sites-seg-btn.active {
+  background: var(--text-primary);
+  color: var(--bg-base);
+  font-weight: 700;
+}
+.sites-seg-count {
+  padding: 0 0.375rem;
+  border-radius: var(--radius-badge);
+  background: var(--alert-badge);
+  color: var(--alert-text);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.sites-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  align-items: start;
+  gap: 1rem;
+}
+.site-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 1rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+}
+.site-card.alert {
+  background: var(--alert-card);
+  border-color: var(--alert-border);
+}
+.site-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.125rem;
+}
+.site-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+.site-name:hover,
+.site-name.focused {
+  color: var(--accent-text);
+}
+.site-badge {
+  flex-shrink: 0;
+  padding: 0.1875rem 0.5rem;
+  border-radius: var(--radius-badge);
+  background: var(--bg-active);
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.site-badge.ok {
+  background: var(--ok-badge);
+  color: var(--ok-text);
+}
+.site-badge.alert {
+  background: var(--alert-badge);
+  color: var(--alert-text);
+}
+.site-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+  padding: 0.5rem 0.625rem;
+  background: var(--bg-sunken);
+  border: 1px solid transparent;
+  border-radius: var(--radius-row);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.site-card.alert .site-row {
+  background: var(--alert-row);
+}
+.site-row:hover {
+  border-color: var(--border-hover);
+}
+.site-row.focused,
+.site-row.selected {
+  border-color: var(--accent);
+}
+.site-row.selected {
+  background: var(--accent-subtle);
+}
+.site-tag {
+  flex-shrink: 0;
+  min-width: 2.25rem;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  color: var(--tag-other);
+}
+.site-tag.tag-olt { color: var(--tag-olt); }
+.site-tag.tag-pe { color: var(--tag-pe); }
+.site-tag.tag-mk { color: var(--tag-mk); }
+.site-tag.tag-sw { color: var(--tag-sw); }
+.site-row-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.site-row-host,
+.site-row-down {
+  flex-shrink: 0;
+  margin-left: auto;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.75rem;
+}
+.site-row-host {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+.site-row-down {
+  font-weight: 700;
+  color: var(--alert-text);
+}
+/* Row actions appear on hover, over the host column. */
+.row-fav-btn,
+.row-more-btn {
+  display: none;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-badge);
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.site-row:hover .row-fav-btn,
+.site-row:hover .row-more-btn,
+.row-fav-btn.on {
+  display: flex;
+}
+.site-row:hover .site-row-host {
+  display: none;
+}
+.row-fav-btn.on {
+  color: var(--warning);
+}
+.site-row:hover .row-fav-btn {
+  margin-left: auto;
+}
+.row-fav-btn:hover,
+.row-more-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.row-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+.site-empty {
+  padding: 0.5rem 0.125rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.site-more {
+  align-self: flex-start;
+  padding: 0.125rem;
+  border: none;
+  background: none;
+  color: var(--accent-text);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.site-more:hover {
+  text-decoration: underline;
+}
+
+.recent-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  margin-top: 1.5rem;
+}
+.recent-title {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.recent-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+}
+.recent-chip {
+  height: 2.25rem;
+  max-width: 20rem;
+  padding: 0 1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-btn);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.recent-chip:hover {
+  border-color: var(--border-hover);
+}
+.recent-chip.focused,
+.recent-chip.selected {
+  border-color: var(--accent);
+}
+.recent-chip.selected {
+  background: var(--accent-subtle);
 }
 
 .start-search-row {
@@ -1125,7 +1617,7 @@ function doEditConnection(config: ConnectionConfig | null) {
 .start-filter-btn:hover,
 .start-filter-btn.active {
   background: var(--bg-hover);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .start-search-input {
@@ -1156,8 +1648,7 @@ function doEditConnection(config: ConnectionConfig | null) {
   display: flex;
   flex-wrap: wrap;
   gap: 0.625rem;
-  margin-bottom: 1.75rem;
-  align-items: flex-start;
+  align-items: center;
 }
 
 .start-action-btn {
@@ -1224,7 +1715,7 @@ function doEditConnection(config: ConnectionConfig | null) {
   color: var(--text-disabled);
 }
 .start-breadcrumb .link {
-  color: var(--accent);
+  color: var(--accent-text);
   cursor: pointer;
 }
 .start-breadcrumb .link:hover {
@@ -1398,17 +1889,17 @@ function doEditConnection(config: ConnectionConfig | null) {
 }
 .start-card-icon.ssh,
 .start-card-icon.telnet,
-.start-card-icon.mosh { color: var(--accent); }
+.start-card-icon.mosh { color: var(--accent-text); }
 .start-card-icon.local { color: var(--success); }
 .start-card-icon.database { color: var(--warning); }
 .start-card-icon.rdp,
 .start-card-icon.vnc,
-.start-card-icon.spice { color: var(--accent); }
-.start-card-icon.k8s { color: var(--accent); }
+.start-card-icon.spice { color: var(--accent-text); }
+.start-card-icon.k8s { color: var(--accent-text); }
 .start-card-icon.serial { color: var(--success-dim); }
 .start-card-icon.group { color: var(--text-secondary); }
 .start-card-icon.ungrouped { color: var(--text-muted); }
-.start-card-icon.quick { background: var(--accent-subtle); color: var(--accent); }
+.start-card-icon.quick { background: var(--accent-subtle); color: var(--accent-text); }
 
 .start-card-name {
   font-weight: 600;
@@ -1447,7 +1938,7 @@ function doEditConnection(config: ConnectionConfig | null) {
   background: var(--accent-subtle);
 }
 .quick-name {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .start-empty-hint,
@@ -1464,4 +1955,31 @@ function doEditConnection(config: ConnectionConfig | null) {
   opacity: 0.3;
 }
 
+
+/* FlexTerm (D1c): solid buttons, white text on the action color. */
+[data-theme^="flexterm"] .start-action-btn {
+  height: 2.25rem;
+  border-radius: var(--radius-btn);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+[data-theme^="flexterm"] .start-action-btn.primary {
+  color: var(--on-accent);
+  font-weight: 700;
+}
+[data-theme^="flexterm"] .start-action-btn.primary:hover {
+  filter: none;
+  background: var(--el-color-primary-dark-2);
+}
+[data-theme^="flexterm"] .start-action-btn-group > .start-action-btn {
+  border-radius: var(--radius-btn) 0 0 var(--radius-btn);
+}
+[data-theme^="flexterm"] .start-action-btn-dropdown-arrow {
+  height: 2.25rem;
+  border-radius: 0 var(--radius-btn) var(--radius-btn) 0;
+}
+[data-theme^="flexterm"] .start-search-input .el-input__wrapper {
+  background-color: var(--bg-input) !important;
+  border-radius: var(--radius-row) !important;
+}
 </style>
