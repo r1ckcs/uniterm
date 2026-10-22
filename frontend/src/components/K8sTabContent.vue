@@ -1,7 +1,7 @@
 <template>
   <div class="db-tab-content">
     <div v-if="error" class="k8s-fatal">{{ error }}</div>
-    <div v-else-if="!connId" class="k8s-connecting">Connecting…</div>
+    <div v-else-if="!connId" class="k8s-connecting">{{ t('k8s.connecting') }}</div>
     <div v-else class="db-main">
       <div class="db-left" :style="{ width: leftWidth + 'px' }">
         <K8sTree :model-value="rootResourceKey" @update:model-value="selectResource" />
@@ -48,6 +48,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import * as k8sClient from '../services/k8sClient'
+import { t } from '../i18n'
 import { usePanelStore } from '../stores/panelStore'
 import { useTabStore } from '../stores/tabStore'
 import { useSessionStore } from '../stores/sessionStore'

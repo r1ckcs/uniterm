@@ -5,14 +5,14 @@
       :model-value="namespace"
       size="small"
       class="k8s-ns-select"
-      placeholder="all namespaces"
+      :placeholder="t('conn.k8sShowAllNamespaces')"
       filterable
       allow-create
       default-first-option
       clearable
       @update:model-value="v => $emit('update:namespace', v || '')"
     >
-      <el-option label="all namespaces" value="" />
+      <el-option :label="t('conn.k8sShowAllNamespaces')" value="" />
       <el-option v-for="opt in namespaceOptions" :key="opt" :label="opt" :value="opt" />
     </el-select>
 
@@ -31,6 +31,7 @@
 import { computed } from 'vue'
 import { ElSelect, ElOption } from 'element-plus'
 import { getResource } from '../services/k8sResources'
+import { t } from '../i18n'
 import type { NavFrame } from '../types/k8s'
 
 const props = defineProps<{ stack: NavFrame[]; namespace: string; namespaceOptions: string[] }>()

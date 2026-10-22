@@ -108,7 +108,7 @@
           <el-select v-model="editorLineEnding" style="width: 8.75rem">
             <el-option label="LF (Linux/macOS)" value="lf" />
             <el-option label="CRLF (Windows)" value="crlf" />
-            <el-option label="CR (old Mac)" value="cr" />
+            <el-option :label="t('sftp.edit.eolCrOldMac')" value="cr" />
           </el-select>
         </div>
         <div class="editor-buttons">

@@ -48,7 +48,7 @@
             {{ getShellLabel(sh) }}
           </MenuItem>
           <MenuItem v-if="settingsStore.availableShells.length === 0" class="disabled">
-            No shells available
+            {{ t('conn.noShells') }}
           </MenuItem>
         </Menu>
       </div>

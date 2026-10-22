@@ -14,7 +14,7 @@
       @close="handleClose"
       @toggle-ai-lock="onToggleAiLock"
     />
-    <div v-else class="no-panel">Panel not found</div>
+    <div v-else class="no-panel">{{ t('tab.panelNotFound') }}</div>
 
     <!-- Drop zone overlay -->
     <div v-if="dragOver" class="drop-zone-overlay">
@@ -31,6 +31,7 @@ defineOptions({ name: 'TerminalTabContent' })
 
 import { computed, ref, nextTick } from 'vue'
 import { usePanelStore } from '../stores/panelStore'
+import { t } from '../i18n'
 import { useTabStore } from '../stores/tabStore'
 import type { TerminalTab } from '../types/workspace'
 import Panel from './Panel.vue'

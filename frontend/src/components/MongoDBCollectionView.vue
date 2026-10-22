@@ -137,13 +137,13 @@
       </div>
       <el-table :data="indexes" border size="small" style="width:100%" :empty-text="t('db.noData')">
         <el-table-column prop="name" :label="t('db.colName')" show-overflow-tooltip />
-        <el-table-column label="Fields">
+        <el-table-column :label="t('mongodb.indexFields')">
           <template #default="{ row }">
             {{ (row as MongoIndexInfo).keys.join(', ') }}
           </template>
         </el-table-column>
         <el-table-column prop="type" :label="t('db.colType')" />
-        <el-table-column prop="unique" label="Unique" :width="uiPx(80)">
+        <el-table-column prop="unique" :label="t('db.idxUnique')" :width="uiPx(80)">
           <template #default="{ row }">
             {{ row.unique ? '✓' : '' }}
           </template>
@@ -164,10 +164,10 @@
         <el-form-item :label="t('db.colName')">
           <el-input v-model="newIndexName" placeholder="index_name" />
         </el-form-item>
-        <el-form-item label="Fields">
+        <el-form-item :label="t('mongodb.indexFields')">
           <el-input v-model="newIndexFields" placeholder="field1,-field2" />
         </el-form-item>
-        <el-form-item label="Unique">
+        <el-form-item :label="t('db.idxUnique')">
           <el-switch v-model="newIndexUnique" />
         </el-form-item>
       </el-form>

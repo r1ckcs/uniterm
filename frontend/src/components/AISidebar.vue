@@ -149,7 +149,7 @@
             @mousedown.prevent="onSelectHashPanel(p.title)"
           >
             <span class="hash-panel-name">#{{ p.title }}</span>
-            <span v-if="lockedPanels.includes(p.id)" class="hash-associated-badge">已关联</span>
+            <span v-if="lockedPanels.includes(p.id)" class="hash-associated-badge">{{ t('ai.hashLinked') }}</span>
             <span class="hash-panel-hint">{{ getPanelShellHint(p.id) }}</span>
           </div>
         </div>
@@ -194,10 +194,10 @@
         </div>
         <div class="input-actions">
           <div class="input-actions-left">
-            <button class="ghost-btn hash-btn" title="引用终端" :disabled="lockedPanels.length === 0 && !currentIsTerminal" @click="onHashButtonClick">
+            <button class="ghost-btn hash-btn" :title="t('ai.referenceTerminal')" :disabled="lockedPanels.length === 0 && !currentIsTerminal" @click="onHashButtonClick">
               <span class="hash-btn-icon">#</span>
             </button>
-            <button class="ghost-btn hash-btn" title="Skill / 命令" :disabled="lockedPanels.length === 0 && !currentIsTerminal" @click="onSlashButtonClick">
+            <button class="ghost-btn hash-btn" :title="t('ai.skillOrCommand')" :disabled="lockedPanels.length === 0 && !currentIsTerminal" @click="onSlashButtonClick">
               <span class="hash-btn-icon">/</span>
             </button>
             <template v-if="settingsStore.settings.ai.models.length > 0">
