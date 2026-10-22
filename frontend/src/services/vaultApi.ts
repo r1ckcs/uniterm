@@ -6,7 +6,7 @@
 //
 // Mock selection, for development and screenshots only:
 //   ?vault=<scenario> in the URL, or localStorage 'uniterm.vaultMock'
-//   scenarios: welcome | ready | join | newDevice | recovery | revoked | error | test
+//   scenarios: welcome | ready | join | newDevice | recovery | revoked | error | test | multiKeys
 import * as App from '../../bindings/github.com/ys-ll/uniterm/app'
 import { Events } from '@wailsio/runtime'
 import { useConnectionStore } from '../stores/connectionStore'
@@ -153,8 +153,8 @@ export function createMockVaultApi(scenario: string, delayMs = 1500, connectionI
   let others: VaultDevice[] = []
   const signedIn = (patch: Partial<VaultStatus>) => Object.assign(status, { account: { email } }, patch)
 
-  if (['ready', 'join', 'test'].includes(scenario)) {
-    signedIn({ phase: 'ready', lastSyncAt: hoursAgo(0.05) })
+  if (['ready', 'join', 'test', 'multiKeys'].includes(scenario)) {
+    signedIn({ phase: 'ready', lastSyncAt: hoursAgo(0.05), recoveryKeys: scenario === 'multiKeys' ? 2 : 1 })
     others = [
       { id: 'dev-mac-casa', name: 'MacBook de casa', fingerprint: 'C41E 08AF 6D2B 9930', role: 'admin', isThis: false, isRecovery: false, lastSeenAt: hoursAgo(20) },
       { id: 'dev-mac-noc', name: 'Mac mini do NOC', fingerprint: '2B90 E7D1 55A3 0C6F', role: 'admin', isThis: false, isRecovery: false, lastSeenAt: hoursAgo(24 * 9) },
@@ -221,7 +221,7 @@ export function createMockVaultApi(scenario: string, delayMs = 1500, connectionI
     async confirmRecovery(positions, words) {
       const ok = positions.every((p, i) => MOCK_WORDS[p] === words[i]?.trim().toLowerCase())
       if (!ok) throw new VaultError('vault.recovery.mismatch')
-      set({ phase: 'ready', recoveryCheck: undefined, recoveryRegen: false, lastSyncAt: new Date().toISOString() })
+      set({ phase: 'ready', recoveryCheck: undefined, recoveryRegen: false, recoveryKeys: 1, lastSyncAt: new Date().toISOString() })
     },
     async recoverWithWords(words) {
       if (words.length !== MOCK_WORDS.length) throw new VaultError('vault.recovery.badWords')

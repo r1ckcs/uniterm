@@ -26,6 +26,9 @@ export interface VaultStatus {
   // showRecovery is replacing the phrase of an open vault (Cancel allowed, the
   // old phrase stays valid until confirm), not creating the vault (CONTRATO v6).
   recoveryRegen?: boolean
+  // Recovery keys in the roster (counted in ready). > 1 means a phrase change
+  // was interrupted and an old phrase still works (CONTRATO v7).
+  recoveryKeys?: number
   lastSyncAt?: string
   syncing: boolean
   offline: boolean
