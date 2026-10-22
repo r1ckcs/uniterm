@@ -1037,3 +1037,142 @@ func TestCachedStoreReadsOffline(t *testing.T) {
 		t.Fatalf("log after reconnect = %q", got)
 	}
 }
+
+// --- revocation dominates (review of 7b3266f6) ---
+
+// driveLike lets the creator set createdTime, as Drive does.
+type driveLike struct {
+	*MemStore
+	created map[string]int64
+}
+
+func (d *driveLike) List(prefix string) ([]Entry, error) {
+	es, err := d.MemStore.List(prefix)
+	for i := range es {
+		if c, ok := d.created[es[i].ID]; ok {
+			es[i].Created = c
+		}
+	}
+	return es, err
+}
+
+func (d *driveLike) Create(name string, data []byte) (Entry, error) {
+	e, err := d.MemStore.Create(name, data)
+	if d.created != nil && err == nil {
+		d.created[e.ID] = 1 // backdated
+	}
+	return e, err
+}
+
+// revokedAdminFork: admin A revokes admin R at counter k+1; R (stolen
+// device) then forks from k with backdated versions: k+1' adding its own
+// admin x, k+2' superseding the real k+1. Returns the pre-revocation
+// anchor and the real revocation version.
+func revokedAdminFork(t *testing.T, s *driveLike, tm *team, r *SoftwareDeviceKey, alsoRevokeA bool) (TrustState, TrustState) {
+	t.Helper()
+	must(t, tm.va.AddMember(MemberOf(r, "henrique", "mac-roubado", RoleAdmin)))
+	before := tm.va.Roster()
+	k := tm.va.Trust()
+	must(t, tm.va.Revoke(IDOf(r)))
+	real := tm.va.Trust()
+
+	s.created = map[string]int64{}
+	fa := cloneRoster(before)
+	fa.Counter, fa.Prev = k.Counter+1, k.Hash
+	fa.Members = append(fa.Members, MemberOf(newKey(t), "atacante", "x", RoleAdmin))
+	if alsoRevokeA {
+		// R revokes A in its branch too (mutual revocation).
+		vk, err := newVaultKey()
+		must(t, err)
+		fa.Members = slices.DeleteFunc(fa.Members, func(m Member) bool { return m.DeviceID == IDOf(tm.a) })
+		for _, m := range before.Members {
+			if m.DeviceID == IDOf(tm.a) {
+				fa.Former = append(fa.Former, m)
+			}
+		}
+		fa.Epoch++
+		fa.KeyChecks = append(fa.KeyChecks, keyCheck("pessoal", fa.Epoch, vk))
+		fa.Closed = append(fa.Closed, EpochClose{Epoch: before.Epoch, Seqs: map[string]Cut{}})
+	}
+	va, err := writeRoster(s, r, &fa)
+	must(t, err)
+	fb := cloneRoster(fa)
+	fb.Counter, fb.Prev = fa.Counter+1, va.hash
+	fb.Supersedes = []Superseded{{real.Counter, real.Hash}}
+	_, err = writeRoster(s, r, &fb)
+	must(t, err)
+	return k, real
+}
+
+func hasMember(v *Vault, id string) bool {
+	for _, m := range v.Roster().Members {
+		if m.DeviceID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func TestRevokedAdminCannotUndoRevocation(t *testing.T) {
+	s := &driveLike{MemStore: NewMemStore()}
+	tm := newTeam(t, s)
+	r := newKey(t)
+	k, real := revokedAdminFork(t, s, tm, r, false)
+	s2 := s
+	// A client pinned on the revocation.
+	client, err := openAt(s2, tm.w, real)
+	must(t, err)
+	must(t, client.Refresh())
+	if hasMember(client, IDOf(r)) || client.Trust() != real {
+		t.Fatalf("pinned client moved to the revoked admin's fork: %+v", client.Trust())
+	}
+	// A client anchored before the revocation (old recovery anchor, device
+	// that was offline) takes the revocation, not the backdated fork.
+	old, err := openAt(s2, tm.w, k)
+	must(t, err)
+	if hasMember(old, IDOf(r)) || old.Trust() != real {
+		t.Fatalf("pre-revocation anchor landed on the fork: %+v", old.Trust())
+	}
+	// The admin marks the fork superseded; nothing changes for the clients.
+	must(t, tm.va.Refresh())
+	must(t, tm.va.SupersedeLosers())
+	must(t, client.Refresh())
+	if hasMember(client, IDOf(r)) {
+		t.Fatal("revoked admin back after SupersedeLosers")
+	}
+}
+
+func TestMutualRevocationFailsClosed(t *testing.T) {
+	s := &driveLike{MemStore: NewMemStore()}
+	tm := newTeam(t, s)
+	r := newKey(t)
+	k, _ := revokedAdminFork(t, s, tm, r, true)
+	if _, err := openAt(s, tm.w, k); !errors.Is(err, ErrConflict) || !errors.Is(err, ErrFork) {
+		t.Fatalf("open from before the fork = %v, want ErrConflict", err)
+	}
+}
+
+func TestClientOnAttackerForkReturns(t *testing.T) {
+	// A client whose listing only showed the attacker's branch (pinned on
+	// k+1') goes back to the revocation once an admin supersedes the fork.
+	s := &driveLike{MemStore: NewMemStore()}
+	tm := newTeam(t, s)
+	r := newKey(t)
+	_, real := revokedAdminFork(t, s, tm, r, false)
+	forkV, _ := candidates(s, rosterName(real.Counter))
+	var fork TrustState
+	for _, e := range forkV {
+		data, _, _ := s.Get(e.ID)
+		vr, _, _ := parseRoster(data, "pessoal")
+		if vr.hash != real.Hash {
+			fork = TrustState{VaultID: "pessoal", Counter: vr.Counter, Hash: vr.hash}
+		}
+	}
+	must(t, tm.va.Refresh())
+	must(t, tm.va.SupersedeLosers())
+	victim, err := openAt(s, tm.w, fork)
+	must(t, err)
+	if hasMember(victim, IDOf(r)) || victim.Trust() != tm.va.Trust() {
+		t.Fatalf("victim stayed on the fork: %+v (admin at %+v)", victim.Trust(), tm.va.Trust())
+	}
+}

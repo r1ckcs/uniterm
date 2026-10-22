@@ -297,6 +297,8 @@ func (r *Roster) validate(vaultID string) error {
 type verifiedRoster struct {
 	Roster
 	hash string
+	// signer is the device that signed this version (set by decodeRoster).
+	signer string
 }
 
 // parseRoster decodes and validates a stored roster object without checking
@@ -333,6 +335,7 @@ func decodeRoster(data []byte, vaultID string, authority *Roster) (*verifiedRost
 	if err := verify(signer.SignPub, "roster", obj.Body, obj.Sig); err != nil {
 		return nil, fmt.Errorf("vault: roster %d: %w", vr.Counter, err)
 	}
+	vr.signer = obj.Signer
 	return vr, nil
 }
 
@@ -430,7 +433,9 @@ type rosterChain struct {
 	warnings []string
 	// losers are the valid versions that lost a race (for Supersedes).
 	losers []Superseded
-	// stalled: the counter after cur has candidates, none following cur.
+	// versions are the accepted versions, by counter.
+	versions map[uint64]*verifiedRoster
+	// stalled: storage has versions that don't follow the accepted chain.
 	// Normal for junk, but also what a client on a dead branch sees.
 	stalled bool
 }
@@ -488,60 +493,181 @@ func loadRoster(s Store, trust TrustState) (*rosterChain, error) {
 		return nil, fmt.Errorf("vault: roster %d claims counter %d", trust.Counter, cur.Counter)
 	}
 
-	ch := &rosterChain{hashes: map[uint64]string{cur.Counter: cur.hash}, created: map[uint64]int64{cur.Counter: curCreated}}
-	for c := trust.Counter + 1; c <= newest; c++ {
-		type cand struct {
-			vr      *verifiedRoster
-			created int64
-		}
-		var valid []cand
+	ch := &rosterChain{hashes: map[uint64]string{cur.Counter: cur.hash}, created: map[uint64]int64{cur.Counter: curCreated},
+		versions: map[uint64]*verifiedRoster{cur.Counter: cur}}
+
+	// Every valid version from the anchor on, as a tree: a version is valid
+	// under the one its Prev names (signed by an admin of it, chain rules).
+	root := &rosterNode{vr: cur, created: curCreated}
+	frontier := []*rosterNode{root}
+	nodes, ignored := 1, 0
+	for c := trust.Counter + 1; c <= newest && len(frontier) > 0; c++ {
+		var next []*rosterNode
+		invalid := 0
 		for _, e := range byCounter[c] {
 			data, _, err := s.Get(e.ID)
 			if err != nil {
 				return nil, err
 			}
-			next, err := decodeRoster(data, trust.VaultID, &cur.Roster)
-			if err == nil {
-				err = checkSuccessor(cur, next)
+			child := validChild(data, trust.VaultID, frontier)
+			if child == nil || nodes >= maxRosterNodes {
+				invalid++
+				continue
 			}
-			if err == nil {
-				// A version can't declare one of its own ancestors dead.
-				for _, x := range next.Supersedes[len(cur.Supersedes):] {
-					if ch.hashes[x.Counter] == x.Hash {
-						err = fmt.Errorf("vault: roster %d supersedes its own ancestor %d", c, x.Counter)
-					}
+			child.created = e.Created
+			child.parent.children = append(child.parent.children, child)
+			next = append(next, child)
+			nodes++
+		}
+		ignored += invalid
+		if invalid > 0 {
+			ch.warnings = append(ch.warnings, fmt.Sprintf("roster %d: ignored %d candidate(s) that do not follow a valid version", c, invalid))
+		}
+		frontier = next
+	}
+
+	// Walk down, choosing at each fork (see chooseBranch).
+	for n := root; len(n.children) > 0; {
+		win, err := chooseBranch(n.children)
+		if err != nil {
+			return nil, err
+		}
+		if len(n.children) > 1 {
+			ch.warnings = append(ch.warnings, fmt.Sprintf("roster %d: %d valid versions (admins raced or a revoked admin forked); took one", win.vr.Counter, len(n.children)))
+			for _, l := range n.children {
+				if l != win {
+					ch.losers = append(ch.losers, Superseded{Counter: l.vr.Counter, Hash: l.vr.hash})
 				}
 			}
-			if err == nil {
-				valid = append(valid, cand{next, e.Created})
-			}
 		}
-		if n := len(byCounter[c]) - len(valid); n > 0 {
-			ch.warnings = append(ch.warnings, fmt.Sprintf("roster %d: ignored %d candidate(s) that do not follow version %d", c, n, c-1))
-		}
-		if len(valid) == 0 {
-			break
-		}
-		if len(valid) > 1 {
-			ch.warnings = append(ch.warnings, fmt.Sprintf("roster %d: %d valid versions (admins raced); took the earliest", c, len(valid)))
-			slices.SortFunc(valid, func(a, b cand) int {
-				if a.created != b.created {
-					return int(min(max(a.created-b.created, -1), 1))
-				}
-				return strings.Compare(a.vr.hash, b.vr.hash)
-			})
-		}
-		for _, l := range valid[1:] {
-			ch.losers = append(ch.losers, Superseded{Counter: c, Hash: l.vr.hash})
-		}
-		cur = valid[0].vr
+		n = win
+		cur = n.vr
 		ch.hashes[cur.Counter] = cur.hash
-		ch.created[cur.Counter] = valid[0].created
+		ch.created[cur.Counter] = n.created
+		ch.versions[cur.Counter] = cur
 	}
 	ch.cur = cur
 	ch.trust = TrustState{VaultID: trust.VaultID, Counter: cur.Counter, Hash: cur.hash}
-	ch.stalled = len(byCounter[cur.Counter+1]) > 0
+	ch.stalled = ignored > 0 || len(byCounter[cur.Counter+1]) > 0
 	return ch, nil
+}
+
+// maxRosterNodes bounds the tree of valid versions loadRoster builds (each
+// costs a valid admin signature, so only admins can grow it).
+const maxRosterNodes = 4096
+
+type rosterNode struct {
+	vr       *verifiedRoster
+	created  int64
+	parent   *rosterNode
+	children []*rosterNode
+	// memo of subtree sets (see subtree)
+	revoked, signers map[string]bool
+}
+
+// validChild returns data as a node under the frontier version it follows,
+// or nil if it follows none validly.
+func validChild(data []byte, vaultID string, frontier []*rosterNode) *rosterNode {
+	vr, _, err := parseRoster(data, vaultID)
+	if err != nil {
+		return nil
+	}
+	for _, p := range frontier {
+		if p.vr.hash != vr.Prev {
+			continue
+		}
+		next, err := decodeRoster(data, vaultID, &p.vr.Roster)
+		if err != nil || checkSuccessor(p.vr, next) != nil {
+			return nil
+		}
+		// A version can't declare one of its own ancestors dead.
+		for _, x := range next.Supersedes[len(p.vr.Supersedes):] {
+			for a := p; a != nil; a = a.parent {
+				if a.vr.Counter == x.Counter && a.vr.hash == x.Hash {
+					return nil
+				}
+			}
+		}
+		return &rosterNode{vr: next, parent: p}
+	}
+	return nil
+}
+
+// subtree returns who the versions in n's subtree revoke (moved to Former)
+// and who signed them.
+func (n *rosterNode) subtree() (revoked, signers map[string]bool) {
+	if n.revoked != nil {
+		return n.revoked, n.signers
+	}
+	revoked, signers = map[string]bool{}, map[string]bool{n.vr.signer: true}
+	if n.parent != nil {
+		for _, m := range n.vr.Former[len(n.parent.vr.Former):] {
+			revoked[m.DeviceID] = true
+		}
+	}
+	for _, c := range n.children {
+		r, sg := c.subtree()
+		for id := range r {
+			revoked[id] = true
+		}
+		for id := range sg {
+			signers[id] = true
+		}
+	}
+	n.revoked, n.signers = revoked, signers
+	return revoked, signers
+}
+
+// ErrConflict: two branches of the roster revoke each other's signers.
+var ErrConflict = fmt.Errorf("%w: conflicting roster history (branches revoke each other); resolve it from a trusted device", ErrFork)
+
+// chooseBranch picks among sibling versions. Revocation dominates: a branch
+// that revokes a device signing versions of another branch beats it (a
+// revoked admin, e.g. a stolen device, can still sign successors of the
+// versions before its revocation, and Drive lets it backdate them). If two
+// branches revoke each other's signers, nothing can be trusted: fail
+// closed. Among the rest (a plain race), the earliest created wins, then
+// the lowest hash: the same choice on every client.
+func chooseBranch(kids []*rosterNode) (*rosterNode, error) {
+	if len(kids) == 1 {
+		return kids[0], nil
+	}
+	dominates := func(a, b *rosterNode) bool {
+		rev, _ := a.subtree()
+		_, sig := b.subtree()
+		for id := range rev {
+			if sig[id] {
+				return true
+			}
+		}
+		return false
+	}
+	var free []*rosterNode
+	for _, k := range kids {
+		beaten := false
+		for _, o := range kids {
+			if o == k || !dominates(o, k) {
+				continue
+			}
+			if dominates(k, o) {
+				return nil, ErrConflict
+			}
+			beaten = true
+		}
+		if !beaten {
+			free = append(free, k)
+		}
+	}
+	if len(free) == 0 {
+		return nil, ErrConflict
+	}
+	slices.SortFunc(free, func(a, b *rosterNode) int {
+		if a.created != b.created {
+			return int(min(max(a.created-b.created, -1), 1))
+		}
+		return strings.Compare(a.vr.hash, b.vr.hash)
+	})
+	return free[0], nil
 }
 
 // maxReanchorWalk bounds how far back reanchor looks for the common
@@ -575,7 +701,7 @@ func reanchor(s Store, trust TrustState, mine *rosterChain) (*rosterChain, Trust
 	lowest := uint64(0)
 	for _, e := range entries {
 		c, ok := parseRosterName(e.Name)
-		if !ok || c <= trust.Counter || (mine != nil && mine.hashes[c] != "" && c <= mine.cur.Counter) {
+		if !ok || c <= trust.Counter {
 			continue
 		}
 		data, _, err := s.Get(e.ID)
@@ -583,8 +709,8 @@ func reanchor(s Store, trust TrustState, mine *rosterChain) (*rosterChain, Trust
 			return nil, TrustState{}, err
 		}
 		vr, _, err := parseRoster(data, trust.VaultID)
-		if err != nil {
-			continue
+		if err != nil || branch[Superseded{vr.Counter, vr.hash}] {
+			continue // junk, or a version of the client's own branch
 		}
 		for _, x := range vr.Supersedes {
 			if lowest == 0 || x.Counter < lowest {
@@ -595,16 +721,28 @@ func reanchor(s Store, trust TrustState, mine *rosterChain) (*rosterChain, Trust
 	if lowest == 0 {
 		return nil, TrustState{}, nil
 	}
+	// The client's branch, newest first: its accepted versions, then the
+	// ones walked back through.
+	var mineVs []*verifiedRoster
+	if mine != nil {
+		for c := mine.cur.Counter; c > trust.Counter; c-- {
+			mineVs = append(mineVs, mine.versions[c])
+		}
+	}
 	at := trust
 	for step := 0; step < maxReanchorWalk && at.Counter > 1 && at.Counter >= lowest; step++ {
 		vr, err := rosterByHash(s, at)
 		if err != nil {
 			return nil, TrustState{}, err
 		}
+		mineVs = append(mineVs, vr)
 		branch[Superseded{at.Counter, at.Hash}] = true
 		at = TrustState{VaultID: at.VaultID, Counter: at.Counter - 1, Hash: vr.Prev}
 		alt, err := loadRoster(s, at)
 		if err != nil {
+			continue
+		}
+		if !safeToMove(mineVs, at, alt) {
 			continue
 		}
 		for _, x := range alt.cur.Supersedes {
@@ -615,6 +753,40 @@ func reanchor(s Store, trust TrustState, mine *rosterChain) (*rosterChain, Trust
 		}
 	}
 	return nil, TrustState{}, nil
+}
+
+// safeToMove refuses to leave a branch that revoked someone: the client
+// accepted that revocation, and an admin-signed Supersedes must never undo
+// it (the signer may be the revoked device). mine is the client's branch
+// above the ancestor at (newest first, the ancestor's child last).
+func safeToMove(mine []*verifiedRoster, at TrustState, alt *rosterChain) bool {
+	if len(mine) == 0 {
+		return true
+	}
+	tip, first := mine[0], mine[len(mine)-1]
+	// Former grows or the epoch rotates only on a revocation.
+	if len(tip.Former) > len(first.Former) || tip.Epoch > first.Epoch {
+		return false
+	}
+	// A rotation in the version right above the ancestor counts too.
+	if base, ok := alt.versions[at.Counter]; ok && (len(first.Former) > len(base.Former) || first.Epoch > base.Epoch) {
+		return false
+	}
+	former := map[string]bool{}
+	for _, m := range tip.Former {
+		former[m.DeviceID] = true
+	}
+	for c := at.Counter + 1; c <= alt.cur.Counter; c++ {
+		if v := alt.versions[c]; v != nil && former[v.signer] {
+			return false
+		}
+	}
+	for _, m := range alt.cur.Members {
+		if former[m.DeviceID] {
+			return false
+		}
+	}
+	return true
 }
 
 // rosterByHash finds the stored version with trust's counter and hash.
@@ -645,7 +817,7 @@ func writeRoster(s Store, admin DeviceKey, r *Roster) (*verifiedRoster, error) {
 	if _, err := s.Create(rosterName(r.Counter), obj); err != nil {
 		return nil, err
 	}
-	return &verifiedRoster{Roster: *r, hash: RosterHash(body)}, nil
+	return &verifiedRoster{Roster: *r, hash: RosterHash(body), signer: IDOf(admin)}, nil
 }
 
 func cloneMembers(ms []Member) []Member {
