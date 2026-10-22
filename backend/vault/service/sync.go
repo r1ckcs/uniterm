@@ -146,13 +146,17 @@ func (s *Service) syncLocked() (SyncResult, error) {
 		merged.Apply("queued", vault.IDOf(s.dev), q.Payload)
 	}
 	snap := merged.Snapshot()
-	if d := records.LocalChanges(local.Digest(key), key, snap); len(d) > 0 {
+	kept := snap // what the stores hold once snap is written
+	if fk, ok := s.o.Bridge.(FieldKeeper); ok {
+		kept = snap.Keep(fk.Keeps)
+	}
+	if d := records.LocalChanges(local.Digest(key), key, kept); len(d) > 0 {
 		res.Pulled = len(d)
 		if err := s.o.Bridge.Apply(snap); err != nil {
 			return res, err
 		}
 	}
-	if err := writeJSON(s.path("baseline.json"), snap.Digest(key)); err != nil {
+	if err := writeJSON(s.path("baseline.json"), kept.Digest(key)); err != nil {
 		return res, err
 	}
 	s.updateMetaLocked(merged)
