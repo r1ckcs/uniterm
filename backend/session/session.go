@@ -29,6 +29,10 @@ type ConnectionGroup struct {
 	ID       string  `json:"id"`
 	Name     string  `json:"name"`
 	ParentId *string `json:"parentId,omitempty"`
+	// Color and Icon are inherited by the connections and subgroups that
+	// have none (see style.go).
+	Color string `json:"color,omitempty"`
+	Icon  string `json:"icon,omitempty"`
 }
 
 // SSHAlgoConfig holds per-connection SSH algorithm preferences. See
@@ -286,6 +290,11 @@ type ConnectionConfig struct {
 	// secret is ever duplicated here.
 	WorkspaceMembers []SavedWorkspaceMember    `json:"workspaceMembers,omitempty"`
 	WorkspaceLayout  *SavedWorkspaceLayoutNode `json:"workspaceLayout,omitempty"`
+	// Color (palette key, #rrggbb or "none") and Icon (key of
+	// ConnectionIcons or "none"); empty inherits from the group. See
+	// style.go and CONTRATO-cor-icone.md.
+	Color string `json:"color,omitempty"`
+	Icon  string `json:"icon,omitempty"`
 }
 
 // SavedWorkspaceMember is one terminal slot inside a saved workspace.

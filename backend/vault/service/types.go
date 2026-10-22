@@ -130,6 +130,13 @@ type Bridge interface {
 	Apply(records.Snapshot) error
 }
 
+// FieldKeeper is an optional Bridge extension: which fields the stores can
+// hold. Fields they can't (written by a newer build) stay out of the
+// baseline, so this build never sends them back as null.
+type FieldKeeper interface {
+	Keeps(kind records.Kind, field string) bool
+}
+
 // Secrets keeps small secrets: the device key, the OAuth refresh token.
 // The OS keychain, or a 0600 file in test mode.
 type Secrets interface {

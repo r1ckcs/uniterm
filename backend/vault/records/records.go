@@ -15,7 +15,9 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/ys-ll/uniterm/backend/vault"
@@ -62,9 +64,27 @@ type Payload struct {
 	// ordering uses the signed Lamport clock.
 	At      time.Time `json:"at"`
 	Changes []Change  `json:"changes"`
+	// Schema says which fields the writer knows (see lateFields). Absent
+	// (0) in ops of builds from before it existed. Old builds ignore it,
+	// so it is not part of Format: bumping Format would make them skip
+	// every new op.
+	Schema int `json:"schema,omitempty"`
 }
 
 const payloadFormat = 1
+
+// payloadSchema is the Schema this build writes.
+const payloadSchema = 2
+
+// lateFields are fields added after builds that sync already existed,
+// with the Schema that introduced them. A writer below that Schema cannot
+// know the field: it drops it from its stores and its next diff sends it
+// as null. So such an op's mention of the field (set or null) is ignored;
+// nothing is lost, as that writer could never set it.
+var lateFields = map[string]int{
+	"color": 2, // connection and group, CONTRATO-cor-icone.md
+	"icon":  2,
+}
 
 // Limits on what one op may carry (a writer can't blow up other clients).
 const (
@@ -77,7 +97,7 @@ const (
 
 // Encode builds an op payload.
 func Encode(at time.Time, changes []Change) ([]byte, error) {
-	p := Payload{Format: payloadFormat, At: at.UTC(), Changes: changes}
+	p := Payload{Format: payloadFormat, Schema: payloadSchema, At: at.UTC(), Changes: changes}
 	if err := p.validate(); err != nil {
 		return nil, err
 	}
@@ -167,6 +187,7 @@ func (s *State) Apply(name, author string, payload []byte) {
 		s.LastAt[author] = p.At
 	}
 	for _, c := range p.Changes {
+		c.Fields = knownTo(p.Schema, c.Fields)
 		k := Key{c.Kind, c.ID}
 		stamp := Stamp{Author: author, At: p.At, Fields: slices.Sorted(maps.Keys(c.Fields))}
 		switch {
@@ -193,6 +214,23 @@ func (s *State) Apply(name, author string, payload []byte) {
 	}
 }
 
+// knownTo drops the late fields a writer of schema could not know.
+func knownTo(schema int, f Fields) Fields {
+	var out Fields
+	for name, since := range lateFields {
+		if _, ok := f[name]; ok && schema < since {
+			if out == nil {
+				out = maps.Clone(f)
+			}
+			delete(out, name)
+		}
+	}
+	if out == nil {
+		return f
+	}
+	return out
+}
+
 // merge sets the changed fields; null removes one.
 func (f Fields) merge(changed Fields) {
 	for name, v := range changed {
@@ -212,6 +250,53 @@ func (s *State) Snapshot() Snapshot {
 	out := Snapshot{}
 	for k, r := range s.Records {
 		out[k] = maps.Clone(r.Fields)
+	}
+	return out
+}
+
+// Keep returns a copy of s holding only the fields keep accepts: the ones
+// the local stores can hold. A field this build doesn't know is dropped by
+// the stores on write; leaving it out of the baseline is what keeps the
+// next diff from sending it back as null.
+func (s Snapshot) Keep(keep func(kind Kind, field string) bool) Snapshot {
+	out := make(Snapshot, len(s))
+	for k, f := range s {
+		g := make(Fields, len(f))
+		for name, v := range f {
+			if keep(k.Kind, name) {
+				g[name] = v
+			}
+		}
+		out[k] = g
+	}
+	return out
+}
+
+// JSONFields lists the JSON field names of struct v (or pointer to it),
+// "id" included; "-" fields are left out.
+func JSONFields(v any) map[string]bool {
+	t := reflect.TypeOf(v)
+	for t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	out := map[string]bool{}
+	for i := range t.NumField() {
+		sf := t.Field(i)
+		if !sf.IsExported() && !sf.Anonymous {
+			continue
+		}
+		name, _, _ := strings.Cut(sf.Tag.Get("json"), ",")
+		if name == "-" {
+			continue
+		}
+		if sf.Anonymous && name == "" && sf.Type.Kind() == reflect.Struct {
+			maps.Copy(out, JSONFields(reflect.Zero(sf.Type).Interface()))
+			continue
+		}
+		if name == "" {
+			name = sf.Name
+		}
+		out[name] = true
 	}
 	return out
 }

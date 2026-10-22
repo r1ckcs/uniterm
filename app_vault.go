@@ -87,6 +87,17 @@ func deviceName() string {
 // storeBridge maps the connection and identity stores to vault records.
 type storeBridge struct{ a *App }
 
+// Fields the stores can hold, per record kind (service.FieldKeeper).
+var storeFields = map[records.Kind]map[string]bool{
+	records.Connection: records.JSONFields(session.ConnectionConfig{}),
+	records.Group:      records.JSONFields(session.ConnectionGroup{}),
+	records.Identity:   records.JSONFields(session.Identity{}),
+}
+
+func (b *storeBridge) Keeps(kind records.Kind, field string) bool {
+	return storeFields[kind][field]
+}
+
 func (b *storeBridge) Local() (records.Snapshot, error) {
 	snap := records.Snapshot{}
 	if b.a.connectionStore != nil {
