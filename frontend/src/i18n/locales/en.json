@@ -1958,5 +1958,6 @@
   "vault.testModeStrip": "TEST MODE: keys in a file",
   "vault.recovery.regenTitle": "New recovery key",
   "vault.recovery.regenNote": "The previous phrase stops working when you confirm. Until then, or if you cancel, it stays valid.",
-  "vault.confirm.submitRegen": "Replace recovery key"
+  "vault.confirm.submitRegen": "Replace recovery key",
+  "vault.settings.multipleRecoveryKeys": "There is more than one valid recovery key; generate a new one to invalidate the old ones."
 }

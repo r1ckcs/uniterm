@@ -1958,5 +1958,6 @@
   "vault.testModeStrip": "MODO DE TESTE: chaves em arquivo",
   "vault.recovery.regenTitle": "Nova chave de recuperação",
   "vault.recovery.regenNote": "A frase anterior deixa de valer quando você confirmar. Até lá, ou se cancelar, ela continua valendo.",
-  "vault.confirm.submitRegen": "Trocar a chave de recuperação"
+  "vault.confirm.submitRegen": "Trocar a chave de recuperação",
+  "vault.settings.multipleRecoveryKeys": "Há mais de uma chave de recuperação válida; gere uma nova para invalidar as antigas."
 }

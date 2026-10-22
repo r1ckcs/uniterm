@@ -93,6 +93,19 @@
         </div>
       </div>
 
+      <!-- An interrupted phrase change left an old recovery phrase valid. -->
+      <div v-if="(s.recoveryKeys ?? 0) > 1" class="vault-card vault-exposed">
+        <div class="vault-card-body">
+          <div class="vault-stale vault-stale-top">
+            <TriangleAlert class="vi-md" />
+            <span>{{ t('vault.settings.multipleRecoveryKeys') }}</span>
+            <el-button v-if="vault.canRegenerateRecovery && vault.isAdmin" size="small" type="primary" :loading="vault.busy" @click="vault.regenerateRecovery()">
+              {{ t('vault.revoke.newRecovery') }}
+            </el-button>
+          </div>
+        </div>
+      </div>
+
       <!-- Pending join requests the user closed -->
       <div v-if="vault.visibleJoinRequests.length > 0 && !vault.joinRequest" class="vault-card">
         <div class="vault-card-body vault-row">
@@ -312,6 +325,7 @@ async function onSignOut() {
 }
 .vault-stale svg { color: var(--warning); flex-shrink: 0; }
 .vault-stale span { flex: 1; min-width: 12rem; }
+.vault-stale-top { margin-top: 0; }
 .vault-exposed-list { margin: 0.625rem 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8125rem; color: var(--text-primary); }
 .vault-exposed-list li { display: flex; gap: 0.75rem; }
 /* Icon sizes in rem so they follow the UI scale. */

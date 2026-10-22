@@ -140,6 +140,15 @@ describe('vault store (mock backend)', () => {
     expect(vault.lastRevoke!.recoveryStale).toBe(false)
   })
 
+  it('an interrupted phrase change shows up as more than one recovery key', async () => {
+    const vault = await storeWith('multiKeys')
+    expect(vault.status.recoveryKeys).toBe(2)
+    expect(await vault.regenerateRecovery()).toBe(true)
+    const words = await vault.recoveryWords()
+    expect(await vault.confirmRecovery(vault.status.recoveryCheck!.map((i) => words[i]))).toBe(true)
+    expect(vault.status.recoveryKeys).toBe(1)
+  })
+
   it('changed-by map is keyed by connection id', async () => {
     const vault = await storeWith('ready', ['a', 'b', 'c'])
     await vi.waitFor(() => expect(vault.changeFor('b')).not.toBeNull())

@@ -1958,5 +1958,6 @@
   "vault.testModeStrip": "测试模式：密钥保存在文件中",
   "vault.recovery.regenTitle": "新的恢复密钥",
   "vault.recovery.regenNote": "确认后，旧的恢复短语将失效。在此之前或取消时，旧短语仍然有效。",
-  "vault.confirm.submitRegen": "替换恢复密钥"
+  "vault.confirm.submitRegen": "替换恢复密钥",
+  "vault.settings.multipleRecoveryKeys": "存在多个有效的恢复密钥；请生成新的密钥以使旧密钥失效。"
 }
