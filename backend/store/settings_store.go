@@ -370,11 +370,11 @@ func (s *SettingsStore) Load() (AppSettings, error) {
 func defaultSettings() AppSettings {
 	n := defaultUiFontSize()
 	return AppSettings{
-		Theme:      "dark",
+		Theme:      "flexterm",
 		Language:   "system",
 		UiFontSize: &n,
 		Terminal: TerminalSettings{
-			Theme:            "uniterm-dark",
+			Theme:            "follow-app",
 			FontFamily:       "Consolas, \"Courier New\", monospace",
 			FontSize:         14,
 			SelectionAction:  "none",
