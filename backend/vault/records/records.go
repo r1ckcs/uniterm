@@ -8,6 +8,9 @@ package records
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -135,11 +138,13 @@ type State struct {
 	deleted map[Key]bool
 	// Skipped names ops whose payload did not parse (applied as nothing).
 	Skipped []string
+	// LastAt is each author's newest op time (the devices list).
+	LastAt map[string]time.Time
 }
 
 // NewState is an empty state.
 func NewState() *State {
-	return &State{Records: map[Key]*Record{}, deleted: map[Key]bool{}}
+	return &State{Records: map[Key]*Record{}, deleted: map[Key]bool{}, LastAt: map[string]time.Time{}}
 }
 
 // Replay applies ops in the given order (the log's total order).
@@ -157,6 +162,9 @@ func (s *State) Apply(name, author string, payload []byte) {
 	if err != nil {
 		s.Skipped = append(s.Skipped, name)
 		return
+	}
+	if p.At.After(s.LastAt[author]) {
+		s.LastAt[author] = p.At
 	}
 	for _, c := range p.Changes {
 		k := Key{c.Kind, c.ID}
@@ -239,12 +247,7 @@ func Diff(base, cur Snapshot) []Change {
 			out = append(out, Change{Kind: k.Kind, ID: k.ID, Delete: true})
 		}
 	}
-	slices.SortFunc(out, func(a, b Change) int {
-		if a.Kind != b.Kind {
-			return cmpStr(string(a.Kind), string(b.Kind))
-		}
-		return cmpStr(a.ID, b.ID)
-	})
+	sortChanges(out)
 	return out
 }
 
@@ -301,4 +304,84 @@ func FromFields(id string, f Fields, v any) error {
 		return err
 	}
 	return json.Unmarshal(data, v)
+}
+
+// Digest is a snapshot reduced to keyed field hashes: what a device last
+// wrote into its stores, kept on disk to tell its own edits from remote
+// ones it has applied, without keeping secrets in the clear.
+type Digest map[string]map[string]string
+
+func digestKey(k Key) string { return string(k.Kind) + "/" + k.ID }
+
+// Digest hashes every field with key (HMAC-SHA256, so weak passwords
+// can't be guessed from the file without the device's key).
+func (s Snapshot) Digest(key []byte) Digest {
+	out := Digest{}
+	for k, f := range s {
+		m := map[string]string{}
+		for name, v := range f {
+			h := hmac.New(sha256.New, key)
+			h.Write([]byte(name))
+			h.Write([]byte{0})
+			h.Write(v)
+			m[name] = hex.EncodeToString(h.Sum(nil))
+		}
+		out[digestKey(k)] = m
+	}
+	return out
+}
+
+// LocalChanges is what this device changed in cur since it last wrote
+// base (a Digest made with the same key). Remote edits applied since then
+// are in base, so they are not sent back as reverts.
+func LocalChanges(base Digest, key []byte, cur Snapshot) []Change {
+	curD := cur.Digest(key)
+	var out []Change
+	for k, f := range cur {
+		old, ok := base[digestKey(k)]
+		if !ok {
+			out = append(out, Change{Kind: k.Kind, ID: k.ID, Create: true, Fields: maps.Clone(f)})
+			continue
+		}
+		changed := Fields{}
+		for name, v := range f {
+			if old[name] != curD[digestKey(k)][name] {
+				changed[name] = v
+			}
+		}
+		for name := range old {
+			if _, ok := f[name]; !ok {
+				changed[name] = json.RawMessage("null")
+			}
+		}
+		if len(changed) > 0 {
+			out = append(out, Change{Kind: k.Kind, ID: k.ID, Fields: changed})
+		}
+	}
+	for dk := range base {
+		kind, id, _ := cutKey(dk)
+		if _, ok := cur[Key{kind, id}]; !ok {
+			out = append(out, Change{Kind: kind, ID: id, Delete: true})
+		}
+	}
+	sortChanges(out)
+	return out
+}
+
+func cutKey(s string) (Kind, string, bool) {
+	for i := range len(s) {
+		if s[i] == '/' {
+			return Kind(s[:i]), s[i+1:], true
+		}
+	}
+	return "", s, false
+}
+
+func sortChanges(out []Change) {
+	slices.SortFunc(out, func(a, b Change) int {
+		if a.Kind != b.Kind {
+			return cmpStr(string(a.Kind), string(b.Kind))
+		}
+		return cmpStr(a.ID, b.ID)
+	})
 }

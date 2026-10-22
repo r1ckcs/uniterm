@@ -1,6 +1,7 @@
 package records
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 	"time"
@@ -128,4 +129,39 @@ func rawPayload(t *testing.T, c Change) []byte {
 		t.Fatal(err)
 	}
 	return data
+}
+
+func TestLocalChangesIgnoreAppliedRemoteEdits(t *testing.T) {
+	key := []byte("k")
+	// The device last wrote v1 into its stores; a remote edit (host) came in
+	// and was applied, so the digest is of the applied state.
+	applied := snap(t, conn{ID: "c1", Name: "x", Host: "remote"}, conn{ID: "c2", Name: "y", Host: "h"})
+	base := applied.Digest(key)
+	// Then the user changed c1's name, deleted c2 and added c3.
+	cur := snap(t, conn{ID: "c1", Name: "novo", Host: "remote"}, conn{ID: "c3", Name: "z", Host: "h3"})
+	got := LocalChanges(base, key, cur)
+	if len(got) != 3 {
+		t.Fatalf("changes = %+v", got)
+	}
+	if c := got[0]; c.ID != "c1" || len(c.Fields) != 1 || string(c.Fields["name"]) != `"novo"` {
+		t.Fatalf("c1 = %+v (must not resend host)", c)
+	}
+	if !got[1].Delete || got[1].ID != "c2" || !got[2].Create || got[2].ID != "c3" {
+		t.Fatalf("c2/c3 = %+v %+v", got[1], got[2])
+	}
+	if d := LocalChanges(cur.Digest(key), key, cur); len(d) != 0 {
+		t.Fatalf("no-op = %+v", d)
+	}
+	if bytes.Contains(mustJSON(t, base), []byte("remote")) {
+		t.Fatal("digest leaks values")
+	}
+}
+
+func mustJSON(t *testing.T, v any) []byte {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
 }
