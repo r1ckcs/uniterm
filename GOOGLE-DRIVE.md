@@ -111,6 +111,26 @@ O token de acesso fica no **Keychain** do aparelho, nunca em arquivo, e é revog
 
 **Expiração em 7 dias (somente app Externo em modo Teste).** O Google invalida o login a cada 7 dias, e o app volta a pedir para entrar com Google. O cofre e os dados não se perdem. Para acabar com isso, publique o app: **Público** → **Publicar app** → **Em produção**. Como o único escopo é `drive.file`, que não é sensível, a publicação não exige verificação. App **Interno** não tem essa limitação.
 
+### Login permanente com conta pessoal (Gmail)
+
+Dá para manter o login permanente com conta pessoal: publique o app **Em produção** como descrito acima. Com isso:
+
+- o refresh token **não expira por prazo**;
+- o app renova o acesso sozinho;
+- qualquer conta Google pode entrar, sem lista de usuários de teste. Quem entra só consegue ler o próprio cofre, nunca o de outra pessoa.
+
+O login ainda cai, e o app volta a pedir "Entrar com Google" (sem perder o cofre), quando:
+
+- você remove o acesso em <https://myaccount.google.com/permissions>, ou sai do cofre no app;
+- o FlexTerm fica **6 meses sem usar** o token;
+- a mesma conta passa de **100 logins ativos** no mesmo cliente OAuth. O mais antigo cai; acontece com reinstalações repetidas sem sair do cofre;
+- o projeto do Google Cloud é apagado, ou o cliente OAuth é excluído ou recriado;
+- o app volta para o modo Teste.
+
+**Se o console pedir dados para publicar** (página inicial, política de privacidade ou verificação de marca), aponte para a página do repositório. Isso não muda o login: com `drive.file`, a tela de consentimento não mostra o aviso de "app não verificado".
+
+**Limite da conta pessoal:** o projeto fica preso à sua conta. Se ela for perdida ou bloqueada, o login de todos os aparelhos para. Para o cofre do NOC, o Workspace continua sendo o caminho certo (seção 8). Lá, o projeto pertence à empresa.
+
 ## 7. Testar dois aparelhos no mesmo Mac
 
 **Com Google:**
