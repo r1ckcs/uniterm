@@ -19,8 +19,8 @@ import (
 // in place later is not picked up). The last successful listing is kept
 // and served while the remote is unavailable.
 type CachedStore struct {
-	Remote Store
-	dir    string
+	Remote  Store
+	dir     string
 	mu      sync.Mutex
 	listed  []Entry // merged listings, replaced per prefix on each success
 	offline bool
