@@ -248,8 +248,6 @@ github.com/yosida95/uritemplate/v3 v3.0.2 h1:Ed3Oyj9yrmi9087+NczuL5BwkIc4wvTb5zI
 github.com/yosida95/uritemplate/v3 v3.0.2/go.mod h1:ILOh0sOhIJR3+L/8afwt/kE++YT040gmv5BQTMR2HP4=
 github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 h1:ilQV1hzziu+LLM3zUTJ0trRztfwgjqKnBWNtSRkbmwM=
 github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78/go.mod h1:aL8wCCfTfSfmXjznFBSZNN13rSJjlIOI1fUNAtF7rmI=
-github.com/ys-ll/crypto v0.57.1-0.20260922023551-18e0be45963e h1:Q3sa/5WcZnIiEcjy+3ex/p+Y+fQpN4DNnm+QwJjdYYQ=
-github.com/ys-ll/crypto v0.57.1-0.20260922023551-18e0be45963e/go.mod h1:Fdz0i5U6CoizGwLda9DttjSk6qlZo25zYNtR+ycvuZA=
 github.com/ys-ll/mosh-go v0.0.0-20260702130124-e17b92cd9dab h1:Ru8ctnV5xIDpn1oozOXHizeEtwAU/vSCNaND+i7J0ck=
 github.com/ys-ll/mosh-go v0.0.0-20260702130124-e17b92cd9dab/go.mod h1:HZno4DV/XO+yAZ6lC3EmzMk0whPxrfgY5uix7jcUFps=
 github.com/ys-ll/simples3 v0.0.0-20260801154215-9210db974cd6 h1:gkPJwm05bhmvktWCmlahZ+7Mo4CLiwodGk76NEdx3y8=

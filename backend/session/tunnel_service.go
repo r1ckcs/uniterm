@@ -64,12 +64,13 @@ func (ts *TunnelService) Start(sessionID string, sshConfig ConnectionConfig, tar
 		return 0, err
 	}
 	clientConfig := &ssh.ClientConfig{
-		User:              sshConfig.User,
-		Auth:              authMethods,
-		Timeout:           30 * time.Second,
-		HostKeyCallback:   hostKeyCallback(nil),
-		Config:            algoSet.config(),
-		HostKeyAlgorithms: algoSet.HostKeys,
+		User:                     sshConfig.User,
+		Auth:                     authMethods,
+		Timeout:                  30 * time.Second,
+		HostKeyCallback:          hostKeyCallback(nil),
+		Config:                   algoSet.config(),
+		HostKeyAlgorithms:        algoSet.HostKeys,
+		HostKeySignatureVerifier: algoSet.hostKeyVerifier(),
 	}
 
 	conn, err := dialFirstHop(addr, upstream)

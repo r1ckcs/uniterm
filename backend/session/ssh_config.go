@@ -23,6 +23,13 @@ type sshAlgoSet struct {
 	Ciphers      []string
 	MACs         []string
 	HostKeys     []string
+	// Legacy accepts sub-1024-bit RSA host keys (SSHAlgoConfig.LegacyDevice).
+	Legacy bool
+}
+
+// hostKeyVerifier is the set's ssh.ClientConfig.HostKeySignatureVerifier.
+func (a sshAlgoSet) hostKeyVerifier() func(ssh.PublicKey, []byte, *ssh.Signature) error {
+	return hostKeyVerifier(a.Legacy)
 }
 
 func (a sshAlgoSet) config() ssh.Config {
@@ -36,6 +43,7 @@ func (a sshAlgoSet) config() ssh.Config {
 func (a sshAlgoSet) apply(clientConfig *ssh.ClientConfig) {
 	clientConfig.Config = a.config()
 	clientConfig.HostKeyAlgorithms = a.HostKeys
+	clientConfig.HostKeySignatureVerifier = a.hostKeyVerifier()
 }
 
 // sshKeyExchanges returns the KEX algorithm list for the compatible mode:
@@ -226,7 +234,15 @@ func sshAlgorithmsSecure() sshAlgoSet {
 // used for dialing, plus the set for the EOF handshake retry. nil preferences
 // select the compatible mode.
 func resolveSSHAlgorithms(p *SSHAlgoConfig) (base sshAlgoSet, retry sshAlgoSet, err error) {
-	if p == nil {
+	base, retry, err = resolveSSHAlgorithmLists(p)
+	if err == nil && p != nil && p.LegacyDevice {
+		base.Legacy, retry.Legacy = true, true
+	}
+	return base, retry, err
+}
+
+func resolveSSHAlgorithmLists(p *SSHAlgoConfig) (base sshAlgoSet, retry sshAlgoSet, err error) {
+	if p == nil || (p.LegacyDevice && p.Mode == SSHAlgoModeSecure) {
 		return sshAlgorithms(), sshAlgorithmsCTRFirst(), nil
 	}
 	switch p.Mode {
@@ -429,6 +445,11 @@ var algorithmMismatchMarkers = []string{
 // wrapSSHAlgorithmError annotates a failed negotiation with mode-specific
 // guidance so the raw library error does not dead-end the user.
 func wrapSSHAlgorithmError(mode string, err error) error {
+	if w, ok := isWeakHostKeyError(err); ok {
+		// The UI recognizes "legacy host key (RSA <n> bits)" and shows the
+		// translated hint to enable "Legacy device" on this connection.
+		return fmt.Errorf("ssh handshake: %w", w)
+	}
 	msg := err.Error()
 	for _, marker := range algorithmMismatchMarkers {
 		if strings.Contains(msg, marker) {

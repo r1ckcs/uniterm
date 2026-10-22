@@ -154,7 +154,7 @@ import { usePanelStore } from '../stores/panelStore'
 import { useTerminalMenu } from '../composables/useTerminalMenu'
 import { writeClipboard, readClipboardText } from '../composables/useClipboardWrite'
 import { filterTerminalInput } from '../utils/terminalInputFilter'
-import { isAuthFailureError } from '../utils/authError'
+import { isAuthFailureError, isHandshakeFailureError, legacyKeyBits } from '../utils/authError'
 import { DcsReassembler } from '../utils/dcsReassembler'
 import Menu from './Menu.vue'
 import MenuItem from './MenuItem.vue'
@@ -1616,9 +1616,20 @@ onMounted(() => {
         if (props.onSessionStatus) {
           // 认证类失败（密码被拒）单独上报，让面板立即弹重新认证对话框，
           // 而不是让用户按回车再全量重连两次（issue #949）。
-          props.onSessionStatus(isAuthFailureError(payload.errorMessage) ? 'auth_failed' : payload.status)
+          // Falha antes da autenticação (algoritmo, chave do host): pedir a
+          // senha de novo não resolve, então o painel não reabre credenciais.
+          const handshake = isHandshakeFailureError(payload.errorMessage)
+          props.onSessionStatus(isAuthFailureError(payload.errorMessage) ? 'auth_failed' : handshake ? 'handshake_failed' : payload.status)
         }
-        terminal?.write('\r\n\x1b[31mConnection failed. Press Enter to retry.\x1b[0m\r\n')
+        const weakBits = legacyKeyBits(payload.errorMessage)
+        if (weakBits > 0) {
+          terminal?.write(`\r\n\x1b[31m${t('ssh.legacyKeyError', { bits: weakBits })}\x1b[0m\r\n`)
+        }
+        if (isHandshakeFailureError(payload.errorMessage)) {
+          terminal?.write(`\r\n\x1b[31m${t('ssh.handshakeFailed')}\x1b[0m\r\n`)
+        } else {
+          terminal?.write('\r\n\x1b[31mConnection failed. Press Enter to retry.\x1b[0m\r\n')
+        }
       } else if (payload.status === 'disconnected') {
         retryOnEnter = true
         if (props.onSessionStatus) {

@@ -66,12 +66,13 @@ func (s *MoshSession) Connect(config ConnectionConfig) error {
 		return fmt.Errorf("mosh ssh auth: %w", err)
 	}
 	clientConfig := &ssh.ClientConfig{
-		User:              config.User,
-		Auth:              authMethods,
-		Timeout:           30 * time.Second,
-		HostKeyCallback:   hostKeyCallback(nil),
-		Config:            algoSet.config(),
-		HostKeyAlgorithms: algoSet.HostKeys,
+		User:                     config.User,
+		Auth:                     authMethods,
+		Timeout:                  30 * time.Second,
+		HostKeyCallback:          hostKeyCallback(nil),
+		Config:                   algoSet.config(),
+		HostKeyAlgorithms:        algoSet.HostKeys,
+		HostKeySignatureVerifier: algoSet.hostKeyVerifier(),
 	}
 
 	conn, err := net.DialTimeout("tcp", addr, clientConfig.Timeout)

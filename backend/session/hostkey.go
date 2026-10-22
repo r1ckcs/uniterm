@@ -1,6 +1,7 @@
 package session
 
 import (
+	"crypto/rsa"
 	"errors"
 	"fmt"
 	"net"
@@ -25,6 +26,11 @@ type HostKeyPrompt struct {
 	// of a different algorithm (OpenSSH prompts in that case too, with a
 	// warning).
 	OtherKeyTypesKnown bool `json:"otherKeyTypesKnown"`
+	// KeyBits is the RSA modulus size (0 for other key types).
+	KeyBits int `json:"keyBits,omitempty"`
+	// Weak marks an RSA key below 1024 bits (accepted only on a connection
+	// marked as a legacy device): the dialog warns before trusting it.
+	Weak bool `json:"weak,omitempty"`
 }
 
 // HostKeyPrompter asks the user whether to trust an unknown host key. It
@@ -194,11 +200,14 @@ func verifyHostKey(appFile, userFile, hostname string, key ssh.PublicKey, prompt
 		return fmt.Errorf("host key for %s changed while verifying", hostname)
 	}
 
+	bits, weak := rsaKeyBits(key)
 	ok, perr := prompt(HostKeyPrompt{
 		Host:               hostname,
 		KeyType:            key.Type(),
 		Fingerprint:        fp,
 		OtherKeyTypesKnown: status == hostKeyUnknownOtherType,
+		KeyBits:            bits,
+		Weak:               weak,
 	})
 	if perr != nil {
 		return fmt.Errorf("host key for %s not accepted: %w", hostname, perr)
@@ -227,4 +236,18 @@ func appendKnownHost(file, hostname string, key ssh.PublicKey) error {
 	defer f.Close()
 	_, err = f.WriteString(knownhosts.Line([]string{knownhosts.Normalize(hostname)}, key) + "\n")
 	return err
+}
+
+// rsaKeyBits returns an RSA key's modulus size and whether it is below the
+// 1024-bit minimum (0, false for other key types).
+func rsaKeyBits(key ssh.PublicKey) (int, bool) {
+	ck, ok := key.(ssh.CryptoPublicKey)
+	if !ok {
+		return 0, false
+	}
+	pub, ok := ck.CryptoPublicKey().(*rsa.PublicKey)
+	if !ok {
+		return 0, false
+	}
+	return pub.N.BitLen(), pub.N.BitLen() < 1024
 }

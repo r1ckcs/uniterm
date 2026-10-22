@@ -1960,5 +1960,11 @@
   "vault.recovery.regenTitle": "New recovery key",
   "vault.recovery.regenNote": "The previous phrase stops working when you confirm. Until then, or if you cancel, it stays valid.",
   "vault.confirm.submitRegen": "Replace recovery key",
-  "vault.settings.multipleRecoveryKeys": "There is more than one valid recovery key; generate a new one to invalidate the old ones."
+  "vault.settings.multipleRecoveryKeys": "There is more than one valid recovery key; generate a new one to invalidate the old ones.",
+  "conn.sshLegacyDevice": "Legacy device (accept weak algorithms and keys)",
+  "conn.sshLegacyDeviceDesc": "Accepts RSA keys below 1024 bits and old algorithms for this connection only. Use it only for gear that cannot be upgraded, on a management network.",
+  "conn.sshLegacySecureNote": "With \"Legacy device\" on, Secure mode is treated as Compatible.",
+  "hostKey.weakKey": "{bits}-bit RSA key — weak. Only accept it for old equipment you know.",
+  "ssh.legacyKeyError": "The device uses an old key/algorithm (RSA {bits} bits). Turn on \"Legacy device\" for this connection.",
+  "ssh.handshakeFailed": "SSH negotiation failed (not a password problem). Press Enter to try again."
 }
