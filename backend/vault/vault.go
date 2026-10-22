@@ -3,7 +3,6 @@ package vault
 import (
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 )
@@ -12,22 +11,26 @@ import (
 var ErrNotWriter = errors.New("vault: device is not a writer")
 
 // Vault is one device's open view of a vault: the verified roster, the
-// epoch keys this device can unwrap, and the log. Safe for concurrent use.
+// epoch keys this device can unwrap, and the log. Safe for concurrent use
+// within a process; one Vault per device and vault (the local State is not
+// shared between processes).
 type Vault struct {
-	mu      sync.Mutex
-	store   Store
-	dev     DeviceKey
-	self    string
-	roster  *verifiedRoster
-	trust   TrustState
-	keys    map[uint64][]byte
-	lamport uint64
+	mu       sync.Mutex
+	store    Store
+	state    StateStore
+	st       State
+	dev      DeviceKey
+	self     string
+	roster   *verifiedRoster
+	hashes   map[uint64]string
+	warnings []string
+	keys     map[uint64][]byte
 }
 
 // Create starts a new vault in an empty store with dev as its only admin
-// (genesis roster, epoch 1). Persist v.Trust(); RosterHash of the genesis
-// (v.Trust().Hash) is the anchor other devices are given when they join.
-func Create(s Store, vaultID string, dev DeviceKey, owner, name string) (*Vault, error) {
+// (genesis roster, epoch 1), saving the local state. The genesis hash
+// (Trust().Hash) is the anchor other devices are given when they join.
+func Create(s Store, state StateStore, vaultID string, dev DeviceKey, owner, name string) (*Vault, error) {
 	if !ValidName(vaultID) || strings.Contains(vaultID, "/") {
 		return nil, fmt.Errorf("vault: invalid vault id %q", vaultID)
 	}
@@ -51,18 +54,31 @@ func Create(s Store, vaultID string, dev DeviceKey, owner, name string) (*Vault,
 	if err != nil {
 		return nil, err
 	}
+	st := State{Trust: TrustState{VaultID: vaultID, Counter: 1, Hash: vr.hash}, NextSeq: 1}
+	if err := state.Save(st); err != nil {
+		return nil, err
+	}
 	return &Vault{
-		store: s, dev: dev, self: self.DeviceID, roster: vr,
-		trust: TrustState{VaultID: vaultID, Counter: 1, Hash: vr.hash},
-		keys:  map[uint64][]byte{1: vk},
+		store: s, state: state, st: st, dev: dev, self: self.DeviceID, roster: vr,
+		hashes: map[uint64]string{1: vr.hash}, keys: map[uint64][]byte{1: vk},
 	}, nil
 }
 
-// Open verifies the roster chain from trust and unwraps this device's epoch
-// keys. Fails with ErrRollback/ErrFork if storage went back or diverged,
-// and ErrNotMember if this device was removed.
-func Open(s Store, dev DeviceKey, trust TrustState) (*Vault, error) {
-	v := &Vault{store: s, dev: dev, self: IDOf(dev), trust: trust}
+// Join saves the local state of a device approved into a vault: the trust
+// anchor is the genesis hash the admin showed out of band. Then Open.
+func Join(state StateStore, vaultID, genesisHash string) error {
+	return state.Save(State{Trust: TrustState{VaultID: vaultID, Counter: 1, Hash: genesisHash}, NextSeq: 1})
+}
+
+// Open verifies the roster chain from the local trust state and unwraps
+// this device's epoch keys. Fails with ErrRollback/ErrFork if storage went
+// back or diverged, and ErrNotMember if this device was removed.
+func Open(s Store, state StateStore, dev DeviceKey) (*Vault, error) {
+	st, err := state.Load()
+	if err != nil {
+		return nil, err
+	}
+	v := &Vault{store: s, state: state, st: st, dev: dev, self: IDOf(dev)}
 	if err := v.Refresh(); err != nil {
 		return nil, err
 	}
@@ -77,10 +93,11 @@ func (v *Vault) Refresh() error {
 }
 
 func (v *Vault) refreshLocked() error {
-	r, trust, err := loadRoster(v.store, v.trust)
+	ch, err := loadRoster(v.store, v.st.Trust)
 	if err != nil {
 		return err
 	}
+	r := ch.cur
 	if _, ok := r.member(v.self); !ok {
 		return ErrNotMember
 	}
@@ -90,38 +107,38 @@ func (v *Vault) refreshLocked() error {
 			keys[e] = vk
 			continue
 		}
-		wrapped, _, err := v.store.Get(wrapName(v.self, e))
+		vk, err := loadWrap(v.store, v.dev, &r.Roster, e)
 		if errors.Is(err, ErrNotFound) && e < r.Epoch {
 			continue // joined after this epoch
 		}
 		if err != nil {
 			return fmt.Errorf("vault: key of epoch %d: %w", e, err)
 		}
-		vk, err := unwrapKey(v.dev, &r.Roster, e, wrapped)
-		if err != nil {
-			return err
-		}
 		keys[e] = vk
 	}
-	v.roster, v.trust, v.keys = r, trust, keys
+	st := v.st
+	st.Trust = ch.trust
+	if st != v.st {
+		if err := v.state.Save(st); err != nil {
+			return err
+		}
+	}
+	v.st, v.roster, v.hashes, v.warnings, v.keys = st, r, ch.hashes, ch.warnings, keys
 	return nil
 }
 
-// Trust is the state to persist locally after Create/Open/Refresh.
+// Trust is the newest roster version accepted.
 func (v *Vault) Trust() TrustState {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	return v.trust
+	return v.st.Trust
 }
 
 // Roster returns a copy of the current verified roster.
 func (v *Vault) Roster() Roster {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	r := v.roster.Roster
-	r.KeyChecks = append([]string(nil), r.KeyChecks...)
-	r.Members = cloneMembers(r.Members)
-	return r
+	return cloneRoster(v.roster.Roster)
 }
 
 func putWrap(s Store, m Member, vaultID string, epoch uint64, vk []byte) error {
@@ -140,101 +157,135 @@ func (v *Vault) requireAdminLocked() error {
 	return nil
 }
 
-// nextRosterLocked writes the successor of the current roster.
-func (v *Vault) nextRosterLocked(epoch uint64, checks []string, members []Member) error {
-	r := &Roster{
-		Format: rosterFormat, VaultID: v.roster.VaultID, Counter: v.roster.Counter + 1,
-		Prev: v.roster.hash, Epoch: epoch, KeyChecks: checks, Members: members,
-	}
-	if err := r.validate(r.VaultID); err != nil {
+// nextRosterLocked writes next as the successor of the current roster, then
+// re-reads the listing and keeps it only if it is the version every client
+// will pick at that counter (another admin may have written one too).
+// Running a single "primary" admin for roster changes, with the spare
+// stepping in only when the primary is gone, avoids the race altogether.
+func (v *Vault) nextRosterLocked(next Roster) error {
+	next.Format, next.VaultID = rosterFormat, v.roster.VaultID
+	next.Counter, next.Prev = v.roster.Counter+1, v.roster.hash
+	if err := next.validate(next.VaultID); err != nil {
 		return err
 	}
-	if err := checkSuccessor(v.roster, &verifiedRoster{Roster: *r, hash: ""}); err != nil {
+	if err := checkSuccessor(v.roster, &verifiedRoster{Roster: next}); err != nil {
 		return err
 	}
-	vr, err := writeRoster(v.store, v.dev, r)
+	vr, err := writeRoster(v.store, v.dev, &next)
+	if errors.Is(err, ErrExists) {
+		return ErrLostRace
+	}
 	if err != nil {
 		return err
 	}
-	v.roster = vr
-	v.trust = TrustState{VaultID: r.VaultID, Counter: vr.Counter, Hash: vr.hash}
+	if err := v.refreshLocked(); err != nil {
+		return err
+	}
+	if v.hashes[vr.Counter] != vr.hash {
+		return ErrLostRace
+	}
 	return nil
 }
 
 // AddMember (admin) adds a device approved out of band and wraps the epoch
-// keys this admin holds for it, so it can read the log written so far
-// (until snapshots exist, phase 2).
+// keys this admin holds for it, so it can read the log written so far.
+// That includes old secrets changed before it joined; phase 2 (snapshots)
+// wraps only the current epoch.
 func (v *Vault) AddMember(m Member) error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if err := v.requireAdminLocked(); err != nil {
 		return err
 	}
+	if err := validMember(m); err != nil {
+		return err
+	}
 	if _, ok := v.roster.member(m.DeviceID); ok {
 		return fmt.Errorf("vault: %s is already a member", m.DeviceID)
 	}
-	members := append(cloneMembers(v.roster.Members), m)
-	probe := v.roster.Roster
-	probe.Members = members
-	if err := probe.validate(probe.VaultID); err != nil {
-		return err
+	if _, ok := v.roster.former(m.DeviceID); ok {
+		return fmt.Errorf("vault: %s was removed; a removed device can't rejoin", m.DeviceID)
 	}
+	next := cloneRoster(v.roster.Roster)
+	next.Members = append(next.Members, m)
 	for e, vk := range v.keys {
 		if err := putWrap(v.store, m, v.roster.VaultID, e, vk); err != nil {
 			return err
 		}
 	}
-	return v.nextRosterLocked(v.roster.Epoch, append([]string(nil), v.roster.KeyChecks...), members)
+	return v.nextRosterLocked(next)
 }
 
-// Revoke (admin) removes a device and rotates the vault key: the new epoch's
-// key is wrapped only for the devices that stay. What the removed device
-// already decrypted is not undone; those secrets must be changed at their
-// source.
+// Revoke (admin) removes a device and rotates the vault key: the closing
+// epoch gets the cutoffs (highest accepted seq per author, the removed
+// device included), and the new key is wrapped only for the devices that
+// stay. What the removed device already decrypted is not undone; those
+// secrets must be changed at their source.
+//
+// Ops a writer appends under the old epoch after the cutoffs were taken
+// are refused; its client must re-append them under the new epoch.
 func (v *Vault) Revoke(deviceID string) error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if err := v.requireAdminLocked(); err != nil {
 		return err
 	}
-	var members []Member
+	if deviceID == v.self {
+		return errors.New("vault: an admin can't revoke itself; ask another admin")
+	}
+	next := cloneRoster(v.roster.Roster)
 	found := false
+	next.Members = next.Members[:0]
 	for _, m := range cloneMembers(v.roster.Members) {
 		if m.DeviceID == deviceID {
+			next.Former = append(next.Former, m)
 			found = true
 			continue
 		}
-		members = append(members, m)
+		next.Members = append(next.Members, m)
 	}
 	if !found {
 		return fmt.Errorf("vault: %s is not a member", deviceID)
 	}
+
+	log, err := readLog(v.store, &v.roster.Roster, v.keys, v.hashes)
+	if err != nil {
+		return err
+	}
+	seqs := map[string]uint64{}
+	if n := len(v.roster.Closed); n > 0 {
+		for a, s := range v.roster.Closed[n-1].Seqs {
+			seqs[a] = s
+		}
+	}
+	for _, op := range log.Ops {
+		seqs[op.Author] = max(seqs[op.Author], op.Seq)
+	}
+
 	epoch := v.roster.Epoch + 1
 	vk, err := newVaultKey()
 	if err != nil {
 		return err
 	}
-	checks := append(append([]string(nil), v.roster.KeyChecks...), keyCheck(v.roster.VaultID, epoch, vk))
-	probe := Roster{Format: rosterFormat, VaultID: v.roster.VaultID, Counter: 1, Epoch: epoch, KeyChecks: checks, Members: members}
-	if err := probe.validate(probe.VaultID); err != nil {
+	next.Epoch = epoch
+	next.KeyChecks = append(next.KeyChecks, keyCheck(v.roster.VaultID, epoch, vk))
+	next.Closed = append(next.Closed, EpochClose{Epoch: epoch - 1, Seqs: seqs})
+	if err := next.validate(next.VaultID); err != nil {
 		return err
 	}
-	for _, m := range members {
+	for _, m := range next.Members {
 		if err := putWrap(v.store, m, v.roster.VaultID, epoch, vk); err != nil {
 			return err
 		}
 	}
-	if err := v.nextRosterLocked(epoch, checks, members); err != nil {
-		return err
-	}
-	v.keys[epoch] = vk
-	return nil
+	// The new key reaches v.keys by unwrapping this device's own wrap when
+	// nextRosterLocked re-reads the roster.
+	return v.nextRosterLocked(next)
 }
 
-// Append signs, encrypts (current epoch) and stores one op. Several
-// devices append concurrently without coordination: each writes only
-// under its own ops/<deviceID>/ prefix, and a sequence number taken by a
-// concurrent writer of the same device is skipped.
+// Append signs, encrypts (current epoch) and stores one op. The sequence
+// number and clock are reserved in the local state before the write, so a
+// stale listing or a crash can't make this device reuse a number.
 func (v *Vault) Append(payload []byte) (Op, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
@@ -245,73 +296,72 @@ func (v *Vault) Append(payload []byte) (Op, error) {
 	if !m.Role.canWrite() {
 		return Op{}, ErrNotWriter
 	}
-	names, err := v.store.List("ops/" + v.self + "/")
+	// The listing only ever raises the local counter (state lost or
+	// restored from an old backup).
+	entries, err := v.store.List("ops/" + v.self + "/")
 	if err != nil {
 		return Op{}, err
 	}
-	var seq uint64
-	for _, n := range names {
-		if a, s, ok := parseOpName(n); ok && a == v.self && s > seq {
-			seq = s
+	seq := max(v.st.NextSeq, 1)
+	for _, e := range entries {
+		if a, s, ok := parseOpName(e.Name); ok && a == v.self && s >= seq {
+			seq = s + 1
 		}
 	}
 	epoch := v.roster.Epoch
+	seq = max(seq, v.roster.cutoff(epoch-1, v.self)+1)
 	vk := v.keys[epoch]
-	v.lamport++
+	seen := RosterRef{Counter: v.roster.Counter, Hash: v.roster.hash}
 	for range 1000 {
-		seq++
-		obj, err := sealOp(v.dev, v.roster.VaultID, seq, epoch, v.lamport, vk, payload)
+		st := v.st
+		st.NextSeq, st.Lamport = seq+1, st.Lamport+1
+		if st.Lamport > maxLamport {
+			return Op{}, errors.New("vault: logical clock exhausted")
+		}
+		if err := v.state.Save(st); err != nil {
+			return Op{}, err
+		}
+		v.st = st
+		obj, err := sealOp(v.dev, v.roster.VaultID, seq, epoch, st.Lamport, seen, vk, payload)
 		if err != nil {
 			return Op{}, err
 		}
 		name := opName(v.self, seq)
 		_, err = v.store.Create(name, obj)
 		if errors.Is(err, ErrExists) {
+			seq++
 			continue
 		}
 		if err != nil {
 			return Op{}, err
 		}
-		return Op{Name: name, Author: v.self, Seq: seq, Epoch: epoch, Lamport: v.lamport, Payload: payload}, nil
+		return Op{Name: name, Author: v.self, Seq: seq, Epoch: epoch, Lamport: st.Lamport, Payload: payload}, nil
 	}
 	return Op{}, errors.New("vault: could not allocate an op sequence number")
 }
 
-// ReadLog returns every op that verifies against the current roster,
-// ordered by (Lamport, author, seq), and the objects it refused.
-func (v *Vault) ReadLog() ([]Op, []Rejected, error) {
+// ReadLog returns the verified log, what it refused and why, and warnings
+// (roster candidates ignored, admin races, hidden roster versions).
+func (v *Vault) ReadLog() (Log, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	names, err := v.store.List("ops/")
+	log, err := readLog(v.store, &v.roster.Roster, v.keys, v.hashes)
 	if err != nil {
-		return nil, nil, err
+		return log, err
 	}
-	var ops []Op
-	var rejected []Rejected
-	for _, name := range names {
-		data, _, err := v.store.Get(name)
-		if err != nil {
-			return nil, nil, err
-		}
-		op, err := openOp(&v.roster.Roster, v.keys, name, data)
-		if err != nil {
-			rejected = append(rejected, Rejected{Name: name, Reason: err.Error()})
-			continue
-		}
-		if op.Lamport > v.lamport {
-			v.lamport = op.Lamport
-		}
-		ops = append(ops, op)
+	log.Warnings = append(append([]string(nil), v.warnings...), log.Warnings...)
+	// Later appends order after everything seen.
+	var top uint64
+	for _, op := range log.Ops {
+		top = max(top, op.Lamport)
 	}
-	sort.Slice(ops, func(i, j int) bool {
-		a, b := ops[i], ops[j]
-		if a.Lamport != b.Lamport {
-			return a.Lamport < b.Lamport
+	if top > v.st.Lamport {
+		st := v.st
+		st.Lamport = top
+		if err := v.state.Save(st); err != nil {
+			return log, err
 		}
-		if a.Author != b.Author {
-			return a.Author < b.Author
-		}
-		return a.Seq < b.Seq
-	})
-	return ops, rejected, nil
+		v.st = st
+	}
+	return log, nil
 }

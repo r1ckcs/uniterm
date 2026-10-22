@@ -12,7 +12,8 @@ import (
 )
 
 // FileStore keeps a vault's objects as files under a folder. It is the
-// local backend and, in front of a remote store, the offline cache.
+// local backend and, in front of a remote store, the offline cache. Names
+// are unique here (one candidate per name) and an entry's ID is its name.
 type FileStore struct {
 	dir string
 }
@@ -41,8 +42,8 @@ func contentVersion(data []byte) Version {
 	return Version(hex.EncodeToString(sum[:16]))
 }
 
-func (s *FileStore) Get(name string) ([]byte, Version, error) {
-	p, err := s.path(name)
+func (s *FileStore) Get(id string) ([]byte, Version, error) {
+	p, err := s.path(id)
 	if err != nil {
 		return nil, "", err
 	}
@@ -89,27 +90,37 @@ func writeTemp(p string, data []byte) (string, error) {
 	return name, nil
 }
 
-func (s *FileStore) Create(name string, data []byte) (Version, error) {
+func (s *FileStore) Create(name string, data []byte) (Entry, error) {
 	p, err := s.path(name)
 	if err != nil {
-		return "", err
+		return Entry{}, err
 	}
 	tmp, err := writeTemp(p, data)
 	if err != nil {
-		return "", err
+		return Entry{}, err
 	}
 	defer os.Remove(tmp)
 	// link(2) fails if the target exists, so the object appears complete or
 	// not at all, and two writers racing on one name can't both win.
 	if err := os.Link(tmp, p); err != nil {
 		if errors.Is(err, fs.ErrExist) {
-			return "", ErrExists
+			return Entry{}, ErrExists
 		}
-		return "", err
+		return Entry{}, err
 	}
-	return contentVersion(data), nil
+	return s.entry(name, p)
 }
 
+func (s *FileStore) entry(name, p string) (Entry, error) {
+	fi, err := os.Lstat(p)
+	if err != nil {
+		return Entry{}, err
+	}
+	return Entry{ID: name, Name: name, Created: fi.ModTime().UnixNano()}, nil
+}
+
+// Put writes name, replacing any existing object. Not part of Store (vault
+// objects are only created); used for local copies and by tests.
 func (s *FileStore) Put(name string, data []byte) (Version, error) {
 	p, err := s.path(name)
 	if err != nil {
@@ -126,8 +137,8 @@ func (s *FileStore) Put(name string, data []byte) (Version, error) {
 	return contentVersion(data), nil
 }
 
-func (s *FileStore) List(prefix string) ([]string, error) {
-	var out []string
+func (s *FileStore) List(prefix string) ([]Entry, error) {
+	var out []Entry
 	err := filepath.WalkDir(s.dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
@@ -144,16 +155,20 @@ func (s *FileStore) List(prefix string) ([]string, error) {
 		}
 		name := filepath.ToSlash(rel)
 		if strings.HasPrefix(name, prefix) && ValidName(name) {
-			out = append(out, name)
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+			out = append(out, Entry{ID: name, Name: name, Created: info.ModTime().UnixNano()})
 		}
 		return nil
 	})
-	sort.Strings(out)
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, err
 }
 
-func (s *FileStore) Delete(name string) error {
-	p, err := s.path(name)
+func (s *FileStore) Delete(id string) error {
+	p, err := s.path(id)
 	if err != nil {
 		return err
 	}

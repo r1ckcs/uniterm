@@ -80,3 +80,29 @@ func unwrapKey(dev DeviceKey, r *Roster, epoch uint64, wrapped []byte) ([]byte, 
 	}
 	return vk, nil
 }
+
+// loadWrap finds this device's wrap of an epoch key among the candidates
+// stored under its name: anyone may add a candidate, only one carrying the
+// key the roster commits to is accepted.
+func loadWrap(s Store, dev DeviceKey, r *Roster, epoch uint64) ([]byte, error) {
+	cands, err := candidates(s, wrapName(IDOf(dev), epoch))
+	if err != nil {
+		return nil, err
+	}
+	if len(cands) == 0 {
+		return nil, ErrNotFound
+	}
+	lastErr := errBadWrap
+	for _, e := range cands {
+		wrapped, _, err := s.Get(e.ID)
+		if err != nil {
+			return nil, err
+		}
+		vk, err := unwrapKey(dev, r, epoch, wrapped)
+		if err == nil {
+			return vk, nil
+		}
+		lastErr = err
+	}
+	return nil, lastErr
+}

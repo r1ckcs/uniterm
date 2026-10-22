@@ -6,8 +6,11 @@
 //	keys/<deviceID>.<epoch>   vault key of an epoch, HPKE-wrapped per device
 //	ops/<deviceID>/<seq>      encrypted, signed operation (append-only)
 //
-// Every name is written by a single device and never rewritten, so a Store
-// needs no compare-and-swap: only create-if-absent.
+// Remote stores (Google Drive) can't create a file only if its name is
+// free, and two files may share a name. So a name holds a set of
+// candidates: anyone with write access can add one, and clients keep only
+// the candidates that verify (signature, chain, key check), ignoring the
+// rest instead of failing on them.
 package vault
 
 import (
@@ -16,35 +19,58 @@ import (
 )
 
 var (
-	// ErrNotFound: no object under that name.
+	// ErrNotFound: no object with that id.
 	ErrNotFound = errors.New("vault: object not found")
-	// ErrExists: Create on a name that is already taken.
+	// ErrExists: Create on a name a unique-name store already has.
 	ErrExists = errors.New("vault: object already exists")
 	// ErrBadName: the name is not a valid object name.
 	ErrBadName = errors.New("vault: invalid object name")
 )
 
 // Version identifies one content of an object (a content hash for the local
-// file store, a revision id for remote stores). It changes whenever the
-// bytes change, so a caller can tell a cached copy is stale.
+// file store, a revision id for remote stores).
 type Version string
+
+// Entry is one stored object. Several entries may share a Name.
+type Entry struct {
+	// ID is unique per object (the name in FileStore, a file id in Drive).
+	ID   string
+	Name string
+	// Created orders entries by server-side creation time; with the content
+	// hash it breaks ties between valid candidates deterministically.
+	Created int64
+}
 
 // Store is where a vault's objects live: a local folder (also the offline
 // cache), later Google Drive or WebDAV. Implementations must be safe for
 // concurrent use.
 type Store interface {
-	// Get returns the object and its version, or ErrNotFound.
-	Get(name string) ([]byte, Version, error)
-	// Create writes a new object, or fails with ErrExists without touching
-	// the existing one. Vault objects are only ever created this way.
-	Create(name string, data []byte) (Version, error)
-	// Put writes the object, replacing any existing one (local state only;
-	// vault objects use Create).
-	Put(name string, data []byte) (Version, error)
-	// List returns the names under prefix ("ops/" lists every op), sorted.
-	List(prefix string) ([]string, error)
-	// Delete removes the object; deleting a missing one is not an error.
-	Delete(name string) error
+	// List returns the entries whose name starts with prefix, sorted by
+	// name, then Created. Names may repeat.
+	List(prefix string) ([]Entry, error)
+	// Get returns an object's content by id, or ErrNotFound.
+	Get(id string) ([]byte, Version, error)
+	// Create adds an object under name. A store with unique names (the
+	// local folder) fails with ErrExists if the name is taken; a store
+	// without (Drive) just adds another candidate.
+	Create(name string, data []byte) (Entry, error)
+	// Delete removes an object by id; a missing one is not an error.
+	Delete(id string) error
+}
+
+// candidates returns the entries stored under exactly name.
+func candidates(s Store, name string) ([]Entry, error) {
+	entries, err := s.List(name)
+	if err != nil {
+		return nil, err
+	}
+	var out []Entry
+	for _, e := range entries {
+		if e.Name == name {
+			out = append(out, e)
+		}
+	}
+	return out, nil
 }
 
 // ValidName reports whether name is a relative object name made of
