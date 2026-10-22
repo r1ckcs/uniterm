@@ -62,6 +62,7 @@
             v-for="conn in favoriteConns"
             :key="conn.id"
             class="connection-item indented"
+            :title="compactTitle(conn)"
             :data-conn-id="conn.id"
             :class="{
               active: selectedIds.has(conn.id),
@@ -78,7 +79,7 @@
             @dblclick="onItemDblClick(conn)"
             @contextmenu.prevent="onContextMenu($event, conn)"
           >
-            <span class="conn-icon"><component :is="connIcon(conn)" :size="'0.875rem'" /></span>
+            <span class="conn-icon"><ConnStyleIcon :conn="conn" :fallback="connIcon(conn)" /></span>
             <div class="conn-details">
               <span class="name">{{ conn.name }}</span>
               <span class="conn-meta">
@@ -125,6 +126,7 @@
             v-for="conn in filteredGrouped.ungrouped"
             :key="conn.id"
             class="connection-item indented"
+            :title="compactTitle(conn)"
             :data-conn-id="conn.id"
             :class="{
               active: selectedIds.has(conn.id),
@@ -141,7 +143,7 @@
             @dblclick="onItemDblClick(conn)"
             @contextmenu.prevent="onContextMenu($event, conn)"
           >
-            <span class="conn-icon"><component :is="connIcon(conn)" :size="'0.875rem'" /></span>
+            <span class="conn-icon"><ConnStyleIcon :conn="conn" :fallback="connIcon(conn)" /></span>
             <div class="conn-details">
               <span class="name">{{ conn.name }}</span>
               <span class="conn-meta">
@@ -161,6 +163,7 @@
           v-for="conn in filteredGrouped.ungrouped"
           :key="conn.id"
           class="connection-item"
+          :title="compactTitle(conn)"
           :data-conn-id="conn.id"
           :class="{
             active: selectedIds.has(conn.id),
@@ -177,7 +180,7 @@
           @dblclick="onItemDblClick(conn)"
           @contextmenu.prevent="onContextMenu($event, conn)"
         >
-          <span class="conn-icon"><component :is="connIcon(conn)" :size="'0.875rem'" /></span>
+          <span class="conn-icon"><ConnStyleIcon :conn="conn" :fallback="connIcon(conn)" /></span>
           <div class="conn-details">
             <span class="name">{{ conn.name }}</span>
             <span class="conn-meta">
@@ -409,6 +412,7 @@
 </template>
 
 <script setup lang="ts">
+import ConnStyleIcon from './ConnStyleIcon.vue'
 import VaultChangedBadge from './VaultChangedBadge.vue'
 import { ref, onMounted, onUnmounted, computed, watch, nextTick, provide } from 'vue'
 import { X, ChevronRight, ChevronDown, Filter, Check, Network, Zap, Clock, Plus, Palette, SquareTerminal, Activity, Pencil, MoreHorizontal, FolderTree, ArrowRightLeft, Star } from '@lucide/vue'
@@ -1560,6 +1564,12 @@ function getShellLabel(path: string): string {
 function getSubtitle(conn: ConnectionConfig): string {
   if (conn.type === 'container') return conn.containerRuntime || 'container'
   return formatConnSubtitle(conn, getShellLabel)
+}
+
+// Compact list: the host is cut short in a narrow sidebar, so the hover
+// title carries the full name and host.
+function compactTitle(conn: ConnectionConfig): string | undefined {
+  return settingsStore.settings.listDensity === 'compact' ? `${conn.name}\n${getSubtitle(conn)}` : undefined
 }
 
 function connIcon(conn: ConnectionConfig) {

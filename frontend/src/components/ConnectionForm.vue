@@ -427,6 +427,18 @@
             <el-form-item :label="t('conn.remark')">
               <el-input v-model="form.remark" type="textarea" :rows="3" />
             </el-form-item>
+            <el-form-item :label="t('connStyle.label')">
+              <ConnectionStylePicker
+                :color="form.color || ''"
+                :icon="form.icon || ''"
+                :inherit-from="form.groupId"
+                :groups="connectionStore.groups"
+                :preview-name="form.name"
+                :type-icon="connectionTypeIcon(form)"
+                @update:color="(v) => { form.color = v || undefined }"
+                @update:icon="(v) => { form.icon = v || undefined }"
+              />
+            </el-form-item>
             <div v-if="showAdvancedToggle" class="advanced-toggle" @click="showAdvanced = !showAdvanced">
               <el-icon class="advanced-arrow" :class="{ expanded: showAdvanced }"><ChevronRight :size="'0.875rem'" /></el-icon>
               <span>{{ t('conn.advanced') }}</span>
@@ -754,7 +766,8 @@ import IdentityEditDialog from './IdentityEditDialog.vue'
 import ProxyEditDialog from './ProxyEditDialog.vue'
 import SSHAlgorithmsDialog from './SSHAlgorithmsDialog.vue'
 import { isSqlDbType } from '../utils/quickConnect'
-import { CATEGORY_META, CATEGORY_ORDER, CONNECTION_TYPES, connectionTypeFormLabel, connectionTypeInfo, defaultPortFor } from '../utils/connectionTypes'
+import { CATEGORY_META, CATEGORY_ORDER, CONNECTION_TYPES, connectionTypeFormLabel, connectionTypeInfo, connectionTypeIcon, defaultPortFor } from '../utils/connectionTypes'
+import ConnectionStylePicker from './ConnectionStylePicker.vue'
 import { getShellLabel as getShellLabelBase } from '../utils/shellLabel'
 import { backendErrorText } from '../utils/backendError'
 import type { Identity } from '../types/identity'
@@ -1453,6 +1466,8 @@ function resetForm() {
   form.keyContent = ''
   form.identityId = ''
   form.groupId = undefined
+  form.color = undefined
+  form.icon = undefined
   form.rdpFixedWidth = -1
   form.rdpFixedHeight = -1
   form.rdpSmartSizing = false

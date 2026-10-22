@@ -111,6 +111,26 @@
   --tag-sw: #c084fc;
   --tag-other: var(--text-secondary);
 
+  /* Connection/group color palette (CONTRATO-cor-icone): reference hexes;
+     the flexterm themes retune them per background. *-header is the tone
+     for marks drawn on the app header (the tab stripe). */
+  --conn-red: #e5484d;
+  --conn-orange: #f46414;
+  --conn-amber: #f5a524;
+  --conn-green: #30a46c;
+  --conn-cyan: #22d3ee;
+  --conn-blue: #4f63e6;
+  --conn-purple: #8e4ec6;
+  --conn-gray: #8b93a7;
+  --conn-red-header: var(--conn-red);
+  --conn-orange-header: var(--conn-orange);
+  --conn-amber-header: var(--conn-amber);
+  --conn-green-header: var(--conn-green);
+  --conn-cyan-header: var(--conn-cyan);
+  --conn-blue-header: var(--conn-blue);
+  --conn-purple-header: var(--conn-purple);
+  --conn-gray-header: var(--conn-gray);
+
   /* Scrollbar */
   --scrollbar-thumb: rgba(255, 255, 255, 0.18);
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
@@ -386,6 +406,23 @@
   --tag-sw: #dcc4ff;
   --tag-other: #c7d0ee;
 
+  --conn-red: #ff6b6f;
+  --conn-orange: #ff8a3d;
+  --conn-amber: #f5b13d;
+  --conn-green: #3fcf8e;
+  --conn-cyan: #22d3ee;
+  --conn-blue: #8b9bff;
+  --conn-purple: #b98cf0;
+  --conn-gray: #a3aec6;
+  --conn-red-header: #ff6b6f;
+  --conn-orange-header: #ff8a3d;
+  --conn-amber-header: #f5b13d;
+  --conn-green-header: #3fcf8e;
+  --conn-cyan-header: #22d3ee;
+  --conn-blue-header: #8b9bff;
+  --conn-purple-header: #b98cf0;
+  --conn-gray-header: #a3aec6;
+
   --scrollbar-thumb: #24335c;
   --scrollbar-thumb-hover: #34477a;
 
@@ -519,6 +556,24 @@
   --tag-mk: #17703f;
   --tag-sw: #6b4bbd;
   --tag-other: #4a5470;
+
+  --conn-red: #c62f35;
+  --conn-orange: #c2500f;
+  --conn-amber: #a86b00;
+  --conn-green: #1f7a4c;
+  --conn-cyan: #0b7d8f;
+  --conn-blue: #3446c9;
+  --conn-purple: #7440b0;
+  --conn-gray: #5f6880;
+  /* The light header is navy: marks on it use the dark tones. */
+  --conn-red-header: #ff6b6f;
+  --conn-orange-header: #ff8a3d;
+  --conn-amber-header: #f5b13d;
+  --conn-green-header: #3fcf8e;
+  --conn-cyan-header: #22d3ee;
+  --conn-blue-header: #8b9bff;
+  --conn-purple-header: #b98cf0;
+  --conn-gray-header: #a3aec6;
 
   --scrollbar-thumb: #c9d2e6;
   --scrollbar-thumb-hover: #a9b4cf;

@@ -7,11 +7,14 @@
     <template v-if="!isVirtual">
       <MenuDivider />
       <MenuItem @click="close(); emit('rename')">{{ t('conn.renameGroup') }}</MenuItem>
+      <MenuItem @click="openStyle">{{ t('connStyle.menu') }}</MenuItem>
       <MenuItem @click="close(); emit('changeParent')">{{ t('conn.moveTo') }}</MenuItem>
       <MenuDivider />
       <MenuItem class="danger" @click="close(); emit('deleteGroup')">{{ t('conn.deleteGroup') }}</MenuItem>
     </template>
   </Menu>
+  <!-- Self-contained so every place that shows this menu gets it. -->
+  <GroupStyleDialog v-model:visible="styleOpen" :group-id="styleGroupId" />
 </template>
 
 <script setup lang="ts">
@@ -21,6 +24,7 @@ import { computed, ref } from 'vue'
 import Menu from './Menu.vue'
 import MenuItem from './MenuItem.vue'
 import MenuDivider from './MenuDivider.vue'
+import GroupStyleDialog from './GroupStyleDialog.vue'
 import { useI18n } from '../i18n'
 
 const props = defineProps<{
@@ -51,5 +55,13 @@ const isVirtual = computed(() => !props.group || props.group.id === '__ungrouped
 
 function close() {
   emit('update:visible', false)
+}
+
+const styleOpen = ref(false)
+const styleGroupId = ref<string | null>(null)
+function openStyle() {
+  styleGroupId.value = props.group?.id ?? null
+  close()
+  styleOpen.value = true
 }
 </script>

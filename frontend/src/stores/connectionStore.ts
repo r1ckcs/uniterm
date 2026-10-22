@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { SaveConnections, LoadConnections } from '../../bindings/github.com/ys-ll/uniterm/app'
 import { Events } from '@wailsio/runtime'
-import type { ConnectionConfig, ConnectionGroup } from '../types/session'
+import type { ConnectionConfig, ConnectionGroup, ConnectionColor, ConnectionIcon } from '../types/session'
 
 // Module-level un-subscriber for the cross-window store:connections:changed listener.
 // Tracked at module scope so re-imports under HMR can detach the previous
@@ -114,6 +114,15 @@ export const useConnectionStore = defineStore('connection', () => {
     groups.value.push(group)
     await save()
     return group
+  }
+
+  // '' clears the field (inherit from the parent group).
+  async function setGroupStyle(id: string, color: ConnectionColor | '', icon: ConnectionIcon | '') {
+    const g = groups.value.find(g => g.id === id)
+    if (!g) return
+    g.color = color || undefined
+    g.icon = icon || undefined
+    await save()
   }
 
   async function renameGroup(id: string, name: string) {
@@ -351,6 +360,7 @@ export const useConnectionStore = defineStore('connection', () => {
     removeMany,
     addGroup,
     renameGroup,
+    setGroupStyle,
     deleteGroup,
     reparentGroup,
     isDescendantOf,

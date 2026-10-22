@@ -60,6 +60,21 @@ describe('FlexTerm (D1c) themes', () => {
     })
   }
 
+  for (const theme of ['flexterm', 'flexterm-light']) {
+    it(`${theme}: connection palette icons read at >= 3:1 on lists, cards and the header`, () => {
+      const tokens = themeTokens(theme)
+      const surfaces = ['--bg-base', '--bg-elevated', '--bg-surface', '--bg-sunken', '--bg-active', '--alert-row', '--alert-card']
+      for (const key of ['red', 'orange', 'amber', 'green', 'cyan', 'blue', 'purple', 'gray']) {
+        for (const bg of surfaces) {
+          expect(contrastRatio(tokens[`--conn-${key}`], tokens[bg]), `${theme} ${key} on ${bg}`).toBeGreaterThanOrEqual(3)
+        }
+        for (const bg of ['--header-bg', '--header-tab-active']) {
+          expect(contrastRatio(tokens[`--conn-${key}-header`], tokens[bg]), `${theme} ${key} on ${bg}`).toBeGreaterThanOrEqual(3)
+        }
+      }
+    })
+  }
+
   it('header tabs paint text with solid tokens that the contrast test covers', () => {
     // The dropped (red) tab's shortcut hint uses the alert text color, and a
     // tab without a session gets a solid dimmer color, not opacity.
