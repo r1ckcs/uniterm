@@ -74,7 +74,7 @@
         ref="searchInputRef"
         v-model="searchQuery"
         class="start-search-input"
-        :placeholder="t('sidebar.searchPlaceholder')"
+        :placeholder="`${t('sidebar.searchPlaceholder')} (${quickSearchLabel(isMacUi)})`"
         clearable
         @keydown="onSearchKeydown"
       />
@@ -422,6 +422,8 @@ import { formatConnSubtitle, formatTypeFilterLabel, matchTypeFilter } from '../u
 import { connectionTypeIcon as connTypeIcon, connectionTypeLabel as connTypeLabel, connectionTypeInfo } from '../utils/connectionTypes'
 import { useConnStatusStore } from '../stores/connStatusStore'
 import { useVaultStore } from '../stores/vaultStore'
+import { quickSearchLabel, type QuickSearchRequest } from '../utils/quickSearch'
+import { detectPlatformSync } from '../utils/platform'
 import { getShellLabel as getShellLabelBase } from '../utils/shellLabel'
 import MenuItem from './MenuItem.vue'
 import { CloudOff, Filter, Plus, Laptop, Server, Folder, FolderOpen, Zap, MoreHorizontal, ChevronDown, Star, LayoutDashboard } from '@lucide/vue'
@@ -967,7 +969,43 @@ function getGridColumns(): number {
   return contentCols.value
 }
 
+// ── Quick search (⌘K / Ctrl+Shift+P from anywhere, see App.vue) ──
+const isMacUi = detectPlatformSync() === 'darwin'
+// Where Esc goes back to, while the search was opened by the shortcut.
+const quickReturn = ref<{ returnTo: string | null; created: boolean } | null>(null)
+
+function onQuickSearch(e: Event) {
+  const req = (e as CustomEvent<QuickSearchRequest>).detail
+  if (!req || req.tabId !== props.tab.id) return
+  quickReturn.value = { returnTo: req.returnTo, created: req.created }
+  focusInGrid.value = false
+  focusedCardIndex.value = -1
+  nextTick(() => {
+    searchInputRef.value?.focus()
+    ;(searchInputRef.value as unknown as { select?: () => void })?.select?.()
+  })
+}
+
+function closeQuickSearch() {
+  const q = quickReturn.value
+  quickReturn.value = null
+  searchQuery.value = ''
+  searchInputRef.value?.blur()
+  if (!q) return
+  if (q.created) emit('close-self', props.tab.id)
+  if (q.returnTo && tabStore.tabs.some(t => t.id === q.returnTo)) tabStore.setActiveTab(q.returnTo)
+}
+
+// Leaving the tab ends the shortcut session: Esc then just clears.
+watch(() => tabStore.activeTabId, (id) => { if (id !== props.tab.id) quickReturn.value = null })
+
 function onSearchKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && (quickReturn.value || searchQuery.value)) {
+    e.preventDefault()
+    e.stopPropagation()
+    closeQuickSearch()
+    return
+  }
   if (e.key === 'Tab' || e.key === 'ArrowDown') {
     e.preventDefault()
     e.stopPropagation()
@@ -1220,6 +1258,7 @@ watch(probing, (on) => {
 
 onMounted(() => {
   connStatus.start(() => connectionStore.connections.map(c => c.id))
+  window.addEventListener('app:quick-search', onQuickSearch)
   window.addEventListener('focus', syncWindowFocus)
   window.addEventListener('blur', syncWindowFocus)
   document.addEventListener('visibilitychange', syncWindowFocus)
@@ -1235,6 +1274,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (holdsProbe) connStatus.release()
   holdsProbe = false
+  window.removeEventListener('app:quick-search', onQuickSearch)
   window.removeEventListener('focus', syncWindowFocus)
   window.removeEventListener('blur', syncWindowFocus)
   document.removeEventListener('visibilitychange', syncWindowFocus)
@@ -2049,4 +2089,81 @@ function doEditConnection(config: ConnectionConfig | null) {
   background-color: var(--bg-input) !important;
   border-radius: var(--radius-row) !important;
 }
+
+/* Search results and the inside of a group keep their grid; under the
+   FlexTerm themes the tiles take the D1c row look. */
+html[data-theme^="flexterm"] .start-cards-grid {
+  gap: 0.625rem;
+}
+html[data-theme^="flexterm"] .start-card,
+html[data-theme^="flexterm"] .start-quick-card {
+  padding: 0.625rem 0.75rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-btn);
+}
+html[data-theme^="flexterm"] .start-card:hover {
+  border-color: var(--border-hover);
+}
+html[data-theme^="flexterm"] .start-card.focused,
+html[data-theme^="flexterm"] .start-quick-card.focused {
+  border-color: var(--accent);
+  box-shadow: none;
+}
+html[data-theme^="flexterm"] .start-card.selected {
+  border-color: var(--accent);
+  background: var(--bg-active);
+}
+html[data-theme^="flexterm"] .start-quick-card {
+  border-style: dashed;
+  border-color: var(--border-hover);
+}
+html[data-theme^="flexterm"] .start-quick-card:hover {
+  background: var(--bg-hover);
+}
+html[data-theme^="flexterm"] .start-card-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-row);
+  background: var(--bg-sunken);
+}
+html[data-theme^="flexterm"] .start-card-name {
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+html[data-theme^="flexterm"] .start-card-meta {
+  font-size: 0.6875rem;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+html[data-theme^="flexterm"] .start-quick-card .start-card-meta {
+  font-family: inherit;
+}
+html[data-theme^="flexterm"] .card-more-btn,
+html[data-theme^="flexterm"] .card-fav-btn {
+  background: var(--bg-surface);
+  border-radius: var(--radius-badge);
+}
+html[data-theme^="flexterm"] .start-section-label {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+html[data-theme^="flexterm"] .start-breadcrumb {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+html[data-theme^="flexterm"] .start-breadcrumb .current {
+  font-weight: 800;
+}
+html[data-theme^="flexterm"] .start-filter-btn {
+  border-radius: var(--radius-row);
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+html[data-theme^="flexterm"] .start-empty-hint,
+html[data-theme^="flexterm"] .start-empty-state {
+  color: var(--text-muted);
+}
 </style>
+

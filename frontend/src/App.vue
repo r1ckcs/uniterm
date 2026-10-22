@@ -167,6 +167,7 @@
 </template>
 
 <script setup lang="ts">
+import { isQuickSearchShortcut, type QuickSearchRequest } from './utils/quickSearch'
 import { ref, computed, watch, nextTick, onMounted, onUnmounted, provide, h } from 'vue'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import zhTw from 'element-plus/es/locale/lang/zh-tw'
@@ -248,6 +249,7 @@ import { waitForTerminalSize } from './services/terminalManager'
 import { msg } from './services/message'
 import { unregisterTransferRoute } from './services/transferTaskCenter'
 import type { ConnectionConfig } from './types/session'
+import type { StartTab } from './types/workspace'
 import { Application, Clipboard, Events } from '@wailsio/runtime'
 import { parseQuickConnect } from './utils/quickConnect'
 import { getShellLabel as getShellLabelBase, parseWslFromShell } from './utils/shellLabel'
@@ -917,10 +919,32 @@ function onWheel(e: WheelEvent) {
 // hide. Panel maximizing moved to the configurable keyboard settings
 // (maximizePanel action).
 let isMac = false
+// ⌘K / Ctrl+Shift+P: bring a start tab forward with its search focused.
+// Reuses the active start tab, else the first one, else opens one; Esc in
+// the search goes back (StartTabContent handles it).
+function openQuickSearch() {
+  const prev = tabStore.activeTabId
+  const active = tabStore.activeTab
+  let start = (active?.type === 'start' ? active : tabStore.tabs.find(t => t.type === 'start')) as StartTab | undefined
+  const created = !start
+  if (!start) start = tabStore.createStartTab()
+  else tabStore.setActiveTab(start.id)
+  start.viewMode = 'home'
+  start.groupId = undefined
+  const detail: QuickSearchRequest = { tabId: start.id, returnTo: prev && prev !== start.id ? prev : null, created }
+  nextTick(() => window.dispatchEvent(new CustomEvent('app:quick-search', { detail })))
+}
+
 function onPlatformSystemShortcut(e: KeyboardEvent) {
   // Stand down while the settings page captures a rebind — otherwise
   // recording e.g. Ctrl+1 would switch tabs (and Cmd+Q would quit on mac).
   if (e.defaultPrevented || isRebinding()) return
+  if (isQuickSearchShortcut(e, isMac)) {
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    openQuickSearch()
+    return
+  }
   const digitMatch = e.code.match(/^Digit([1-9])$/)
   if (digitMatch) {
     const kb = settingsStore.settings.keyboard
