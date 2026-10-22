@@ -370,6 +370,7 @@
   --header-text: #eef2ff;
   --header-text-2: #c7d0ee;
   --header-tab-active: #24335c;
+  --header-brand-stroke: #2f4174;
 
   --alert-card: #3a1520;
   --alert-border: #6a2633;
@@ -502,6 +503,7 @@
   --header-text: #ffffff;
   --header-text-2: #c9d2ee;
   --header-tab-active: #2a3a63;
+  --header-brand-stroke: #3a4f8a;
 
   --alert-card: #ffffff;
   --alert-border: #f3b9bd;

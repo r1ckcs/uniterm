@@ -1342,6 +1342,7 @@ function doEditConnection(config: ConnectionConfig | null) {
   font: inherit;
   font-size: 0.75rem;
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
 }
 .sites-seg-btn:hover {
