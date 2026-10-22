@@ -22,3 +22,21 @@ describe('isAuthFailureError', () => {
     expect(isAuthFailureError(undefined)).toBe(false)
   })
 })
+
+describe('handshake failures', () => {
+  it('recognizes a weak legacy host key and its size', async () => {
+    const { isHandshakeFailureError, legacyKeyBits } = await import('./authError')
+    const ours = 'ssh handshake: ssh: legacy host key (RSA 527 bits): enable "Legacy device" for this connection'
+    const raw = 'ssh handshake: ssh: handshake failed: crypto/rsa: 527-bit keys are insecure (see https://go.dev/pkg/crypto/rsa#hdr-Minimum_key_size)'
+    expect(isHandshakeFailureError(ours)).toBe(true)
+    expect(isHandshakeFailureError(raw)).toBe(true)
+    expect(legacyKeyBits(ours)).toBe(527)
+    expect(legacyKeyBits(raw)).toBe(527)
+    expect(legacyKeyBits('dial tcp: timeout')).toBe(0)
+  })
+  it('never treats a rejected password as a handshake failure', async () => {
+    const { isHandshakeFailureError } = await import('./authError')
+    expect(isHandshakeFailureError('ssh handshake: ssh: handshake failed: ssh: unable to authenticate, attempted methods [none password]')).toBe(false)
+    expect(isHandshakeFailureError('ssh: handshake failed: ssh: no common algorithm for key exchange')).toBe(true)
+  })
+})

@@ -449,11 +449,18 @@ function cancelEdit() {
 }
 
 let retryAttempt = 0
+// The last failure happened before authentication (see onSessionStatus):
+// a retry must not reopen the credential dialog for it.
+let lastFailureHandshake = false
 
 function onSessionStatus(status: string) {
   if (status === 'retry') {
     // Manual retry — user pressed Enter
     retryConnection()
+  } else if (status === 'handshake_failed') {
+    lastFailureHandshake = true
+  } else if (status === 'error') {
+    lastFailureHandshake = false
   } else if (status === 'auth_failed') {
     // Issue #949: credentials were rejected — re-open the credential dialog
     // right away instead of making the user press Enter through two full
@@ -461,6 +468,7 @@ function onSessionStatus(status: string) {
     repromptCredentials()
   } else if (status === 'connected') {
     retryAttempt = 0
+    lastFailureHandshake = false
   }
   // Local sessions previously auto-reconnected here after a 200ms delay to
   // paper over ConPTY tearing down the pseudo-console (e.g. opencode /exit).
@@ -558,7 +566,7 @@ async function retryConnection() {
 
   // On first retry, try with existing credentials; on subsequent retries, re-prompt
   const credTypes = ['ssh', 'mosh', 'sftp', 'scp', 'ftp', 'telnet']
-  if (credTypes.includes(props.panel.type) && !['key', 'keyText', 'kerberos'].includes(props.panel.config.authType) && retryAttempt > 1) {
+  if (credTypes.includes(props.panel.type) && !['key', 'keyText', 'kerberos'].includes(props.panel.config.authType) && retryAttempt > 1 && !lastFailureHandshake) {
     const result = await showCredentialDialog(
       t('credential.title'),
       props.panel.config.user || props.panel.config.host ? `${props.panel.config.user}@${props.panel.config.host}` : '',
