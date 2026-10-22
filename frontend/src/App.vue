@@ -669,6 +669,8 @@ interface HostKeyPromptRequest {
   keyType: string
   fingerprint: string
   otherKeyTypesKnown: boolean
+  keyBits?: number // 0 = not applicable
+  weak?: boolean // e.g. RSA below 1024 bits, only on a "legacy device" connection
 }
 let unsubHostKeyPrompt: (() => void) | null = null
 
@@ -678,9 +680,13 @@ async function onHostKeyPrompt(req: HostKeyPromptRequest) {
   try {
     const lines = [t('hostKey.message', { host: req.host, keyType: req.keyType, fingerprint: req.fingerprint })]
     if (req.otherKeyTypesKnown) lines.push(t('hostKey.otherTypes'))
+    // A weak key leads the dialog, set apart, so it is read before "Trust".
+    const weak = req.weak
+      ? [h('span', { style: 'color:var(--error);font-weight:600' }, t('hostKey.weakKey', { bits: req.keyBits || '?' }))]
+      : []
     await ElMessageBox.confirm(
       h('div', { style: 'display:flex;flex-direction:column;gap:0.625rem;word-break:break-all' },
-        lines.map((l) => h('span', l))),
+        [...weak, ...lines.map((l) => h('span', l))]),
       t('hostKey.title'),
       {
         confirmButtonText: t('hostKey.accept'),

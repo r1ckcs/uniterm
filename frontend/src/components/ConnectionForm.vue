@@ -586,6 +586,11 @@
               <el-button v-if="sshAlgoMode === 'custom'" size="small" style="margin-left: 0.75rem;" @click="sshAlgoDialogVisible = true">
                 {{ t('conn.sshAlgoConfigure') }}
               </el-button>
+              <div v-if="sshLegacyDevice && sshAlgoMode === 'secure'" class="field-hint">{{ t('conn.sshLegacySecureNote') }}</div>
+            </el-form-item>
+            <el-form-item v-if="isSSHAlgoType" :label="t('conn.sshLegacyDevice')">
+              <el-switch v-model="sshLegacyDevice" />
+              <div class="field-hint" :class="{ 'field-hint-warn': sshLegacyDevice }">{{ t('conn.sshLegacyDeviceDesc') }}</div>
             </el-form-item>
             <template v-if="form.type === 'ftp'">
               <el-form-item :label="t('conn.ftpEncryption')">
@@ -737,6 +742,7 @@ import { useIdentityStore } from '../stores/identityStore'
 import { useProxyStore } from '../stores/proxyStore'
 import { useI18n } from '../i18n'
 import type { ConnectionConfig, PostLoginExpectStep, SSHAlgoConfig } from '../types/session'
+import { normalizeSSHAlgorithms } from '../utils/sshAlgorithms'
 import { OpenFileDialog, OpenPrivateKeyFile, OpenKubeconfigFile, GetPlatform, ListSerialPorts, TestConnection, GetDefaultSSHKeyPaths } from '../../bindings/github.com/ys-ll/uniterm/app'
 import { ElInput } from 'element-plus'
 import { msg } from '../services/message'
@@ -1123,24 +1129,35 @@ const form = reactive<ConnectionConfig>({
 // mode opens the algorithm editor to fill the four preference lists.
 const isSSHAlgoType = computed(() => ['ssh', 'scp', 'sftp', 'mosh', 'x11-desktop'].includes(form.type))
 const sshAlgoDialogVisible = ref(false)
+// legacyDevice rides along inside sshAlgorithms: every rewrite of the
+// object below must carry it over, or switching modes would silently drop it.
+const legacyFlag = () => (form.sshAlgorithms?.legacyDevice ? { legacyDevice: true } : {})
 const sshAlgoMode = computed<'compatible' | 'secure' | 'custom'>({
   get: () => form.sshAlgorithms?.mode ?? 'compatible',
   set: (mode) => {
+    const legacy = legacyFlag()
     if (mode === 'compatible') {
-      form.sshAlgorithms = undefined
+      form.sshAlgorithms = legacy.legacyDevice ? { mode: 'compatible', ...legacy } : undefined
       return
     }
     if (mode === 'secure') {
-      form.sshAlgorithms = { mode: 'secure' }
+      form.sshAlgorithms = { mode: 'secure', ...legacy }
       return
     }
-    form.sshAlgorithms = { mode: 'custom', keyExchanges: [], ciphers: [], macs: [], hostKeys: [] }
+    form.sshAlgorithms = { mode: 'custom', keyExchanges: [], ciphers: [], macs: [], hostKeys: [], ...legacy }
     sshAlgoDialogVisible.value = true
   },
 })
 
+const sshLegacyDevice = computed<boolean>({
+  get: () => !!form.sshAlgorithms?.legacyDevice,
+  set: (on) => {
+    form.sshAlgorithms = { ...(form.sshAlgorithms ?? { mode: 'compatible' }), legacyDevice: on }
+  },
+})
+
 function onSSHAlgoSaved(config: SSHAlgoConfig) {
-  form.sshAlgorithms = config
+  form.sshAlgorithms = { ...config, ...legacyFlag() }
 }
 
 const RDP_CUSTOM_RESOLUTION = 'custom'
@@ -1661,13 +1678,9 @@ function normalizeForm(): ConnectionConfig {
   // SSH algorithms: only SSH-like session types carry the preference.
   // Compatible mode stores nothing (backend default), secure mode stores
   // just the mode; custom mode requires all four lists filled.
-  if (!isSSHAlgoType.value) {
-    normalized.sshAlgorithms = undefined
-  } else if (normalized.sshAlgorithms?.mode === 'compatible') {
-    normalized.sshAlgorithms = undefined
-  } else if (normalized.sshAlgorithms?.mode === 'secure') {
-    normalized.sshAlgorithms = { mode: 'secure' }
-  } else if (normalized.sshAlgorithms?.mode === 'custom') {
+  // legacyDevice survives every branch (stored only when on).
+  normalized.sshAlgorithms = normalizeSSHAlgorithms(normalized.sshAlgorithms, isSSHAlgoType.value)
+  if (normalized.sshAlgorithms?.mode === 'custom') {
     const algo = normalized.sshAlgorithms
     if (!algo.keyExchanges?.length || !algo.ciphers?.length || !algo.macs?.length || !algo.hostKeys?.length) {
       throw new Error(t('conn.sshAlgoEmptyList'))
@@ -2243,5 +2256,8 @@ function onConnect() {
 .login-password { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; }
 .conn-vault-changed {
   margin-bottom: 0.75rem;
+}
+.field-hint-warn {
+  color: var(--warning);
 }
 </style>

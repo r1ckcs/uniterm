@@ -22,6 +22,10 @@ export interface SSHAlgoConfig {
   ciphers?: string[]
   macs?: string[]
   hostKeys?: string[]
+  // Old gear (e.g. RSA host keys below 1024 bits, SHA-1 kex, CBC/3DES): the
+  // backend accepts weak algorithms and keys for THIS connection only. With
+  // it on, 'secure' mode is treated as 'compatible'.
+  legacyDevice?: boolean
 }
 
 export interface ConnectionConfig {
