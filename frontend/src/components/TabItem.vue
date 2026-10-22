@@ -763,7 +763,7 @@ onMounted(async () => {
 .tab-item.active {
   background: var(--bg-hover);
   color: var(--text-primary);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-ring);
 }
 /* AI-locked tabs are signalled by the tab icon alone: a solid warning-coloured
    icon with a soft glow. No surface tint — low-alpha warning colour over the

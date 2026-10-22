@@ -644,7 +644,7 @@ watch(searchQuery, (q) => {
 
 .qc-group-header.drag-over {
   background: var(--accent-subtle);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-ring);
 }
 
 .qc-group-arrow {
@@ -683,7 +683,7 @@ watch(searchQuery, (q) => {
 
 .qc-item.active {
   background: var(--accent-subtle);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-ring);
 }
 
 .qc-item.active .qc-item-name {

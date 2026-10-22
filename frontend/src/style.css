@@ -83,6 +83,9 @@
      the flexterm themes split it because their --accent is a fill that only
      reads under white text. */
   --accent-text: var(--accent);
+  /* Ring drawn around selected list items. D1c marks selection with the
+     fill alone, so the flexterm themes set it to the selection color. */
+  --accent-ring: var(--accent);
 
   /* Sunken surfaces (list rows, inputs) and the app header. */
   --bg-sunken: var(--bg-elevated);
@@ -317,6 +320,7 @@
 
   --accent: #4f63e6;
   --accent-text: #aab6ff;
+  --accent-ring: #24335c;
   --accent-glow: #24335c;
   --accent-subtle: #24335c;
   --on-accent: #ffffff;
@@ -446,6 +450,7 @@
 
   --accent: #2b3dbc;
   --accent-text: #2b3dbc;
+  --accent-ring: #e6e9f8;
   --accent-glow: #d5daf3;
   --accent-subtle: #e6e9f8;
   --on-accent: #ffffff;
@@ -1529,4 +1534,108 @@ body.drag-active .zone {
 }
 [data-theme^="flexterm"] .xterm-link-tooltip {
   border-color: var(--border-subtle);
+}
+
+/* ── FlexTerm (D1c) frame: header, tabs, sidebar ──
+   The header uses its own tokens because the light theme paints it navy
+   (white text) while the rest of the window stays light. */
+[data-theme^="flexterm"] .app-header {
+  background: var(--header-bg);
+  border-bottom-color: var(--header-border);
+}
+[data-theme^="flexterm"] .app-header .header-btn,
+[data-theme^="flexterm"] .app-header .tab-more-btn,
+[data-theme^="flexterm"] .app-header .wc-btn.win {
+  color: var(--header-text-2);
+}
+[data-theme^="flexterm"] .app-header .header-btn:hover,
+[data-theme^="flexterm"] .app-header .tab-more-btn:hover,
+[data-theme^="flexterm"] .app-header .header-btn.active {
+  background: var(--header-tab-active);
+  color: var(--header-text);
+}
+[data-theme^="flexterm"] .app-header .header-btn,
+[data-theme^="flexterm"] .app-header .tab-more-btn {
+  border-radius: var(--radius-row);
+}
+[data-theme^="flexterm"] .app-header .tab-item {
+  height: 2rem;
+  border-radius: var(--radius-row);
+  color: var(--header-text-2);
+}
+[data-theme^="flexterm"] .app-header .tab-item .tab-type-icon,
+[data-theme^="flexterm"] .app-header .tab-item .tab-shortcut,
+[data-theme^="flexterm"] .app-header .tab-item .tab-close {
+  color: var(--header-text-2);
+}
+[data-theme^="flexterm"] .app-header .tab-item:hover {
+  background: var(--header-tab-active);
+  color: var(--header-text);
+}
+[data-theme^="flexterm"] .app-header .tab-item.active {
+  background: var(--header-tab-active);
+  color: var(--header-text);
+  box-shadow: none;
+}
+[data-theme^="flexterm"] .app-header .tab-item.active .tab-name {
+  font-weight: 700;
+}
+[data-theme^="flexterm"] .app-header .tab-item.active .tab-type-icon {
+  color: var(--header-text);
+}
+[data-theme^="flexterm"] .app-header .tab-item .tab-close:hover {
+  background: var(--header-border);
+  color: var(--header-text);
+}
+/* Dropped connection stays red, over every state above. */
+[data-theme^="flexterm"] .app-header .tab-item.tab-down,
+[data-theme^="flexterm"] .app-header .tab-item.tab-down:hover {
+  background: var(--alert-badge);
+}
+[data-theme^="flexterm"] .app-header .tab-item.tab-down .tab-name,
+[data-theme^="flexterm"] .app-header .tab-item.tab-down .tab-type-icon,
+[data-theme^="flexterm"] .app-header .tab-item.tab-down .tab-close {
+  color: var(--alert-text);
+}
+[data-theme^="flexterm"] .app-header .tab-item .tab-type-icon.ai-locked-icon {
+  color: var(--warning);
+}
+[data-theme="flexterm-light"] .app-header .tab-item .tab-type-icon.ai-locked-icon {
+  color: #ffc96b;
+}
+
+/* Selection is the fill alone, with the primary text color. */
+[data-theme^="flexterm"] .connection-item.active .name,
+[data-theme^="flexterm"] .tree-option.active {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+[data-theme^="flexterm"] .sidebar-tab.active {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+[data-theme^="flexterm"] .connection-item,
+[data-theme^="flexterm"] .group-header,
+[data-theme^="flexterm"] .sidebar-tab {
+  border-radius: var(--radius-row);
+}
+[data-theme^="flexterm"] .group-name {
+  font-weight: 700;
+}
+
+/* No blur in D1c: these surfaces are opaque anyway. (The terminal screen
+   preview keeps its frosted glass; it is translucent by design.) */
+[data-theme^="flexterm"] .conn-context-menu,
+[data-theme^="flexterm"] .zmodem-transfer-panel,
+[data-theme^="flexterm"] .terminal-suggestion-popup,
+[data-theme^="flexterm"] .settings-category.active,
+[data-theme^="flexterm"] .setting-card {
+  backdrop-filter: none;
+}
+[data-theme^="flexterm"] .conn-context-menu {
+  border-radius: var(--radius-btn);
+  padding: 0.375rem;
+}
+[data-theme^="flexterm"] .conn-context-menu .menu-item {
+  border-radius: var(--radius-badge);
 }

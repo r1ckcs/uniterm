@@ -1852,7 +1852,7 @@ defineExpose({ focusSearch, openQuickCommands, openChangeGroupFor, openChangeGro
 
 .group-header.drag-over {
   background: var(--accent-subtle);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-ring);
 }
 
 /* ── Connection item ── */
@@ -1894,7 +1894,7 @@ defineExpose({ focusSearch, openQuickCommands, openChangeGroupFor, openChangeGro
 
 .connection-item.active {
   background: var(--accent-subtle);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-ring);
 }
 
 .connection-item.active .name {
