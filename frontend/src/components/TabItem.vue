@@ -1,7 +1,7 @@
 <template>
   <div
     class="tab-item"
-    :class="{ active: isActive, 'ai-locked': isAILocked }"
+    :class="{ active: isActive, 'ai-locked': isAILocked, 'tab-down': isDown }"
     :data-tab-id="tab.id"
     @click="$emit('activate', tab.id)"
     @mouseenter="hovered = true"
@@ -21,7 +21,7 @@
       class="tab-icon-wrapper"
     >
       <component
-        :is="tab.locked ? Lock : tabIcon"
+        :is="tab.locked ? Lock : isDown ? Unplug : tabIcon"
         class="tab-type-icon"
         :class="{ 'ai-locked-icon': isAILocked }"
       />
@@ -32,7 +32,7 @@
       />
       <span v-else-if="!isActive && hasNotification && !tab.locked" class="tab-notification-dot" />
     </span>
-    <span v-if="!editing" class="tab-name" :class="{ 'tab-disconnected': isDisconnected }" :title="tab.name + (tabShortcut ? ` (${tabShortcut})` : '')" @dblclick.stop="startEdit">
+    <span v-if="!editing" class="tab-name" :class="{ 'tab-disconnected': isDisconnected && !isDown }" :title="tabTitle" @dblclick.stop="startEdit">
       <ArrowDownUp v-if="hasActiveTransfers" class="transfer-indicator" :size="'0.875rem'" :title="t('tab.transferring')" />
       <span class="tab-name-text">{{ tab.name }}</span>
     </span>
@@ -163,7 +163,7 @@ import Menu from './Menu.vue'
 import MenuItem from './MenuItem.vue'
 import MenuDivider from './MenuDivider.vue'
 import { Clipboard } from '@wailsio/runtime'
-import { SquareTerminal, FolderUp, X, ArrowDownUp, Lock, Radio } from '@lucide/vue'
+import { SquareTerminal, FolderUp, X, ArrowDownUp, Lock, Radio, Unplug } from '@lucide/vue'
 
 const props = defineProps<{
   tab: TerminalTab | SettingsTab | SFTPTab | RDPTab | VNCTab | SPICETab | DBTab | MonitorTab | WorkspaceTab
@@ -321,6 +321,29 @@ const isDisconnected = computed(() => {
     const s = sessionStore.getStatus(p.sessionId)
     return s === 'disconnected' || s === 'error'
   })
+})
+
+// A connection that dropped (disconnected/error), as opposed to one still
+// connecting: painted red so a fallen session stands out in a row of tabs.
+// Terminals reconnect on Enter, so their tooltip says so.
+const isDown = computed(() => {
+  if (!isDisconnected.value) return false
+  // k8s and container tabs are not in the props union (see isDisconnected).
+  const type: string = props.tab.type
+  if (type === 'k8s') return k8sStore.getConnStatus((props.tab as any).connectionId) === 'error'
+  if (type === 'container') return !!containerStore.sessions[(props.tab as any).id]?.error
+  const panelIds: string[] = props.tab.type === 'workspace' ? props.tab.panelIds : 'panelId' in props.tab ? [props.tab.panelId] : []
+  return panelIds.some(pid => {
+    const p = panelStore.getPanel(pid)
+    return !!p?.sessionId
+  })
+})
+
+const tabTitle = computed(() => {
+  const name = props.tab.name + (tabShortcut.value ? ` (${tabShortcut.value})` : '')
+  if (!isDown.value) return name
+  const hint = props.tab.type === 'terminal' || props.tab.type === 'workspace' ? t('tab.disconnectedHint') : t('tab.disconnected')
+  return `${name}\n${hint}`
 })
 
 // Session output log state. Refreshed lazily when the right-click menu
@@ -917,5 +940,14 @@ onMounted(async () => {
      visibility is a transitionable property, so a visible→hidden ghost would
      otherwise linger for the transition duration. */
   transition: visibility 0s;
+}
+/* Dropped connection (isDown): last in the sheet so it wins over the active
+   and hover tab colors. */
+.tab-item.tab-down {
+  background: var(--error-glow);
+}
+.tab-item.tab-down .tab-name,
+.tab-item.tab-down .tab-type-icon {
+  color: var(--error);
 }
 </style>
