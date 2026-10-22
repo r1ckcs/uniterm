@@ -62,6 +62,7 @@
             v-for="conn in favoriteConns"
             :key="conn.id"
             class="connection-item indented"
+            :title="compactTitle(conn)"
             :data-conn-id="conn.id"
             :class="{
               active: selectedIds.has(conn.id),
@@ -125,6 +126,7 @@
             v-for="conn in filteredGrouped.ungrouped"
             :key="conn.id"
             class="connection-item indented"
+            :title="compactTitle(conn)"
             :data-conn-id="conn.id"
             :class="{
               active: selectedIds.has(conn.id),
@@ -161,6 +163,7 @@
           v-for="conn in filteredGrouped.ungrouped"
           :key="conn.id"
           class="connection-item"
+          :title="compactTitle(conn)"
           :data-conn-id="conn.id"
           :class="{
             active: selectedIds.has(conn.id),
@@ -1561,6 +1564,12 @@ function getShellLabel(path: string): string {
 function getSubtitle(conn: ConnectionConfig): string {
   if (conn.type === 'container') return conn.containerRuntime || 'container'
   return formatConnSubtitle(conn, getShellLabel)
+}
+
+// Compact list: the host is cut short in a narrow sidebar, so the hover
+// title carries the full name and host.
+function compactTitle(conn: ConnectionConfig): string | undefined {
+  return settingsStore.settings.listDensity === 'compact' ? `${conn.name}\n${getSubtitle(conn)}` : undefined
 }
 
 function connIcon(conn: ConnectionConfig) {

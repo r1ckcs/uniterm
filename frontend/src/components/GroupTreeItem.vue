@@ -40,6 +40,7 @@
       v-for="conn in node.connections"
       :key="conn.id"
       class="connection-item indented"
+      :title="compactTitle(conn)"
       :data-conn-id="conn.id"
       :class="{
         active: selected.has(conn.id),
@@ -119,6 +120,13 @@ const utils = inject<any>('utils')!
 
 const { connIcon, getSubtitle, t } = utils
 const connectionStore = useConnectionStore()
+
+// Compact list: the host is cut short in a narrow sidebar, so the hover
+// title carries the full name and host.
+function compactTitle(conn: ConnectionConfig): string | undefined {
+  return settingsStore.settings.listDensity === 'compact' ? `${conn.name}\n${getSubtitle(conn)}` : undefined
+}
+
 
 // A styled group (own color/icon, or inherited) shows it before its name.
 const hasGroupStyle = computed(() => {
