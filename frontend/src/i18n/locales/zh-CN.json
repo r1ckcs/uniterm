@@ -1327,6 +1327,8 @@
   "startTab.noStatus": "尚未检查连接可达性。",
   "startTab.noFavorites": "还没有收藏；点击连接上的星标即可收藏。",
   "startTab.filterAll": "全部",
+  "startTab.syncOff": "同步已关闭——你的连接只保存在这台设备上。",
+  "startTab.syncOffSignIn": "使用 Google 登录",
   "startTab.defaultName": "新标签页",
   "startTab.recentConnections": "最近",
   "startTab.favorites": "收藏",

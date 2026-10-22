@@ -36,6 +36,24 @@ describe('vault store (mock backend)', () => {
     expect(vault.onboardingVisible).toBe(false)
   })
 
+  it('sync-off strip: only when off, not in test mode, hidden by "Not now" for the session', async () => {
+    setActivePinia(createPinia())
+    setVaultApi(createMockVaultApi('idle', 5, () => []))
+    const before = useVaultStore()
+    expect(before.syncOffNotice).toBe(false) // no status yet
+    await before.start()
+    await flush()
+    expect(before.syncOffNotice).toBe(true)
+    before.dismissSyncOff()
+    expect(before.syncOffNotice).toBe(false)
+    // A new app start (fresh store) shows it again.
+    expect((await storeWith('idle')).syncOffNotice).toBe(true)
+    expect((await storeWith('ready')).syncOffNotice).toBe(false)
+    const test = await storeWith('test')
+    expect(test.status.testMode).toBe(true)
+    expect(test.syncOffNotice).toBe(false)
+  })
+
   it('first device: sign in → 24 words → confirm the 3 asked positions → ready', async () => {
     const vault = await storeWith('welcome')
     await vault.signIn()

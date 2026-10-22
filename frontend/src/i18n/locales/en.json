@@ -1327,6 +1327,8 @@
   "startTab.noStatus": "Reachability is not being checked yet.",
   "startTab.noFavorites": "No favorites yet; use the star on a connection.",
   "startTab.filterAll": "All",
+  "startTab.syncOff": "Sync is off — your connections stay only on this device.",
+  "startTab.syncOffSignIn": "Sign in with Google",
   "startTab.defaultName": "New Tab",
   "startTab.recentConnections": "Recent",
   "startTab.favorites": "Favorites",

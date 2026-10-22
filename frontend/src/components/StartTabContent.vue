@@ -1,6 +1,15 @@
 <template>
   <div ref="startTabRef" class="start-tab">
     <div class="start-content" :style="contentStyle">
+      <!-- Sync is off: the welcome dialog shows once, this strip keeps the
+           way in visible until the user signs in or says not now. -->
+      <div v-if="tab.viewMode === 'home' && vault.syncOffNotice" class="sync-off-strip" role="status">
+        <el-icon class="sync-off-icon"><CloudOff /></el-icon>
+        <span class="sync-off-text">{{ t('startTab.syncOff') }}</span>
+        <button class="sync-off-btn primary" :disabled="vault.busy" @click="onSyncSignIn">{{ t('startTab.syncOffSignIn') }}</button>
+        <button class="sync-off-btn" @click="vault.dismissSyncOff()">{{ t('vault.welcome.notNow') }}</button>
+      </div>
+
       <!-- Head: title, site filter and the actions -->
       <div class="sites-head">
         <h1 class="sites-title">
@@ -412,9 +421,10 @@ import { GetRecentConnections } from '../../bindings/github.com/ys-ll/uniterm/ap
 import { formatConnSubtitle, formatTypeFilterLabel, matchTypeFilter } from '../utils/quickConnect'
 import { connectionTypeIcon as connTypeIcon, connectionTypeLabel as connTypeLabel, connectionTypeInfo } from '../utils/connectionTypes'
 import { useConnStatusStore } from '../stores/connStatusStore'
+import { useVaultStore } from '../stores/vaultStore'
 import { getShellLabel as getShellLabelBase } from '../utils/shellLabel'
 import MenuItem from './MenuItem.vue'
-import { Filter, Plus, Laptop, Server, Folder, FolderOpen, Zap, MoreHorizontal, ChevronDown, Star, LayoutDashboard } from '@lucide/vue'
+import { CloudOff, Filter, Plus, Laptop, Server, Folder, FolderOpen, Zap, MoreHorizontal, ChevronDown, Star, LayoutDashboard } from '@lucide/vue'
 
 const props = defineProps<{
   tab: StartTab
@@ -439,6 +449,13 @@ const favoriteStore = useFavoriteStore()
 const tabStore = useTabStore()
 const settingsStore = useSettingsStore()
 const connStatus = useConnStatusStore()
+const vault = useVaultStore()
+
+// Opens the onboarding dialog and starts the Google sign-in it walks through.
+function onSyncSignIn() {
+  vault.openOnboarding()
+  void vault.signIn()
+}
 
 // ── Default local shell ──
 const effectiveDefaultShell = computed(() => {
@@ -1294,6 +1311,55 @@ function doEditConnection(config: ConnectionConfig | null) {
 
 .start-content {
   margin: 0 auto;
+}
+
+.sync-off-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem 0.625rem 0.5rem 0.875rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-btn);
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+}
+.sync-off-icon {
+  color: var(--text-secondary);
+}
+.sync-off-text {
+  flex: 1;
+  min-width: 12rem;
+}
+.sync-off-btn {
+  height: 1.75rem;
+  padding: 0 0.875rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-row);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sync-off-btn:hover {
+  background: var(--bg-hover);
+}
+.sync-off-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+}
+.sync-off-btn.primary:hover {
+  background: var(--el-color-primary-dark-2);
+}
+.sync-off-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .sites-head {

@@ -1327,6 +1327,8 @@
   "startTab.noStatus": "O alcance das conexões ainda não está sendo verificado.",
   "startTab.noFavorites": "Nenhum favorito ainda; use a estrela de uma conexão.",
   "startTab.filterAll": "Todos",
+  "startTab.syncOff": "Sincronização desligada — suas conexões ficam só neste aparelho.",
+  "startTab.syncOffSignIn": "Entrar com Google",
   "startTab.defaultName": "Nova aba",
   "startTab.recentConnections": "Recentes",
   "startTab.favorites": "Favoritos",
