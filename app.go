@@ -2059,6 +2059,11 @@ func (a *App) GetDataDirInfo() (DataDirInfo, error) {
 // flag). Returns an error if the target is not writable or, for a non-migrate
 // change into an existing dir, the new dir's credentials cannot be unlocked.
 func (a *App) SetDataDir(kind, customDir string, migrate bool) error {
+	if os.Getenv(store.DataDirEnv) != "" {
+		// The override is per process; writing a bootstrap here would move
+		// the real instance's data dir instead.
+		return fmt.Errorf("data dir is set by %s for this run", store.DataDirEnv)
+	}
 	target, err := dataDirFor(kind, customDir)
 	if err != nil {
 		return err

@@ -4,6 +4,7 @@ package store
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -89,6 +90,12 @@ func bootstrapSearchOrder(exe, userCfg string) []string {
 //   - No valid bootstrap + default dir has config files → Upgrade (existing user).
 //   - Otherwise → FirstRun.
 func ResolveDataDir() (DataDir, error) {
+	if dir, ok, err := EnvDataDir(); ok || err != nil {
+		if err != nil {
+			return DataDir{}, err
+		}
+		return DataDir{Path: dir, Type: "custom"}, nil
+	}
 	exe, err := exeDir()
 	if err != nil {
 		return DataDir{}, err
@@ -115,6 +122,30 @@ func ResolveDataDir() (DataDir, error) {
 	}
 	log.Writef("no valid bootstrap and no config in default dir → first run")
 	return DataDir{FirstRun: true}, nil
+}
+
+// DataDirEnv overrides the data directory for this process only (no
+// bootstrap is read or written). Testing aid: a second instance with its
+// own data dir (and its own vault device key) acts as a second device on
+// the same machine.
+const DataDirEnv = "UNITERM_DATA_DIR"
+
+// EnvDataDir returns the UNITERM_DATA_DIR override, creating the directory.
+// The path must be absolute.
+func EnvDataDir() (string, bool, error) {
+	dir := os.Getenv(DataDirEnv)
+	if dir == "" {
+		return "", false, nil
+	}
+	if !filepath.IsAbs(dir) {
+		return "", true, fmt.Errorf("%s must be an absolute path: %q", DataDirEnv, dir)
+	}
+	dir = filepath.Clean(dir)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", true, err
+	}
+	log.Writef("data dir overridden by %s: %s", DataDirEnv, dir)
+	return dir, true, nil
 }
 
 func readBootstrap(path string) (*bootstrap, error) {
