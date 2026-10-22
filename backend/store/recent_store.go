@@ -9,6 +9,11 @@ import (
 )
 
 const recentFileName = "recent.json"
+
+// recentAccessFileName holds when each recent id was last opened, kept apart
+// from recent.json so older builds still read that one. Per device: neither
+// file is synced nor goes to the vault.
+const recentAccessFileName = "recent-access.json"
 const maxRecent = 20
 const recentDebounce = 500 * time.Millisecond
 
@@ -18,6 +23,8 @@ type RecentStore struct {
 	mu      sync.Mutex
 	pending map[string]struct{}
 	ids     []string
+	at      map[string]time.Time
+	now     func() time.Time
 
 	timer *time.Timer
 	stop  chan struct{}
@@ -28,6 +35,8 @@ func NewRecentStore(configDir string) *RecentStore {
 	s := &RecentStore{
 		filePath: filepath.Join(configDir, recentFileName),
 		ids:      make([]string, 0),
+		at:       make(map[string]time.Time),
+		now:      time.Now,
 		pending:  make(map[string]struct{}),
 		stop:     make(chan struct{}),
 		done:     make(chan struct{}),
@@ -60,6 +69,13 @@ func (s *RecentStore) Load() ([]string, error) {
 		return result, nil
 	}
 	s.ids = ids
+	s.at = make(map[string]time.Time)
+	if data, err := os.ReadFile(s.accessPath()); err == nil {
+		_ = json.Unmarshal(data, &s.at) // corrupt: entries just lose their time
+	}
+	if s.at == nil { // "null" in the file
+		s.at = make(map[string]time.Time)
+	}
 	result := make([]string, len(s.ids))
 	copy(result, s.ids)
 	return result, nil
@@ -101,6 +117,7 @@ func (s *RecentStore) Record(id string) error {
 		}
 	}
 
+	s.at[id] = s.now().UTC()
 	s.pending[id] = struct{}{}
 	if s.timer == nil {
 		s.timer = time.AfterFunc(recentDebounce, s.fire)
@@ -118,6 +135,31 @@ func (s *RecentStore) GetAll() []string {
 	result := make([]string, len(s.ids))
 	copy(result, s.ids)
 	return result
+}
+
+// RecentAccess is one recent connection and when it was last opened: RFC
+// 3339, or "" for entries recorded before times were kept.
+type RecentAccess struct {
+	ID string `json:"id"`
+	At string `json:"at"`
+}
+
+// GetAccess returns the recent ids, most recent first, with their times.
+func (s *RecentStore) GetAccess() []RecentAccess {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]RecentAccess, len(s.ids))
+	for i, id := range s.ids {
+		out[i] = RecentAccess{ID: id}
+		if t, ok := s.at[id]; ok && !t.IsZero() {
+			out[i].At = t.UTC().Format(time.RFC3339)
+		}
+	}
+	return out
+}
+
+func (s *RecentStore) accessPath() string {
+	return filepath.Join(filepath.Dir(s.filePath), recentAccessFileName)
 }
 
 // Flush forces an immediate synchronous write of any pending id changes.
@@ -145,13 +187,27 @@ func (s *RecentStore) flush(syncWrite bool) error {
 	s.pending = make(map[string]struct{})
 	ids := make([]string, len(s.ids))
 	copy(ids, s.ids)
+	at := make(map[string]time.Time, len(ids))
+	for _, id := range ids {
+		if t, ok := s.at[id]; ok {
+			at[id] = t
+		}
+	}
 	s.mu.Unlock()
 
 	data, err := json.Marshal(ids)
 	if err != nil {
 		return err
 	}
-	return atomicWriteFile(s.filePath, data, 0644)
+	// 0600: the list of what was opened names customers.
+	if err := atomicWriteFile(s.filePath, data, 0600); err != nil {
+		return err
+	}
+	data, err = json.Marshal(at)
+	if err != nil {
+		return err
+	}
+	return atomicWriteFile(s.accessPath(), data, 0600)
 }
 
 func (s *RecentStore) isClosed() bool {

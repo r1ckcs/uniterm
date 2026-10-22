@@ -222,3 +222,27 @@ func TestSettingsStore_ConcurrentSaveLoad(t *testing.T) {
 		<-done
 	}
 }
+
+// A fresh install gets the FlexTerm theme (terminal follows the app); an
+// existing settings.json keeps what it has.
+func TestSettingsStore_FlexTermThemeOnlyForFreshInstall(t *testing.T) {
+	dir := t.TempDir()
+	s := &SettingsStore{configDir: dir}
+	got, err := s.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got.Theme != "flexterm" || got.Terminal.Theme != "follow-app" {
+		t.Errorf("fresh install: theme %q terminal %q", got.Theme, got.Terminal.Theme)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(`{"theme":"dark","terminal":{"theme":"uniterm-dark"}}`), 0600); err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+	got, err = s.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got.Theme != "dark" || got.Terminal.Theme != "uniterm-dark" {
+		t.Errorf("existing settings changed: theme %q terminal %q", got.Theme, got.Terminal.Theme)
+	}
+}

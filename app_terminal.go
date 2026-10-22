@@ -969,6 +969,7 @@ func (a *App) RecordRecentConnection(connId string) {
 		return
 	}
 	a.recentStore.Record(connId)
+	a.emit("store:recent:changed", a.recentStore.GetAccess())
 }
 
 func (a *App) GetRecentConnections() []string {
