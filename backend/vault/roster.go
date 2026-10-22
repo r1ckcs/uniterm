@@ -104,7 +104,24 @@ type Roster struct {
 	// Former are removed devices, kept so their ops written before removal
 	// still verify (within Closed cutoffs). Append-only.
 	Former []Member `json:"former"`
+	// Supersedes lists versions that lost an admin race (see Superseded).
+	// Append-only, so the newest version carries every one.
+	Supersedes []Superseded `json:"supersedes,omitempty"`
 }
+
+// Superseded names a roster version that lost an admin race. A client that
+// pinned it (its listing showed only the loser for longer than PinDelay)
+// would otherwise stay on that dead branch forever: the winner's
+// successors don't follow it. An admin-signed version of the winning chain
+// that lists it lets that client walk back to the common ancestor and move
+// to the winning chain (see reanchor).
+type Superseded struct {
+	Counter uint64 `json:"counter"`
+	Hash    string `json:"hash"`
+}
+
+// maxSupersedes bounds the list (races are rare; thousands means abuse).
+const maxSupersedes = 1000
 
 const rosterFormat = 1
 
@@ -242,6 +259,16 @@ func (r *Roster) validate(vaultID string) error {
 			}
 		}
 	}
+	if len(r.Supersedes) > maxSupersedes {
+		return errors.New("vault: roster supersedes too many versions")
+	}
+	gone := map[Superseded]bool{}
+	for _, x := range r.Supersedes {
+		if x.Counter == 0 || x.Counter >= r.Counter || len(x.Hash) != 64 || gone[x] {
+			return errors.New("vault: roster supersedes list malformed")
+		}
+		gone[x] = true
+	}
 	seen := map[string]bool{}
 	admins := 0
 	for _, list := range [][]Member{r.Members, r.Former} {
@@ -352,6 +379,14 @@ func checkSuccessor(prev, next *verifiedRoster) error {
 			}
 		}
 	}
+	if len(next.Supersedes) < len(prev.Supersedes) || !slices.Equal(next.Supersedes[:len(prev.Supersedes)], prev.Supersedes) {
+		return fmt.Errorf("vault: roster %d rewrites the superseded versions", next.Counter)
+	}
+	for _, x := range next.Supersedes[len(prev.Supersedes):] {
+		if x.Hash == prev.hash || x.Hash == next.Prev {
+			return fmt.Errorf("vault: roster %d supersedes its own parent", next.Counter)
+		}
+	}
 	// Former is append-only, and only receives devices removed now.
 	if len(next.Former) < len(prev.Former) {
 		return fmt.Errorf("vault: roster %d drops former members", next.Counter)
@@ -393,6 +428,11 @@ type rosterChain struct {
 	created map[uint64]int64
 	// warnings about ignored candidates or admin races.
 	warnings []string
+	// losers are the valid versions that lost a race (for Supersedes).
+	losers []Superseded
+	// stalled: the counter after cur has candidates, none following cur.
+	// Normal for junk, but also what a client on a dead branch sees.
+	stalled bool
 }
 
 // loadRoster verifies the chain in s from the trusted version up to the
@@ -465,6 +505,14 @@ func loadRoster(s Store, trust TrustState) (*rosterChain, error) {
 				err = checkSuccessor(cur, next)
 			}
 			if err == nil {
+				// A version can't declare one of its own ancestors dead.
+				for _, x := range next.Supersedes[len(cur.Supersedes):] {
+					if ch.hashes[x.Counter] == x.Hash {
+						err = fmt.Errorf("vault: roster %d supersedes its own ancestor %d", c, x.Counter)
+					}
+				}
+			}
+			if err == nil {
 				valid = append(valid, cand{next, e.Created})
 			}
 		}
@@ -483,13 +531,109 @@ func loadRoster(s Store, trust TrustState) (*rosterChain, error) {
 				return strings.Compare(a.vr.hash, b.vr.hash)
 			})
 		}
+		for _, l := range valid[1:] {
+			ch.losers = append(ch.losers, Superseded{Counter: c, Hash: l.vr.hash})
+		}
 		cur = valid[0].vr
 		ch.hashes[cur.Counter] = cur.hash
 		ch.created[cur.Counter] = valid[0].created
 	}
 	ch.cur = cur
 	ch.trust = TrustState{VaultID: trust.VaultID, Counter: cur.Counter, Hash: cur.hash}
+	ch.stalled = len(byCounter[cur.Counter+1]) > 0
 	return ch, nil
+}
+
+// maxReanchorWalk bounds how far back reanchor looks for the common
+// ancestor (a race is noticed within minutes, not hundreds of versions).
+const maxReanchorWalk = 64
+
+// reanchor moves a client off a dead branch. trust is its pinned version
+// and mine what loading from it gave (nil on ErrFork). Walking back from
+// trust by Prev hashes (trusted, they chain to the pinned version), it
+// loads the chain from each ancestor; the first chain whose newest version
+// supersedes a version of the client's branch above that ancestor wins.
+// Only admins of the common ancestor's line sign those versions, so storage
+// can't use this to move a client anywhere it chooses.
+//
+// Returns the chain and the ancestor it was loaded from, or nil if the
+// client's branch is not superseded.
+func reanchor(s Store, trust TrustState, mine *rosterChain) (*rosterChain, TrustState, error) {
+	branch := map[Superseded]bool{}
+	if mine != nil {
+		for c, h := range mine.hashes {
+			branch[Superseded{c, h}] = true
+		}
+	}
+	// Cheap precheck (this runs on every refresh that sees junk after the
+	// newest version): walk only if some version above the anchor declares
+	// a superseded one, and no further back than the lowest it declares.
+	entries, err := s.List("roster/")
+	if err != nil {
+		return nil, TrustState{}, err
+	}
+	lowest := uint64(0)
+	for _, e := range entries {
+		c, ok := parseRosterName(e.Name)
+		if !ok || c <= trust.Counter || (mine != nil && mine.hashes[c] != "" && c <= mine.cur.Counter) {
+			continue
+		}
+		data, _, err := s.Get(e.ID)
+		if err != nil {
+			return nil, TrustState{}, err
+		}
+		vr, _, err := parseRoster(data, trust.VaultID)
+		if err != nil {
+			continue
+		}
+		for _, x := range vr.Supersedes {
+			if lowest == 0 || x.Counter < lowest {
+				lowest = x.Counter
+			}
+		}
+	}
+	if lowest == 0 {
+		return nil, TrustState{}, nil
+	}
+	at := trust
+	for step := 0; step < maxReanchorWalk && at.Counter > 1 && at.Counter >= lowest; step++ {
+		vr, err := rosterByHash(s, at)
+		if err != nil {
+			return nil, TrustState{}, err
+		}
+		branch[Superseded{at.Counter, at.Hash}] = true
+		at = TrustState{VaultID: at.VaultID, Counter: at.Counter - 1, Hash: vr.Prev}
+		alt, err := loadRoster(s, at)
+		if err != nil {
+			continue
+		}
+		for _, x := range alt.cur.Supersedes {
+			if x.Counter > at.Counter && branch[x] {
+				alt.warnings = append(alt.warnings, fmt.Sprintf("roster %d was superseded by an admin; moved to the winning versions from %d", x.Counter, at.Counter))
+				return alt, at, nil
+			}
+		}
+	}
+	return nil, TrustState{}, nil
+}
+
+// rosterByHash finds the stored version with trust's counter and hash.
+// The hash alone vouches for it, so the signature is not checked.
+func rosterByHash(s Store, trust TrustState) (*verifiedRoster, error) {
+	cands, err := candidates(s, rosterName(trust.Counter))
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range cands {
+		data, _, err := s.Get(e.ID)
+		if err != nil {
+			return nil, err
+		}
+		if vr, _, err := parseRoster(data, trust.VaultID); err == nil && vr.hash == trust.Hash && vr.Counter == trust.Counter {
+			return vr, nil
+		}
+	}
+	return nil, fmt.Errorf("%w at version %d", ErrFork, trust.Counter)
 }
 
 // writeRoster signs r with the admin key and creates its version object.
@@ -516,6 +660,7 @@ func cloneMembers(ms []Member) []Member {
 
 func cloneRoster(r Roster) Roster {
 	r.KeyChecks = slices.Clone(r.KeyChecks)
+	r.Supersedes = slices.Clone(r.Supersedes)
 	closed := make([]EpochClose, len(r.Closed))
 	for i, c := range r.Closed {
 		seqs := make(map[string]Cut, len(c.Seqs))

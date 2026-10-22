@@ -838,3 +838,132 @@ func TestOldVersionIsPinned(t *testing.T) {
 		t.Fatalf("Open = %v, want ErrRollback", err)
 	}
 }
+
+// --- Supersedes (re-anchoring off a dead branch) ---
+
+// pinnedLoser sets up an admin race at roster 5 whose loser a client has
+// pinned (its listing showed only the loser for longer than PinDelay).
+func pinnedLoser(t *testing.T) (s *MemStore, tm *team, va2 *Vault, pinned *MemState, loser TrustState) {
+	t.Helper()
+	s = NewMemStore()
+	tm = newTeam(t, s)
+	a2 := newKey(t)
+	must(t, tm.va.AddMember(MemberOf(a2, "reserva", "mac-reserva", RoleAdmin)))
+	va2 = tm.join(t, a2)
+	must(t, tm.va.AddMember(MemberOf(newKey(t), "h", "x", RoleReader)))
+	winner, _ := candidates(s, rosterName(5))
+	s.Hide(winner[0].ID)
+	must(t, va2.AddMember(MemberOf(newKey(t), "h", "y", RoleReader)))
+	loser = va2.Trust()
+	s.Show(winner[0].ID)
+	pinned = NewMemState(State{Trust: loser, NextSeq: 1})
+	return s, tm, va2, pinned, loser
+}
+
+func TestSupersededLoserReanchors(t *testing.T) {
+	_, tm, _, pinned, loser := pinnedLoser(t)
+	v, err := Open(tm.store, pinned, tm.r)
+	must(t, err)
+	if v.Trust() != loser {
+		t.Fatalf("before supersede: %+v, want the pinned loser", v.Trust())
+	}
+	// The winning admin sees the race and marks the loser.
+	must(t, tm.va.Refresh())
+	must(t, tm.va.SupersedeLosers())
+	if got := tm.va.Roster().Supersedes; len(got) != 1 || got[0] != (Superseded{loser.Counter, loser.Hash}) {
+		t.Fatalf("supersedes = %+v", got)
+	}
+	must(t, v.Refresh())
+	if v.Trust() != tm.va.Trust() {
+		t.Fatalf("after supersede: %+v, want %+v", v.Trust(), tm.va.Trust())
+	}
+	if st, _ := pinned.Load(); st.Trust == loser {
+		t.Fatal("still pinned to the loser")
+	}
+	if !strings.Contains(strings.Join(logOf(t, v).Warnings, ";"), "superseded") {
+		t.Error("re-anchoring not reported")
+	}
+	// Nothing left to mark: no new version.
+	before := tm.va.Trust()
+	must(t, tm.va.SupersedeLosers())
+	if tm.va.Trust() != before {
+		t.Fatal("SupersedeLosers wrote a version with nothing to mark")
+	}
+}
+
+func TestLostRaceRedoSupersedes(t *testing.T) {
+	// The losing admin's redo marks its own loser.
+	s := NewMemStore()
+	tm := newTeam(t, s)
+	a2 := newKey(t)
+	must(t, tm.va.AddMember(MemberOf(a2, "reserva", "mac-reserva", RoleAdmin)))
+	va2 := tm.join(t, a2)
+	must(t, tm.va.AddMember(MemberOf(newKey(t), "h", "x", RoleReader)))
+	y := MemberOf(newKey(t), "h", "y", RoleReader)
+	if err := va2.AddMember(y); !errors.Is(err, ErrLostRace) {
+		t.Fatalf("= %v, want ErrLostRace", err)
+	}
+	must(t, va2.AddMember(y))
+	if got := va2.Roster().Supersedes; len(got) != 1 || got[0].Counter != 5 {
+		t.Fatalf("supersedes = %+v", got)
+	}
+}
+
+func TestStalledWithoutSupersedeStays(t *testing.T) {
+	// Roster 6 written by an admin that had not refreshed since the race
+	// does not mark the loser: the pinned client stays on its branch (and
+	// the version after it, which does not follow, doesn't move it either)
+	// until SupersedeLosers runs.
+	_, tm, _, pinned, loser := pinnedLoser(t)
+	must(t, tm.va.AddMember(MemberOf(newKey(t), "h", "z", RoleReader)))
+	if len(tm.va.Roster().Supersedes) != 0 {
+		t.Fatal("test premise: roster 6 should not supersede yet")
+	}
+	v, err := Open(tm.store, pinned, tm.r)
+	must(t, err)
+	if v.Trust() != loser {
+		t.Fatalf("moved without a supersede: %+v", v.Trust())
+	}
+	must(t, tm.va.SupersedeLosers())
+	must(t, v.Refresh())
+	if v.Trust() != tm.va.Trust() || v.Trust().Counter != 7 {
+		t.Fatalf("after supersede: %+v, want %+v", v.Trust(), tm.va.Trust())
+	}
+}
+
+func TestSupersedeNeedsAdminSignature(t *testing.T) {
+	s, tm, _, pinned, loser := pinnedLoser(t)
+	// A writer forges roster 6 on the winning chain claiming the loser is dead.
+	must(t, tm.va.Refresh())
+	next := cloneRoster(tm.va.Roster())
+	next.Counter, next.Prev = 6, tm.va.Trust().Hash
+	next.Supersedes = []Superseded{{loser.Counter, loser.Hash}}
+	if _, err := writeRoster(s, tm.w, &next); err != nil {
+		t.Fatal(err)
+	}
+	v, err := Open(s, pinned, tm.r)
+	must(t, err)
+	if v.Trust() != loser {
+		t.Fatalf("moved on a forged supersede: %+v", v.Trust())
+	}
+}
+
+func TestSupersedeOwnAncestorRefused(t *testing.T) {
+	s := NewMemStore()
+	tm := newTeam(t, s)
+	// An admin can't declare a version of its own chain dead.
+	next := cloneRoster(tm.va.Roster())
+	next.Counter, next.Prev = 4, tm.va.Trust().Hash
+	g, _ := candidates(s, rosterName(2))
+	data, _, _ := s.Get(g[0].ID)
+	vr, _, err := parseRoster(data, "pessoal")
+	must(t, err)
+	next.Supersedes = []Superseded{{2, vr.hash}}
+	if _, err := writeRoster(s, tm.a, &next); err != nil {
+		t.Fatal(err)
+	}
+	v := tm.join(t, tm.r)
+	if v.Trust().Counter != 3 {
+		t.Fatalf("accepted a version superseding its own ancestor: %+v", v.Trust())
+	}
+}

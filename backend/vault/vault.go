@@ -27,6 +27,7 @@ type Vault struct {
 	cur      TrustState // newest accepted version (st.Trust is the pinned one)
 	hashes   map[uint64]string
 	warnings []string
+	losers   []Superseded
 	keys     map[uint64][]byte
 }
 
@@ -105,11 +106,27 @@ func (v *Vault) Refresh() error {
 }
 
 func (v *Vault) refreshLocked() error {
-	ch, err := loadRoster(v.store, v.st.Trust)
-	if err != nil {
+	st := v.st
+	ch, err := loadRoster(v.store, st.Trust)
+	if err != nil && !errors.Is(err, ErrFork) {
 		return err
 	}
-	if v.cur.Counter > ch.trust.Counter {
+	moved := false
+	if err != nil || ch.stalled {
+		alt, from, rerr := reanchor(v.store, st.Trust, ch)
+		switch {
+		case rerr != nil && err == nil:
+			// Couldn't walk back (junk, missing ancestor): stay put.
+		case alt != nil:
+			ch, st.Trust, moved, err = alt, from, true, nil
+		}
+		if err != nil {
+			return err
+		}
+	}
+	// Moving to the winning chain may lower the counter (the dead branch
+	// went further); that is the admin-signed exception to the check.
+	if !moved && v.cur.Counter > ch.trust.Counter {
 		return fmt.Errorf("%w: storage has %d, accepted %d", ErrRollback, ch.trust.Counter, v.cur.Counter)
 	}
 	r := ch.cur
@@ -131,7 +148,6 @@ func (v *Vault) refreshLocked() error {
 		}
 		keys[e] = vk
 	}
-	st := v.st
 	horizon := time.Now().Add(-PinDelay).UnixNano()
 	for c := ch.trust.Counter; c > st.Trust.Counter; c-- {
 		if ch.created[c] <= horizon {
@@ -145,6 +161,7 @@ func (v *Vault) refreshLocked() error {
 		}
 	}
 	v.st, v.cur, v.roster, v.hashes, v.warnings, v.keys = st, ch.trust, r, ch.hashes, ch.warnings, keys
+	v.losers = ch.losers
 	return nil
 }
 
@@ -186,6 +203,7 @@ func (v *Vault) requireAdminLocked() error {
 func (v *Vault) nextRosterLocked(next Roster) error {
 	next.Format, next.VaultID = rosterFormat, v.roster.VaultID
 	next.Counter, next.Prev = v.roster.Counter+1, v.roster.hash
+	next.Supersedes = append(next.Supersedes, v.unsupersededLocked()...)
 	if err := next.validate(next.VaultID); err != nil {
 		return err
 	}
@@ -206,6 +224,34 @@ func (v *Vault) nextRosterLocked(next Roster) error {
 		return ErrLostRace
 	}
 	return nil
+}
+
+// unsupersededLocked returns the race losers seen in the last refresh that
+// the current roster does not list yet.
+func (v *Vault) unsupersededLocked() []Superseded {
+	var out []Superseded
+	for _, l := range v.losers {
+		if !slices.Contains(v.roster.Supersedes, l) {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// SupersedeLosers (admin) writes a roster version that only marks the race
+// losers seen so far as superseded, so clients that pinned one move to the
+// winning chain. A no-op when there is nothing to mark; the service calls
+// it after each refresh on an admin device.
+func (v *Vault) SupersedeLosers() error {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if err := v.requireAdminLocked(); err != nil {
+		return err
+	}
+	if len(v.unsupersededLocked()) == 0 {
+		return nil
+	}
+	return v.nextRosterLocked(cloneRoster(v.roster.Roster))
 }
 
 // AddMember (admin) adds a device approved out of band and wraps the epoch
