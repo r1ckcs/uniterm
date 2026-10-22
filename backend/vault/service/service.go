@@ -104,6 +104,22 @@ type Service struct {
 
 	changed  map[string]Change
 	lastSeen map[string]time.Time
+
+	// background goroutines, waited for by Close
+	wg     sync.WaitGroup
+	closed bool
+}
+
+// spawn runs f in a goroutine that Close waits for. Caller holds s.mu.
+func (s *Service) spawn(f func()) {
+	if s.closed {
+		return
+	}
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		f()
+	}()
 }
 
 // New loads the local files; call Start to resume a saved session.
@@ -201,14 +217,17 @@ func (s *Service) Start() {
 	if _, ok := s.o.Backend.Resume(); !ok || s.cfg.Account == "" {
 		return
 	}
-	go s.enter()
+	s.spawn(s.enter)
 }
 
-// Close stops the background loops.
+// Close stops the background work and waits for it (a sync in progress
+// finishes first); the service is unusable afterwards.
 func (s *Service) Close() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.closed = true
 	s.stopLocked()
+	s.mu.Unlock()
+	s.wg.Wait()
 }
 
 func (s *Service) stopLocked() {
@@ -326,7 +345,7 @@ func (s *Service) SignIn() error {
 	s.lastErr = nil
 	s.cfg.WelcomeAnswered = true
 	s.setPhaseLocked(PhaseSigningIn)
-	go func() {
+	s.spawn(func() {
 		account, err := s.o.Backend.SignIn(ctx)
 		s.mu.Lock()
 		s.cancel = nil
@@ -340,7 +359,7 @@ func (s *Service) SignIn() error {
 		_ = s.saveConfigLocked()
 		s.mu.Unlock()
 		s.enter()
-	}()
+	})
 	return nil
 }
 
@@ -403,6 +422,9 @@ func (s *Service) Rename(name string) error {
 func (s *Service) enter() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.closed {
+		return
+	}
 	if err := s.enterLocked(); err != nil {
 		if s.phase == PhaseSigningIn || s.phase == PhaseCreating {
 			s.phase = PhaseOff
@@ -547,6 +569,9 @@ func (s *Service) ConfirmRecovery(idx []int, answers []string) error {
 func (s *Service) RegenerateRecovery() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.phase == PhaseRevoked {
+		return newError(CodeRevoked, "this device was removed from the vault")
+	}
 	if s.phase != PhaseReady || s.v == nil {
 		return newError(CodeWrongPhase, "the vault is not open")
 	}
@@ -662,7 +687,7 @@ func (s *Service) startJoinLocked() error {
 	s.setPhaseLocked(PhaseAwaitingApproval)
 	stop := make(chan struct{})
 	s.stop = stop
-	go s.pollJoin(j, stop)
+	s.spawn(func() { s.pollJoin(j, stop) })
 	return nil
 }
 
@@ -769,7 +794,7 @@ func (s *Service) startLoopsLocked() {
 	}
 	stop := make(chan struct{})
 	s.stop = stop
-	go s.loop(stop)
+	s.spawn(func() { s.loop(stop) })
 	s.kickSync()
 }
 
@@ -783,19 +808,18 @@ func (s *Service) kickSync() {
 // LocalChanged is called after the app saved connections or identities.
 func (s *Service) LocalChanged() {
 	s.mu.Lock()
-	stop := s.stop
-	ready := s.phase == PhaseReady
-	s.mu.Unlock()
-	if !ready {
+	defer s.mu.Unlock()
+	if s.phase != PhaseReady {
 		return
 	}
-	go func() {
+	stop := s.stop
+	s.spawn(func() {
 		select {
 		case <-time.After(s.o.Debounce):
 			s.kickSync()
 		case <-stop:
 		}
-	}()
+	})
 }
 
 func (s *Service) loop(stop chan struct{}) {
@@ -835,11 +859,27 @@ func writeJSON(path string, v any) error {
 	if err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+	// A unique temp name: two writers (a closing and a new Service on the
+	// same dir) must not rename each other's file away.
+	f, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	tmp := f.Name()
+	_, werr := f.Write(data)
+	if cerr := f.Close(); werr == nil {
+		werr = cerr
+	}
+	if werr == nil {
+		werr = os.Chmod(tmp, 0o600)
+	}
+	if werr == nil {
+		werr = os.Rename(tmp, path)
+	}
+	if werr != nil {
+		os.Remove(tmp)
+	}
+	return werr
 }
 
 var _ = records.Connection
