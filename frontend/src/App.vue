@@ -11,6 +11,9 @@
       @toggle-ai-lock="onToggleAiLock"
       @tab-dragstart="onTabDragStart"
     />
+    <!-- Vault test mode keeps the device key in a file, not the Keychain:
+         never let it stay on unnoticed (CONTRATO v5). -->
+    <div v-if="vaultStore.status.testMode" class="vault-test-strip" role="status">{{ t('vault.testModeStrip') }}</div>
     <div class="main-content">
       <Sidebar ref="sidebarRef" :visible="sidebarVisible" @toggle="sidebarVisible = !sidebarVisible" @connect="onSidebarConnect" @connect-to-workspace="({ config, workspaceId }: any) => onConnect(config, undefined, undefined, true, workspaceId)" @create-workspace="(configs: any) => onCreateWorkspaceFromConfigs(configs)" @connect-only="onConnectOnly" />
       <div class="tab-area">
@@ -155,6 +158,9 @@
     <CredentialUnlockDialog v-model:visible="unlockVisible" @done="onUnlockDone" @reset="onReset" />
     <PasswordSaveOffer />
     <KeychainLostDialog v-model:visible="keychainLostVisible" @done="onKeychainLostDone" />
+    <!-- Startup credential dialogs first; the vault welcome waits its turn. -->
+    <VaultOnboardingDialog v-if="!dataDirVisible && !encryptVisible && !unlockVisible && !keychainLostVisible" />
+    <VaultJoinApprovalDialog />
     <MobileKeyBar v-if="keyBarSessionId" :session-id="keyBarSessionId" />
   </div>
   </el-config-provider>
@@ -202,6 +208,9 @@ import DataDirDialog from './components/DataDirDialog.vue'
 import EncryptionModeDialog from './components/EncryptionModeDialog.vue'
 import CredentialUnlockDialog from './components/CredentialUnlockDialog.vue'
 import KeychainLostDialog from './components/KeychainLostDialog.vue'
+import VaultOnboardingDialog from './components/VaultOnboardingDialog.vue'
+import VaultJoinApprovalDialog from './components/VaultJoinApprovalDialog.vue'
+import { useVaultStore } from './stores/vaultStore'
 import CredentialPrompt from './components/CredentialPrompt.vue'
 import type { CredentialResult } from './components/CredentialPrompt.vue'
 import MCPApprovalDialog from './components/MCPApprovalDialog.vue'
@@ -333,7 +342,7 @@ function hasLiveSessions(): boolean {
 function onVisibilityChange() {
   if (document.visibilityState === 'hidden') {
     if (hasLiveSessions()) {
-      startAndroidKeepAlive('uniTerm', t('app.backgroundKeepAlive'))
+      startAndroidKeepAlive('FlexTerm', t('app.backgroundKeepAlive'))
     }
   } else {
     stopAndroidKeepAlive()
@@ -388,6 +397,7 @@ const dataDirVisible = ref(false)
 const encryptVisible = ref(false)
 const unlockVisible = ref(false)
 const keychainLostVisible = ref(false)
+const vaultStore = useVaultStore()
 
 // Determine which credential dialog (keychain-lost / setup / unlock) to show
 // based on the current store status. Shared by startup and by the first-run
@@ -444,7 +454,7 @@ async function checkCredentials() {
   // rejects and the placeholder status would wrongly pop the encryption
   // dialog. Skip the whole credential flow so the UI renders for debugging.
   if (!credStore.backendAvailable) {
-    console.warn('[uniTerm] Backend unreachable — browser debug mode: credential flow skipped')
+    console.warn('[FlexTerm] Backend unreachable — browser debug mode: credential flow skipped')
     return
   }
   if (credStore.firstRun || credStore.dataDirInfo.firstRun) {
@@ -956,6 +966,8 @@ onMounted(async () => {
   useHighlightRuleStore().load()
   // Pre-load tunnels so auto-start state and the panel are ready
   useTunnelStore().load()
+  // Credential vault: status, join requests and "changed by" badges
+  vaultStore.start()
   // Auto-open start tab if no tabs are open
   if (tabStore.tabs.length === 0) {
     tabStore.createStartTab()
@@ -1987,6 +1999,18 @@ watch(
   background: var(--bg-base);
   border: 1px solid var(--border-subtle);
   position: relative;
+}
+.vault-test-strip {
+  flex-shrink: 0;
+  padding: 0.1875rem 0.75rem;
+  background: var(--warning);
+  color: #1a1300;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+  position: relative;
+  z-index: 2;
 }
 .main-content {
   display: flex;

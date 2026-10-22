@@ -734,6 +734,8 @@
         <CommandsManager />
       </div>
 
+      <VaultSettings v-if="settingsStore.activeCategory === 'vault'" class="settings-section" />
+
       <!-- Sync settings -->
       <div v-if="settingsStore.activeCategory === 'sync'" class="settings-section sync-settings">
         <h2 class="section-title">{{ t('settings.sync') }}</h2>
@@ -911,8 +913,9 @@
       <div v-if="settingsStore.activeCategory === 'about'" class="settings-section">
         <h2 class="section-title">{{ t('settings.about') }}</h2>
         <div class="about-content">
-          <div class="about-appname">uniTerm</div>
+          <div class="about-appname">FlexTerm</div>
           <p class="about-desc">{{ t('settings.aboutDesc') }}</p>
+          <p class="about-desc">{{ t('settings.aboutForkOf') }}</p>
           <div class="about-version">
             {{ t('settings.version') }}: {{ updateCheck.updateInfo?.current || '...' }}
           </div>
@@ -1424,7 +1427,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch, computed, onMounted, onUnmounted } from 'vue'
-import { Highlighter, Settings, Monitor, MessageCircleMore, Info, RefreshCw, Pencil, Trash2, Globe, Keyboard, Plus, BookOpen, Wrench, FolderOpen, Key, Network, ArrowRightLeft, ChevronLeft, ChevronRight, Copy } from '@lucide/vue'
+import { Highlighter, Settings, Monitor, MessageCircleMore, Info, RefreshCw, Pencil, Trash2, Globe, Keyboard, Plus, BookOpen, Wrench, FolderOpen, Key, Network, ArrowRightLeft, ChevronLeft, ChevronRight, Copy, CloudCog } from '@lucide/vue'
 import { msg } from '../services/message'
 import { FetchModels, ChatCompletion, GetPlatform, GetAllFonts, GetDefaultSessionLogDir, OpenDirectoryDialog, OpenFileDialogFiltered, SetBackgroundImage, ClearBackgroundImage, GetBackgroundImage, RelaunchApp, ListExternalEditors, GenerateMCPToken, RevokeMCPToken, ListMCPTokens, GetMCPStatus } from '../../bindings/github.com/ys-ll/uniterm/app'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -1451,6 +1454,7 @@ import ChangePasswordDialog from './ChangePasswordDialog.vue'
 import DeleteRepoDialog from './DeleteRepoDialog.vue'
 import CustomThemeEditor from './CustomThemeEditor.vue'
 import DataDirDialog from './DataDirDialog.vue'
+import VaultSettings from './VaultSettings.vue'
 import IdentityEditDialog from './IdentityEditDialog.vue'
 import ProxyEditDialog from './ProxyEditDialog.vue'
 import HighlightRulesEditor from './HighlightRulesEditor.vue'
@@ -2278,6 +2282,7 @@ const categories = computed(() => {
     { key: 'identities', label: t('settings.identities'), icon: Key },
     { key: 'proxies', label: t('settings.proxies'), icon: Network },
     { key: 'tunnels', label: t('settings.tunnels'), icon: ArrowRightLeft },
+    { key: 'vault', label: t('vault.title'), icon: CloudCog },
     { key: 'sync', label: t('settings.sync'), icon: RefreshCw },
     { key: 'about', label: t('settings.about'), icon: Info },
   ]
@@ -2409,7 +2414,7 @@ const modelForm = reactive({
   model: '',
   apiKey: '',
   protocol: 'anthropic' as 'anthropic' | 'openai' | 'responses',
-  userAgent: 'uniTerm' as string,
+  userAgent: 'FlexTerm' as string,
   proxyId: '' as string,
 })
 
@@ -2469,7 +2474,7 @@ function resetModelForm() {
   modelForm.model = ''
   modelForm.apiKey = ''
   modelForm.protocol = 'anthropic'
-  modelForm.userAgent = 'uniTerm'
+  modelForm.userAgent = 'FlexTerm'
   modelForm.proxyId = ''
   modelSuggestions.value = []
 }

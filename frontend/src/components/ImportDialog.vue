@@ -8,7 +8,7 @@
     <el-form label-width="6.25rem">
       <el-form-item :label="t('importExport.importType')">
         <el-select v-model="format" style="width:100%">
-          <el-option label="uniTerm (.utm)" value="uniterm" />
+          <el-option label="FlexTerm / uniTerm (.utm)" value="uniterm" />
           <el-option label="MobaXterm (.mxtsessions)" value="mobaxterm" />
           <el-option label="OpenSSH config (~/.ssh/config)" value="openssh" />
           <el-option label="SecureCRT (.xml)" value="securecrt" />
@@ -58,7 +58,7 @@ const password = ref('')
 const importing = ref(false)
 
 const FILTERS: Record<string, { display: string; pattern: string }> = {
-  uniterm: { display: 'uniTerm (*.utm)', pattern: '*.utm' },
+  uniterm: { display: 'FlexTerm / uniTerm (*.utm)', pattern: '*.utm' },
   xshell: { display: 'Xshell (*.xts)', pattern: '*.xts' },
   mobaxterm: { display: 'MobaXterm (*.mxtsessions)', pattern: '*.mxtsessions' },
   windterm: { display: 'WindTerm (*.sessions)', pattern: '*.sessions' },

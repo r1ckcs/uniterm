@@ -15,6 +15,7 @@ import (
 	"unsafe"
 
 	"github.com/go-ole/go-ole"
+	"github.com/ys-ll/uniterm/backend/appname"
 	"github.com/ys-ll/uniterm/backend/log"
 	"golang.org/x/sys/windows"
 )
@@ -258,7 +259,7 @@ func (s *RDPSession) Connect(config ConnectionConfig) error {
 	}()
 
 	if s.parentHwnd == 0 {
-		title, _ := windows.UTF16PtrFromString("uniTerm")
+		title, _ := windows.UTF16PtrFromString(appname.Name)
 		hwnd, _, _ := procFindWindowW.Call(0, uintptr(unsafe.Pointer(title)))
 		if hwnd == 0 {
 			log.Writef("[RDP] ERROR: cannot find main window")

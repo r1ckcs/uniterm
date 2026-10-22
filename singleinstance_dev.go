@@ -6,4 +6,4 @@ package main
 // release binary holding the release lock. With the shared release ID the dev
 // process would detect the release instance on startup, notify it and exit
 // before wails3 dev could attach to it.
-const singleInstanceID = "uniterm-gui-dev"
+const singleInstanceID = "flexterm-gui-dev"

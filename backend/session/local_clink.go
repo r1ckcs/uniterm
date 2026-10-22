@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/ys-ll/uniterm/backend/appname"
 )
 
 // ClinkShellPathPrefix marks a local-terminal ShellPath that launches
@@ -41,9 +43,9 @@ func clinkProfileDir() string {
 		return clinkProfileDirOverride
 	}
 	if cfg, err := os.UserConfigDir(); err == nil {
-		return filepath.Join(cfg, "uniTerm", "clink")
+		return filepath.Join(cfg, appname.DirName, "clink")
 	}
-	return filepath.Join(os.TempDir(), "uniterm-clink")
+	return filepath.Join(os.TempDir(), "flexterm-clink")
 }
 
 // ensureClinkProfile creates the clink profile directory and drops the

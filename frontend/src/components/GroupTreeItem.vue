@@ -61,6 +61,7 @@
         <span class="name">{{ conn.name }}</span>
         <span class="conn-meta">
           <span class="host">{{ getSubtitle(conn) }}</span>
+          <VaultChangedBadge :connection-id="conn.id" />
         </span>
       </div>
       <button
@@ -80,6 +81,7 @@
 </template>
 
 <script setup lang="ts">
+import VaultChangedBadge from './VaultChangedBadge.vue'
 import { inject, computed } from 'vue'
 import { ChevronDown, ChevronRight, MoreHorizontal, Star } from '@lucide/vue'
 import type { ConnectionConfig, ConnectionGroup } from '../types/session'

@@ -17,25 +17,25 @@ func (s *Server) registerTools(srv *mcp.Server) {
 	// ── Discovery group ─────────────────────────────────────────────
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "list_connections",
-		Description: "List saved uniTerm SSH connection profiles (id, name, host, user). No credentials are ever returned. Use the id with exec_command's connectionId, or connect to open a new session.",
+		Description: "List saved FlexTerm SSH connection profiles (id, name, host, user). No credentials are ever returned. Use the id with exec_command's connectionId, or connect to open a new session.",
 	}, s.toolListConnections)
 
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "list_sessions",
-		Description: "List currently active uniTerm terminal sessions (id, type, title, status, cwd). Pass a session id to exec_command to run a command on that connection.",
+		Description: "List currently active FlexTerm terminal sessions (id, type, title, status, cwd). Pass a session id to exec_command to run a command on that connection.",
 	}, s.toolListSessions)
 
 	// ── Exec group ──────────────────────────────────────────────────
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "connect",
-		Description: "Open a new SSH terminal session in uniTerm for a saved connection (by connection id from list_connections). The tab is visible to the user. Returns the new session id.",
+		Description: "Open a new SSH terminal session in FlexTerm for a saved connection (by connection id from list_connections). The tab is visible to the user. Returns the new session id.",
 	}, s.toolConnect)
 
 	mcp.AddTool(srv, &mcp.Tool{
 		Name: "exec_command",
-		Description: "Run a shell command on a remote host over an existing connected uniTerm SSH session (non-interactive; separate stdout/stderr; real exit code). " +
+		Description: "Run a shell command on a remote host over an existing connected FlexTerm SSH session (non-interactive; separate stdout/stderr; real exit code). " +
 			"Prefer this over writing into the user's terminal. Long-running commands (longer than ~20s) return a commandId you can poll with get_command_output. " +
-			"Each command may require user approval in the uniTerm window.",
+			"Each command may require user approval in the FlexTerm window.",
 	}, s.toolExecCommand)
 
 	mcp.AddTool(srv, &mcp.Tool{
@@ -110,7 +110,7 @@ type interruptOut struct{}
 
 func (s *Server) toolListConnections(ctx context.Context, req *mcp.CallToolRequest, _ listConnectionsIn) (*mcp.CallToolResult, listConnectionsOut, error) {
 	if !s.env.ToolsEnabled().Discovery {
-		return nil, listConnectionsOut{}, fmt.Errorf("discovery tools are disabled in uniTerm settings")
+		return nil, listConnectionsOut{}, fmt.Errorf("discovery tools are disabled in FlexTerm settings")
 	}
 	conns := s.env.ListConnections()
 	if conns == nil {
@@ -122,7 +122,7 @@ func (s *Server) toolListConnections(ctx context.Context, req *mcp.CallToolReque
 
 func (s *Server) toolListSessions(ctx context.Context, req *mcp.CallToolRequest, _ listSessionsIn) (*mcp.CallToolResult, listSessionsOut, error) {
 	if !s.env.ToolsEnabled().Discovery {
-		return nil, listSessionsOut{}, fmt.Errorf("discovery tools are disabled in uniTerm settings")
+		return nil, listSessionsOut{}, fmt.Errorf("discovery tools are disabled in FlexTerm settings")
 	}
 	sessions := s.env.ListSessions()
 	if sessions == nil {
@@ -134,7 +134,7 @@ func (s *Server) toolListSessions(ctx context.Context, req *mcp.CallToolRequest,
 
 func (s *Server) toolConnect(ctx context.Context, req *mcp.CallToolRequest, in connectIn) (*mcp.CallToolResult, connectOut, error) {
 	if !s.env.ToolsEnabled().Exec {
-		return nil, connectOut{}, fmt.Errorf("exec tools are disabled in uniTerm settings")
+		return nil, connectOut{}, fmt.Errorf("exec tools are disabled in FlexTerm settings")
 	}
 	if strings.TrimSpace(in.ConnectionID) == "" {
 		return nil, connectOut{}, fmt.Errorf("connectionId is required")
@@ -153,7 +153,7 @@ func (s *Server) toolConnect(ctx context.Context, req *mcp.CallToolRequest, in c
 
 func (s *Server) toolExecCommand(ctx context.Context, req *mcp.CallToolRequest, in execIn) (*mcp.CallToolResult, execOut, error) {
 	if !s.env.ToolsEnabled().Exec {
-		return nil, execOut{}, fmt.Errorf("exec tools are disabled in uniTerm settings")
+		return nil, execOut{}, fmt.Errorf("exec tools are disabled in FlexTerm settings")
 	}
 	if strings.TrimSpace(in.SessionID) == "" {
 		return nil, execOut{}, fmt.Errorf("sessionId is required")
@@ -205,7 +205,7 @@ func (s *Server) toolExecCommand(ctx context.Context, req *mcp.CallToolRequest, 
 
 func (s *Server) toolGetCommandOutput(ctx context.Context, req *mcp.CallToolRequest, in getOutputIn) (*mcp.CallToolResult, getOutputOut, error) {
 	if !s.env.ToolsEnabled().Exec {
-		return nil, getOutputOut{}, fmt.Errorf("exec tools are disabled in uniTerm settings")
+		return nil, getOutputOut{}, fmt.Errorf("exec tools are disabled in FlexTerm settings")
 	}
 	if strings.TrimSpace(in.CommandID) == "" {
 		return nil, getOutputOut{}, fmt.Errorf("commandId is required")
@@ -231,7 +231,7 @@ func (s *Server) toolGetCommandOutput(ctx context.Context, req *mcp.CallToolRequ
 
 func (s *Server) toolInterruptCommand(ctx context.Context, req *mcp.CallToolRequest, in interruptIn) (*mcp.CallToolResult, interruptOut, error) {
 	if !s.env.ToolsEnabled().Exec {
-		return nil, interruptOut{}, fmt.Errorf("exec tools are disabled in uniTerm settings")
+		return nil, interruptOut{}, fmt.Errorf("exec tools are disabled in FlexTerm settings")
 	}
 	if strings.TrimSpace(in.CommandID) == "" {
 		return nil, interruptOut{}, fmt.Errorf("commandId is required")

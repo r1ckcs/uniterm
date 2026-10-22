@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
+
+	"github.com/ys-ll/uniterm/backend/appname"
 )
 
 // x11Forwarder owns the lifecycle of an SSH X11 forwarding session: the
@@ -525,7 +527,7 @@ func displayTargetString(display string) string {
 func xServerHint(goos string) string {
 	switch goos {
 	case "windows":
-		return "Windows: VcXsrv is bundled with uniTerm (plugins/vcxsrv). If missing, reinstall uniTerm."
+		return "Windows: VcXsrv is bundled with " + appname.Name + " (plugins/vcxsrv). If missing, reinstall " + appname.Name + "."
 	case "darwin":
 		return "macOS: install and start XQuartz, then try again."
 	default:

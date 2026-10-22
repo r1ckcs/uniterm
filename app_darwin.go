@@ -109,10 +109,10 @@ func detectExternalEditors() []ExternalEditorOption {
 	return out
 }
 
-// macBundleID is the app's bundle identifier. Wails derives the default
-// identifier from wails.json's "name" as com.wails.<name>, and this project
-// ships no custom build/darwin/Info.plist, so it resolves to com.wails.uniTerm.
-const macBundleID = "com.wails.uniTerm"
+// macBundleID is the app's bundle identifier: CFBundleIdentifier in
+// build/darwin/Info.plist (copied into the .app by darwin:create:app:bundle),
+// kept equal to productIdentifier in build/config.yml.
+const macBundleID = "br.com.netflex.flexterm"
 
 // configureMacKeyRepeat disables macOS's press-and-hold accent picker for this
 // app's bundle only, so that holding a key down produces continuous key-repeat

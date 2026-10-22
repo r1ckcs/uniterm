@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/ys-ll/uniterm/backend/appname"
 )
 
 const DefaultSessionLogFilenameTemplate = "%S_%H_%M%D_%h%m.log"
@@ -132,15 +134,15 @@ func removeAllTokensWithSeparator(template, token string) string {
 	}
 }
 
-// defaultSessionLogDir is the fallback log root: <home>/Documents/uniTerm/logs.
+// defaultSessionLogDir is the fallback log root: <home>/Documents/FlexTerm/logs.
 // Callers must MkdirAll before use. Returns a temp-dir path if the
 // user's home cannot be determined.
 func defaultSessionLogDir() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return filepath.Join(os.TempDir(), "uniTerm", "logs")
+		return filepath.Join(os.TempDir(), appname.DirName, "logs")
 	}
-	return filepath.Join(home, "Documents", "uniTerm", "logs")
+	return filepath.Join(home, "Documents", appname.DirName, "logs")
 }
 
 // DefaultSessionLogDir exposes the OS-default log directory for the

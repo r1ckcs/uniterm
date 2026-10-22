@@ -1,8 +1,8 @@
 ﻿Unicode true
 ManifestDPIAware true
 
-!define PRODUCT_NAME "uniTerm"
-!define BINARY "uniTerm.exe"
+!define PRODUCT_NAME "FlexTerm"
+!define BINARY "FlexTerm.exe"
 !ifndef VERSION
   !define VERSION "dev"
 !endif
@@ -12,9 +12,9 @@ ManifestDPIAware true
 
 Name "${PRODUCT_NAME}"
 !ifdef ARG_WAILS_AMD64_BINARY
-  OutFile "..\..\bin\uniTerm-amd64-installer.exe"
+  OutFile "..\..\bin\FlexTerm-amd64-installer.exe"
 !else
-  OutFile "..\..\bin\uniTerm-arm64-installer.exe"
+  OutFile "..\..\bin\FlexTerm-arm64-installer.exe"
 !endif
 InstallDir "$PROGRAMFILES64\${PRODUCT_NAME}"
 RequestExecutionLevel admin
@@ -25,7 +25,7 @@ SetCompressorDictSize 128
 !include "LogicLib.nsh"
 !define MUI_ABORTWARNING
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${BINARY}"
-; Launch uniTerm via Explorer on finish-page "Run" so it never inherits the
+; Launch FlexTerm via Explorer on finish-page "Run" so it never inherits the
 ; installer's elevated token. Admin is opted in explicitly by the user.
 !define MUI_FINISHPAGE_RUN_FUNCTION "LaunchUnelevated"
 
@@ -38,7 +38,7 @@ Function .onInit
   Call CheckAndCloseProcess
 FunctionEnd
 
-; Launch via Explorer (normal privileges) so uniTerm does not inherit the
+; Launch via Explorer (normal privileges) so FlexTerm does not inherit the
 ; installer's elevated token.
 Function LaunchUnelevated
   Exec 'explorer.exe "$INSTDIR\${BINARY}"'
@@ -97,7 +97,7 @@ Section "Install"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "DisplayName" "${PRODUCT_NAME}"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "UninstallString" '"$INSTDIR\uninstall.exe"'
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "DisplayIcon" '"$INSTDIR\${BINARY}"'
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "Publisher" "uniTerm"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "Publisher" "Netflex"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "DisplayVersion" "${VERSION}"
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "NoModify" 1
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "NoRepair" 1

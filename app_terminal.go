@@ -1266,7 +1266,7 @@ func (a *App) setSessionLogFilename(filenameTemplate string) {
 
 // GetDefaultSessionLogDir returns the directory a fresh session log
 // would land in: the user's override if set, otherwise the OS default
-// (~/Documents/uniTerm/logs on all platforms). Used by the settings UI
+// (~/Documents/FlexTerm/logs on all platforms). Used by the settings UI
 // to show the current default path as a placeholder.
 func (a *App) GetDefaultSessionLogDir() string {
 	a.sessionLogSettingsMu.RLock()

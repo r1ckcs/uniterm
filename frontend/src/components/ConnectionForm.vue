@@ -1,5 +1,6 @@
 <template>
   <el-dialog append-to-body v-model="visible" :title="isEdit ? t('conn.editTitle') : t('conn.newTitle')" width="43.75rem" class="conn-dialog" @opened="onDialogOpened" @closed="onDialogClosed">
+    <VaultChangedBadge v-if="isEdit && editConfig" :connection-id="editConfig.id" inline class="conn-vault-changed" />
     <div class="conn-layout">
       <!-- Left sidebar: category icons -->
       <div class="conn-categories">
@@ -728,6 +729,7 @@
 </template>
 
 <script setup lang="ts">
+import VaultChangedBadge from './VaultChangedBadge.vue'
 import { reactive, computed, watch, ref, nextTick, onMounted } from 'vue'
 import { useConnectionStore } from '../stores/connectionStore'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -2239,4 +2241,7 @@ function onConnect() {
   padding: 1rem 1.25rem;
 }
 .login-password { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; }
+.conn-vault-changed {
+  margin-bottom: 0.75rem;
+}
 </style>

@@ -75,7 +75,7 @@ jobs:
 
       # Match the desktop convention: uniterm-<os>-<arch>-<version>.apk
       - name: Rename artifact
-        run: cp bin/uniTerm.apk "bin/uniterm-android-arm64-${VERSION}.apk"
+        run: cp bin/FlexTerm.apk "bin/uniterm-android-arm64-${VERSION}.apk"
 
       - uses: actions/upload-artifact@v7
         with:

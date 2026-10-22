@@ -17,7 +17,7 @@ import (
 //	                    same env, then quit
 //	run 2 (new binary): check finds no newer version → log PASS → exit 0
 //
-// The verdict is observable in ~/.uniterm/uniterm.log:
+// The verdict is observable in ~/.flexterm/flexterm.log:
 //
 //	[autotest] APPLIED vX → vY
 //	[autotest] PASS: running latest vY

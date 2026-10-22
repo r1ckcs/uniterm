@@ -22,7 +22,7 @@ func (m *Manager) Apply(onProgress func(Progress)) error {
 // applyBinary replaces the running executable with newBinary using
 // minio/selfupdate (which handles the Windows locked-file rename dance and
 // Unix permission semantics). A backup copy of the current binary is kept at
-// <exe>.uniterm-old and removed on success or used for a best-effort rollback.
+// <exe>.flexterm-old and removed on success or used for a best-effort rollback.
 func applyBinary(newBinary string, onProgress func(Progress)) error {
 	if onProgress != nil {
 		onProgress(Progress{Phase: "applying", Total: -1})
@@ -33,7 +33,7 @@ func applyBinary(newBinary string, onProgress func(Progress)) error {
 		return err
 	}
 
-	backupPath := exe + ".uniterm-old"
+	backupPath := exe + ".flexterm-old"
 	backedUp := false
 	if data, err := os.ReadFile(exe); err == nil {
 		if werr := os.WriteFile(backupPath, data, 0755); werr == nil {

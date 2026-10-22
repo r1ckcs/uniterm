@@ -91,7 +91,7 @@ export interface TerminalSettings {
   // readable. 1 = xterm's no-op default = disabled.
   minimumContrast: number
   // Override for the session output log directory. Empty means the
-  // OS default under ~/Documents/uniTerm/logs.
+  // OS default under ~/Documents/FlexTerm/logs.
   sessionLogDir: string
   // Default local directory for files received with ZMODEM sz. Empty keeps
   // the existing behavior of asking for a directory on every transfer.
@@ -132,7 +132,7 @@ export interface AIModelConfig {
 }
 
 export const USER_AGENT_PRESETS: { label: string; value: string }[] = [
-  { label: 'uniTerm', value: 'uniTerm' },
+  { label: 'FlexTerm', value: 'FlexTerm' },
   { label: 'Claude Code', value: 'claude-code/1.0' },
   { label: 'Cursor', value: 'Cursor/1.0' },
   { label: 'Cline', value: 'Cline/1.0' },
@@ -393,8 +393,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
 export interface TerminalThemeEntry { label: string; value: string; type: 'dark' | 'light' }
 export const TERMINAL_THEMES: TerminalThemeEntry[] = [
-  { label: 'uniTerm Dark', value: 'uniterm-dark', type: 'dark' },
-  { label: 'uniTerm Light', value: 'uniterm-light', type: 'light' },
+  { label: 'FlexTerm Dark', value: 'uniterm-dark', type: 'dark' },
+  { label: 'FlexTerm Light', value: 'uniterm-light', type: 'light' },
   { label: 'Solarized Dark', value: 'solarized-dark', type: 'dark' },
   { label: 'Solarized Light', value: 'solarized-light', type: 'light' },
   { label: 'Monokai', value: 'monokai', type: 'dark' },

@@ -19,6 +19,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
+	"github.com/ys-ll/uniterm/backend/appname"
 	"github.com/ys-ll/uniterm/backend/log"
 	"github.com/ys-ll/uniterm/backend/session"
 	"github.com/ys-ll/uniterm/backend/store"
@@ -65,6 +66,10 @@ func main() {
 		return
 	}
 
+	// First FlexTerm start: copy the pre-rename uniTerm folders (config dir
+	// and ~/.uniterm) before anything opens them. Logged once the log is up.
+	migrateErrs := appname.MigrateLegacyDirs()
+
 	// Single-instance relaunch: RelaunchApp/autotest set relaunchPending and
 	// quit; the successor is spawned after Run() returns, once the lock is
 	// released.
@@ -83,6 +88,9 @@ func main() {
 		println("Failed to init log:", err.Error())
 	}
 	defer log.Close()
+	for _, err := range migrateErrs {
+		log.Writef("legacy folder migration: %v", err)
+	}
 
 	// F-201: expose net/http/pprof on localhost:6060 for dev builds only.
 	// Production builds (wails build) leave Version unchanged from "dev"
@@ -90,7 +98,7 @@ func main() {
 	// not open a listener.
 	startPprofIfDev()
 
-	webviewDataPath := filepath.Join(os.TempDir(), fmt.Sprintf("uniTerm-webview2-%d", os.Getpid()))
+	webviewDataPath := filepath.Join(os.TempDir(), fmt.Sprintf("%s-webview2-%d", appname.Name, os.Getpid()))
 	os.MkdirAll(webviewDataPath, 0700)
 
 	app := NewApp(webviewDataPath)
@@ -120,7 +128,7 @@ func main() {
 	}()
 
 	if configDir, err := os.UserConfigDir(); err == nil {
-		ls := store.NewLocalStateStore(filepath.Join(configDir, "uniTerm"))
+		ls := store.NewLocalStateStore(filepath.Join(configDir, appname.DirName))
 		done := make(chan store.LocalState, 1)
 		go func() {
 			if state, err := ls.Load(); err == nil {
@@ -175,7 +183,7 @@ func main() {
 	var window *application.WebviewWindow
 
 	w3app := application.New(application.Options{
-		Name:       "uniTerm",
+		Name:       appname.Name,
 		Assets:     application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
 		OnShutdown: app.shutdown,
 		// Single-instance: a second GUI launch acquires the OS lock, notifies
@@ -208,12 +216,12 @@ func main() {
 			// Wails' disabled SmartScreen protection.
 			DisabledFeatures: []string{"AutofillAiWalletPrivatePasses"},
 		},
-		// Fixed program name so the window's WM_CLASS stays "uniterm" — the
+		// Fixed program name so the window's WM_CLASS stays "flexterm" — the
 		// installed package's .desktop file sets StartupWMClass to the same
 		// value, which is what lets the dock/taskbar associate the running
 		// window with the app icon.
 		Linux: application.LinuxOptions{
-			ProgramName: "uniterm",
+			ProgramName: "flexterm",
 		},
 	})
 
@@ -241,7 +249,7 @@ func main() {
 	}
 
 	window = w3app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:           "uniTerm",
+		Title:           appname.Name,
 		Width:           winW,
 		Height:          winH,
 		X:               savedX,
@@ -471,7 +479,7 @@ const (
 func setupTray(w3app *application.App, app *App, window *application.WebviewWindow, lang string) {
 	tray := w3app.SystemTray.New()
 	applyTrayIcon(tray)
-	tray.SetTooltip("uniTerm")
+	tray.SetTooltip(appname.Name)
 
 	menu := application.NewMenu()
 	menu.Add(trayLabel(lang, trayShow)).OnClick(func(*application.Context) {

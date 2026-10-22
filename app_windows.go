@@ -16,6 +16,7 @@ import (
 	"unicode/utf16"
 	"unsafe"
 
+	"github.com/ys-ll/uniterm/backend/appname"
 	"github.com/ys-ll/uniterm/backend/platform"
 	"github.com/ys-ll/uniterm/backend/session"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -301,7 +302,7 @@ func (a *App) findMainWindow() uintptr {
 		// Verify it has our window title so we don't pick up invisible helper windows.
 		buf := make([]uint16, 256)
 		procGetWindowTextW.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&buf[0])), 255)
-		if windows.UTF16ToString(buf) == "uniTerm" {
+		if windows.UTF16ToString(buf) == appname.Name {
 			result = uintptr(hwnd)
 			return 0 // stop
 		}

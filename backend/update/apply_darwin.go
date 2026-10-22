@@ -15,7 +15,7 @@ func (m *Manager) applyPlatform(pend *PendingUpdate, onProgress func(Progress)) 
 	if err := applyBinary(pend.NewBinary, onProgress); err != nil {
 		return err
 	}
-	// Replacing Contents/MacOS/uniTerm invalidates the bundle signature.
+	// Replacing Contents/MacOS/FlexTerm invalidates the bundle signature.
 	// Releases ship ad-hoc signed, so re-apply an ad-hoc signature.
 	reSignBundle()
 	return nil

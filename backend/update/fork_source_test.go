@@ -18,6 +18,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/ys-ll/uniterm/backend/appname"
 )
 
 // recordingTransport answers every request with 404 and remembers the URLs.
@@ -116,12 +118,12 @@ func TestUpstreamCacheIsIgnoredAndRemoved(t *testing.T) {
 		Timestamp: time.Now(),
 	}
 	data, _ := json.Marshal(stale)
-	if err := os.MkdirAll(filepath.Join(dir, "uniTerm"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, appname.DirName), 0755); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range append(legacyCacheFiles, filepath.Base(cachePath())) {
 		// The last one simulates a same-named file without the repo pin.
-		if err := os.WriteFile(filepath.Join(dir, "uniTerm", name), data, 0600); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, appname.DirName, name), data, 0600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -134,7 +136,7 @@ func TestUpstreamCacheIsIgnoredAndRemoved(t *testing.T) {
 		t.Fatalf("stale upstream cache was served: %+v", info)
 	}
 	for _, name := range legacyCacheFiles {
-		if _, err := os.Stat(filepath.Join(dir, "uniTerm", name)); !os.IsNotExist(err) {
+		if _, err := os.Stat(filepath.Join(dir, appname.DirName, name)); !os.IsNotExist(err) {
 			t.Errorf("legacy cache %s was not removed", name)
 		}
 	}

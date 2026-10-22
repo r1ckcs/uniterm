@@ -9,7 +9,19 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 )
 
-const keychainService = "uniTerm"
+// keychainService is the current Keychain/keyring service. Items written by
+// builds from before the FlexTerm rename live under legacyKeychainService:
+// Get falls back to it once per key, copies the value forward and leaves the
+// old item in place (a downgrade still finds it).
+const (
+	keychainService       = "FlexTerm"
+	legacyKeychainService = "uniTerm"
+)
+
+// legacyDoneKey marks a key whose legacy item must no longer be consulted:
+// it was migrated, or deleted under the new name. Without the marker a
+// deleted key would come back from the untouched legacy item.
+func legacyDoneKey(key string) string { return "legacy-done:" + key }
 
 const (
 	pbkdf2Iterations = 600000
@@ -22,7 +34,22 @@ type Keychain struct{}
 func NewKeychain() *Keychain { return &Keychain{} }
 
 func (k *Keychain) Get(key string) (string, error) {
-	return keychainGet(keychainService, key)
+	v, err := keychainGet(keychainService, key)
+	if err == nil {
+		return v, nil
+	}
+	if _, done := keychainGet(keychainService, legacyDoneKey(key)); done == nil {
+		return "", err
+	}
+	old, legacyErr := keychainGet(legacyKeychainService, key)
+	if legacyErr != nil {
+		return "", err
+	}
+	// Best effort: a failed copy only means the fallback runs again next time.
+	if keychainSet(keychainService, key, old) == nil {
+		_ = keychainSet(keychainService, legacyDoneKey(key), "1")
+	}
+	return old, nil
 }
 
 func (k *Keychain) Set(key, value string) error {
@@ -30,6 +57,7 @@ func (k *Keychain) Set(key, value string) error {
 }
 
 func (k *Keychain) Delete(key string) error {
+	_ = keychainSet(keychainService, legacyDoneKey(key), "1")
 	return keychainDelete(keychainService, key)
 }
 

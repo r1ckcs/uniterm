@@ -82,9 +82,9 @@ jobs:
           pkg-config --modversion webkit2gtk-4.0 || true
           wails3 build GOOS=linux VERSION="$VERSION"   # native CGO build on rocky8
           # Sanity: binary must not require glibc newer than 2.28
-          if command -v objdump >/dev/null && [ -f bin/uniTerm ]; then
+          if command -v objdump >/dev/null && [ -f bin/FlexTerm ]; then
             echo "GLIBC symbols required by binary:"
-            objdump -T bin/uniTerm 2>/dev/null | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -5 || true
+            objdump -T bin/FlexTerm 2>/dev/null | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -5 || true
           fi
 
       - name: Package
@@ -93,11 +93,11 @@ jobs:
           NFPM_ARCH=x86_64
           PKG_SUFFIX="${ARCH}-webkit40"
 
-          upx --best --lzma bin/uniTerm
+          upx --best --lzma bin/FlexTerm
 
           cd bin
-          chmod +x uniTerm
-          tar czf ../../uniterm-linux-${PKG_SUFFIX}-${VERSION}.tar.gz uniTerm
+          chmod +x FlexTerm
+          tar czf ../../uniterm-linux-${PKG_SUFFIX}-${VERSION}.tar.gz FlexTerm
           cd ..
 
           NFPM_VER="2.46.3"
@@ -107,11 +107,11 @@ jobs:
           chmod +x /usr/local/bin/nfpm
 
           cat > nfpm.yaml << EOF
-          name: uniterm
+          name: flexterm
           arch: ${ARCH}
           platform: linux
           version: ${VERSION}
-          maintainer: uniTerm <uniTerm@uniterm.net>
+          maintainer: Netflex <noc@netflex.local>
           description: Lightweight all-in-one terminal emulator (WebKit 4.0 / glibc 2.28 / Kylin)
           homepage: https://uniterm.net
           license: Proprietary
@@ -124,10 +124,10 @@ jobs:
                 - gtk3
                 - webkit2gtk3
           contents:
-            - src: bin/uniTerm
-              dst: /usr/bin/uniterm
-            - src: build/linux/uniTerm.desktop
-              dst: /usr/share/applications/uniterm.desktop
+            - src: bin/FlexTerm
+              dst: /usr/bin/flexterm
+            - src: build/linux/FlexTerm.desktop
+              dst: /usr/share/applications/flexterm.desktop
             - src: build/linux/icons/hicolor
               dst: /usr/share/icons/hicolor
           EOF
@@ -141,7 +141,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: uniTerm-linux-amd64-webkit40
+          name: FlexTerm-linux-amd64-webkit40
           path: |
             uniterm-linux-amd64-webkit40-*.tar.gz
             uniterm-linux-amd64-webkit40-*.deb
@@ -161,7 +161,7 @@ jobs:
             ```bash
             sudo yum install -y gtk3 webkit2gtk3
             sudo rpm -Uvh uniterm-linux-amd64-webkit40-*.rpm
-            uniterm
+            flexterm
             ```
           files: |
             uniterm-linux-amd64-webkit40-*.tar.gz

@@ -5,12 +5,12 @@ version: '3'
 
 # This information is used to generate the build assets.
 info:
-  companyName: "uniTerm"
-  productName: "uniTerm"
-  productIdentifier: "net.uniterm.uniterm"
-  description: "uniTerm - a multi-protocol remote connection terminal"
-  copyright: "(c) uniTerm"
-  comments: "uniTerm"
+  companyName: "FlexTerm"
+  productName: "FlexTerm"
+  productIdentifier: "br.com.netflex.flexterm"
+  description: "FlexTerm - a multi-protocol remote connection terminal (fork of uniTerm)"
+  copyright: "(c) uniTerm authors; FlexTerm modifications (c) Netflex"
+  comments: "FlexTerm, a fork of uniTerm (ys-ll/uniterm)"
   version: "0.1.0"
   # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
   #                               # Should match the name of your .icon file without the extension

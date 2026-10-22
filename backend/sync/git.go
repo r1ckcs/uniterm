@@ -15,6 +15,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	gittransport "github.com/go-git/go-git/v5/plumbing/transport"
 	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
+
+	"github.com/ys-ll/uniterm/backend/appname"
 )
 
 type GitRepo struct {
@@ -119,8 +121,8 @@ func (g *GitRepo) StageAndCommit(msg string) (bool, error) {
 
 	_, err = wt.Commit(msg, &git.CommitOptions{
 		Author: &object.Signature{
-			Name:  "uniTerm",
-			Email: "uniterm@local",
+			Name:  appname.Name,
+			Email: "flexterm@local",
 			When:  time.Now(),
 		},
 	})

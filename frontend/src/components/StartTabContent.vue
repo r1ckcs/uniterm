@@ -2,7 +2,7 @@
   <div ref="startTabRef" class="start-tab">
     <div class="start-content" :style="contentStyle">
       <!-- Branding -->
-      <div class="start-brand" v-show="!searchQuery.trim()">uniTerm</div>
+      <div class="start-brand" v-show="!searchQuery.trim()">FlexTerm</div>
 
       <!-- Search row -->
     <div class="start-search-row">

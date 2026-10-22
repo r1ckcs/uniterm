@@ -102,7 +102,7 @@ jobs:
 
       # Regenerate the gitignored build assets (build/windows/info.json +
       # manifest, darwin Info.plist, linux nfpm.yaml) from build/config.yml.
-      # A fresh checkout has only icon.ico/uniterm.desktop committed, and
+      # A fresh checkout has only icon.ico/FlexTerm.desktop committed, and
       # generate:syso + app-bundle/nfpm all need these.
       - name: Update build assets
         shell: bash
@@ -117,10 +117,10 @@ jobs:
         shell: bash
         run: |
           export PATH="$(go env GOPATH)/bin:$PATH"
-          wails3 build VERSION="$VERSION"                 # bin/uniTerm.exe (amd64)
-          mv bin/uniTerm.exe bin/uniTerm-amd64.exe
-          wails3 build VERSION="$VERSION" ARCH=arm64      # bin/uniTerm.exe (arm64)
-          mv bin/uniTerm.exe bin/uniTerm-arm64.exe
+          wails3 build VERSION="$VERSION"                 # bin/FlexTerm.exe (amd64)
+          mv bin/FlexTerm.exe bin/FlexTerm-amd64.exe
+          wails3 build VERSION="$VERSION" ARCH=arm64      # bin/FlexTerm.exe (arm64)
+          mv bin/FlexTerm.exe bin/FlexTerm-arm64.exe
           echo "AMD64|ARM64 built:"; ls -la bin/
 
       - name: Build (Linux)
@@ -128,12 +128,12 @@ jobs:
         shell: bash
         run: |
           export PATH="$(go env GOPATH)/bin:$PATH"
-          # Native CGO build on the matching-arch runner → bin/uniTerm.
+          # Native CGO build on the matching-arch runner → bin/FlexTerm.
           # gtk3 = legacy WebKit2GTK 4.1 stack (the only one ubuntu-24.04 provides).
           pkg-config --modversion webkit2gtk-4.1
           wails3 build GOOS=linux VERSION="$VERSION" EXTRA_TAGS=gtk3
-          chmod +x bin/uniTerm
-          echo "Linux binary:"; ls -la bin/uniTerm
+          chmod +x bin/FlexTerm
+          echo "Linux binary:"; ls -la bin/FlexTerm
 
       - name: Build (macOS)
         if: matrix.slug == 'darwin'
@@ -145,18 +145,18 @@ jobs:
           # into its own dmg below (matches the v1.8.0 single-arch dmgs).
           wails3 task darwin:build:universal VERSION="$VERSION"
           for arch in amd64 arm64; do
-            cp "bin/uniTerm-$arch" bin/uniTerm
+            cp "bin/FlexTerm-$arch" bin/FlexTerm
             wails3 task darwin:create:app:bundle
-            mv bin/uniTerm.app "bin/uniTerm-$arch.app"
+            mv bin/FlexTerm.app "bin/FlexTerm-$arch.app"
           done
-          ls -la bin/uniTerm-amd64.app/Contents/MacOS bin/uniTerm-arm64.app/Contents/MacOS
+          ls -la bin/FlexTerm-amd64.app/Contents/MacOS bin/FlexTerm-arm64.app/Contents/MacOS
 
           # Self-update payloads: bare app-bundle binary per arch, matching
           # what the in-app updater downloads, verifies and ad-hoc re-signs.
-          # -j junk-paths so the zip root holds just the "uniTerm" executable.
+          # -j junk-paths so the zip root holds just the "FlexTerm" executable.
           for arch in amd64 arm64; do
             zip -q -j "uniterm-darwin-${arch}-${VERSION}.zip" \
-              "bin/uniTerm-${arch}.app/Contents/MacOS/uniTerm"
+              "bin/FlexTerm-${arch}.app/Contents/MacOS/FlexTerm"
           done
           ls -la uniterm-darwin-*.zip
 
@@ -168,14 +168,14 @@ jobs:
           # separate volume and hdiutil regularly ran out of space there for a
           # large .app. Fall back to a zipped .app when hdiutil still fails.
           for arch in amd64 arm64; do
-            APP="bin/uniTerm-$arch.app"
-            chmod +x "$APP/Contents/MacOS/uniTerm"
+            APP="bin/FlexTerm-$arch.app"
+            chmod +x "$APP/Contents/MacOS/FlexTerm"
 
             STAGE="${{ github.workspace }}/dmg_staging_${arch}"
             mkdir -p "$STAGE"
-            cp -R "$APP" "$STAGE/uniTerm.app"
+            cp -R "$APP" "$STAGE/FlexTerm.app"
             ln -s /Applications "$STAGE/Applications"
-            if hdiutil create -volname uniTerm -srcfolder "$STAGE" -ov -format UDZO "uniterm-darwin-${arch}-${VERSION}.dmg"; then
+            if hdiutil create -volname FlexTerm -srcfolder "$STAGE" -ov -format UDZO "uniterm-darwin-${arch}-${VERSION}.dmg"; then
               echo "dmg created ($arch)"
             else
               # Same filename as the bare-binary zip above — the fallback
@@ -211,8 +211,8 @@ jobs:
           $env:Path = "C:\Program Files (x86)\NSIS\Bin;$env:Path"
           $VERSION = "${{ env.VERSION }}"
           $ROOT = $env:GITHUB_WORKSPACE
-          $AMD64_BIN = Join-Path $ROOT 'bin\uniTerm-amd64.exe'
-          $ARM64_BIN = Join-Path $ROOT 'bin\uniTerm-arm64.exe'
+          $AMD64_BIN = Join-Path $ROOT 'bin\FlexTerm-amd64.exe'
+          $ARM64_BIN = Join-Path $ROOT 'bin\FlexTerm-arm64.exe'
           $NSI = Join-Path $ROOT 'build\windows\installer\project.nsi'
 
           # compress amd64 with upx; arm64 is left uncompressed because
@@ -230,12 +230,12 @@ jobs:
           & makensis "-DVERSION=$VERSION" "-DARG_WAILS_ARM64_BINARY=$ARM64_BIN" "-DVCXSRV_DIR=$VCXSRV_DIR" $NSI
 
           foreach ($arch in @('amd64', 'arm64')) {
-            $srcExe = Join-Path $ROOT "bin\uniTerm-$arch.exe"
-            $srcInstaller = Join-Path $ROOT "build\bin\uniTerm-$arch-installer.exe"
+            $srcExe = Join-Path $ROOT "bin\FlexTerm-$arch.exe"
+            $srcInstaller = Join-Path $ROOT "build\bin\FlexTerm-$arch-installer.exe"
 
             # portable zip
             New-Item -ItemType Directory -Force -Path dist_tmp | Out-Null
-            Copy-Item $srcExe "dist_tmp\uniTerm.exe"
+            Copy-Item $srcExe "dist_tmp\FlexTerm.exe"
             Copy-Item -Recurse $VCXSRV_DIR "dist_tmp\plugins\vcxsrv"
             Compress-Archive -Path dist_tmp\* -DestinationPath "uniterm-windows-$arch-portable-$VERSION.zip" -Force
             Remove-Item -Recurse -Force dist_tmp
@@ -249,10 +249,10 @@ jobs:
         run: |
           ARCH=${{ matrix.slug == 'linux-amd64' && 'amd64' || 'arm64' }}
           NFPM_ARCH=${{ matrix.slug == 'linux-amd64' && 'x86_64' || 'arm64' }}
-          upx --best --lzma bin/uniTerm
+          upx --best --lzma bin/FlexTerm
 
           cd bin
-          tar czf ../uniterm-linux-${ARCH}-${VERSION}.tar.gz uniTerm
+          tar czf ../uniterm-linux-${ARCH}-${VERSION}.tar.gz FlexTerm
           cd ..
 
           NFPM_VER="2.46.3"
@@ -262,11 +262,11 @@ jobs:
           chmod +x /usr/local/bin/nfpm
 
           cat > nfpm.yaml << EOF
-          name: uniterm
+          name: flexterm
           arch: ${ARCH}
           platform: linux
           version: ${VERSION}
-          maintainer: uniTerm <uniTerm@uniterm.net>
+          maintainer: Netflex <noc@netflex.local>
           description: Lightweight all-in-one terminal emulator with built-in AI Agent
           homepage: https://uniterm.net
           license: Proprietary
@@ -279,10 +279,10 @@ jobs:
                 - gtk3
                 - webkit2gtk4.1
           contents:
-            - src: bin/uniTerm
-              dst: /usr/bin/uniterm
-            - src: build/linux/uniTerm.desktop
-              dst: /usr/share/applications/uniterm.desktop
+            - src: bin/FlexTerm
+              dst: /usr/bin/flexterm
+            - src: build/linux/FlexTerm.desktop
+              dst: /usr/share/applications/flexterm.desktop
             - src: build/linux/icons/hicolor
               dst: /usr/share/icons/hicolor
           EOF
@@ -295,7 +295,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: uniTerm-${{ matrix.slug }}
+          name: FlexTerm-${{ matrix.slug }}
           path: |
             uniterm-*.zip
             uniterm-*.tar.gz
