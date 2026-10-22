@@ -31,11 +31,14 @@ type Status struct {
 	Device        DeviceInfo   `json:"device"`
 	PendingJoin   *PendingJoin `json:"pendingJoin,omitempty"`
 	RecoveryCheck []int        `json:"recoveryCheck,omitempty"`
-	LastSyncAt    string       `json:"lastSyncAt,omitempty"`
-	Syncing       bool         `json:"syncing"`
-	Offline       bool         `json:"offline"`
-	PendingOps    int          `json:"pendingOps"`
-	Error         *ErrorInfo   `json:"error,omitempty"`
+	// RecoveryRegen: showRecovery is replacing the key of an open vault
+	// (VaultRegenerateRecovery), not creating one; it can be cancelled.
+	RecoveryRegen bool       `json:"recoveryRegen"`
+	LastSyncAt    string     `json:"lastSyncAt,omitempty"`
+	Syncing       bool       `json:"syncing"`
+	Offline       bool       `json:"offline"`
+	PendingOps    int        `json:"pendingOps"`
+	Error         *ErrorInfo `json:"error,omitempty"`
 }
 
 type Account struct {

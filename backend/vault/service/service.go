@@ -89,6 +89,8 @@ type Service struct {
 	draftV     *vault.Vault
 	words      []string
 	check      []int // 1-based positions
+	// regen: the words replace the recovery key of the open vault s.v
+	regen bool
 
 	// new device
 	joiner       *join.Joiner
@@ -261,6 +263,7 @@ func (s *Service) statusLocked() Status {
 		}
 	}
 	if s.phase == PhaseShowRecovery {
+		st.RecoveryRegen = s.regen
 		for _, p := range s.check {
 			st.RecoveryCheck = append(st.RecoveryCheck, p-1)
 		}
@@ -525,11 +528,84 @@ func (s *Service) ConfirmRecovery(idx []int, answers []string) error {
 	if len(idx) != len(s.check) || !slices.Equal(pos, s.check) || !recovery.Check(s.words, pos, answers) {
 		return newError(CodeRecoveryMismatch, "the words do not match")
 	}
+	if s.regen {
+		return s.finishRegenLocked()
+	}
 	if err := s.publishDraftLocked(); err != nil {
 		return s.failLocked(err)
 	}
 	s.words, s.check, s.draft, s.draftV, s.draftState = nil, nil, nil, nil, nil
 	return s.openLocked()
+}
+
+// RegenerateRecovery (admin) starts replacing the recovery key: the new
+// words are shown and confirmed like at creation (phase showRecovery with
+// recoveryRegen), and only then the new key and its anchor are written and
+// the old key revoked. Until then the old phrase keeps working; cancelling
+// or quitting changes nothing. Needed after revoking an admin
+// (RevokeResult.RecoveryStale): the old anchor predates the revocation.
+func (s *Service) RegenerateRecovery() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.phase != PhaseReady || s.v == nil {
+		return newError(CodeWrongPhase, "the vault is not open")
+	}
+	// Decide on the current roster (this device may have been revoked or
+	// demoted since the last sync).
+	if err := s.v.Refresh(); errors.Is(err, vault.ErrNotMember) {
+		_ = s.revokedLocked()
+		s.emitStatusLocked()
+		return newError(CodeRevoked, "this device was removed from the vault")
+	} else if err != nil {
+		return s.failLocked(err)
+	}
+	if !s.isAdminLocked() {
+		return newError(CodeNotAdmin, "only an admin replaces the recovery key")
+	}
+	words, _, err := recovery.Generate()
+	if err != nil {
+		return asError(err)
+	}
+	check, err := recovery.Challenge(3)
+	if err != nil {
+		return asError(err)
+	}
+	s.words, s.check, s.regen = words, check, true
+	s.lastErr = nil
+	s.setPhaseLocked(PhaseShowRecovery)
+	return nil
+}
+
+// CancelRecovery abandons a recovery key replacement (the old key stays).
+func (s *Service) CancelRecovery() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.phase != PhaseShowRecovery || !s.regen {
+		return newError(CodeWrongPhase, "no recovery key replacement in progress")
+	}
+	s.words, s.check, s.regen = nil, nil, false
+	s.setPhaseLocked(PhaseReady)
+	return nil
+}
+
+func (s *Service) finishRegenLocked() error {
+	var err error
+	for range 3 {
+		if err = recovery.SetupWithWords(s.store, s.v, s.words); !errors.Is(err, vault.ErrLostRace) {
+			break
+		}
+		_ = s.v.Refresh()
+	}
+	if err != nil {
+		// Still in showRecovery with the same words: confirming again
+		// resumes where it stopped.
+		return s.failLocked(err)
+	}
+	s.words, s.check, s.regen = nil, nil, false
+	s.lastErr = nil
+	s.setPhaseLocked(PhaseReady)
+	s.kickSync()
+	return nil
 }
 
 // publishDraftLocked copies every drafted object (rosters, wraps, the
