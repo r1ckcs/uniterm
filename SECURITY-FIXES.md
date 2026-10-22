@@ -32,7 +32,7 @@ Branch: `security/hardening`.
 
 ## Não corrigido (e por quê)
 
-- **Chave de assinatura das releases**: o código de verificação está pronto (22/10/2026), mas a chave ed25519 ainda não existe. Enquanto o build não embutir `releasePublicKey`, o app pode avisar que há versão nova do fork (e abrir a página da release), mas **nunca instala sozinho**. Para publicar: gerar o par offline, assinar `checksums.txt` → `checksums.txt.sig` (64 bytes crus ou base64) e compilar com a chave pública.
+- **Chave de assinatura das releases**: verificação e ferramentas prontas (22/10/2026; ver `RELEASES.md`: geração e assinatura em máquina offline, `build/release-pubkey.txt` embutido pelos Taskfiles, `wails3 task release:package/verify/publish`), mas a chave ed25519 ainda não foi gerada. Enquanto `build/release-pubkey.txt` não existir, o app pode avisar que há versão nova do fork, mas **nunca instala sozinho**.
 - **Checagem automática de atualização**: desligada por padrão desde 22/10/2026 (o fork não tem releases; ligar só geraria tráfego). Quem já tinha `autoCheckUpdate: true` gravado continua checando — agora só o fork.
 - **Links do upstream que ficaram**: "Página inicial" e "Manual" em Sobre abrem `uniterm.net` no navegador (só documentação, nada é enviado); README/CONTRIBUTING/workflows de CI citam `ys-ll` (não rodam no app). O caminho de módulo Go `github.com/ys-ll/uniterm` é só nome de import.
 - **RDP**: a verificação de certificado ainda fica a cargo do ActiveX, e o app clica sozinho nos diálogos de segurança do próprio processo. `RedirectDrives` segue ligado. Mudar isso exige testar em Windows.

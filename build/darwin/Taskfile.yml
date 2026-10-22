@@ -11,6 +11,12 @@ vars:
   # Empty for dev builds (main.Version stays "dev").
   VERSION: '{{.VERSION | default ""}}'
 
+  # Base64 ed25519 release public key (RELEASES.md), embedded into the
+  # updater. Empty when build/release-pubkey.txt is absent: the build then
+  # never installs updates (fail-closed).
+  RELEASE_PUBKEY:
+    sh: cat "{{.ROOT_DIR}}/build/release-pubkey.txt" 2>/dev/null || true
+
 tasks:
   build:
     summary: Builds the application
@@ -48,7 +54,7 @@ tasks:
     cmds:
       - '{{if eq .OBFUSCATED "true"}}garble {{.GARBLE_ARGS}} build{{else}}go build{{end}} {{.BUILD_FLAGS}} -o "{{.OUTPUT}}"'
     vars:
-      BUILD_FLAGS: '{{if eq .DEV "true"}}{{if or .EXTRA_TAGS (eq .OBFUSCATED "true")}}-tags {{if eq .OBFUSCATED "true"}}wails_obfuscated{{if .EXTRA_TAGS}},{{end}}{{end}}{{.EXTRA_TAGS}} {{end}}-buildvcs=false -gcflags=all="-l"{{else}}-tags production{{if eq .OBFUSCATED "true"}},wails_obfuscated{{end}}{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -trimpath -buildvcs=false -ldflags="-w -s{{if .VERSION}} -X main.Version={{.VERSION}}{{end}}"{{end}}'
+      BUILD_FLAGS: '{{if eq .DEV "true"}}{{if or .EXTRA_TAGS (eq .OBFUSCATED "true")}}-tags {{if eq .OBFUSCATED "true"}}wails_obfuscated{{if .EXTRA_TAGS}},{{end}}{{end}}{{.EXTRA_TAGS}} {{end}}-buildvcs=false -gcflags=all="-l"{{else}}-tags production{{if eq .OBFUSCATED "true"}},wails_obfuscated{{end}}{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -trimpath -buildvcs=false -ldflags="-w -s{{if .VERSION}} -X main.Version={{.VERSION}}{{end}}{{if .RELEASE_PUBKEY}} -X github.com/ys-ll/uniterm/backend/update.releasePublicKey={{.RELEASE_PUBKEY}}{{end}}"{{end}}'
       DEFAULT_OUTPUT: '{{.BIN_DIR}}/{{.APP_NAME}}'
       OUTPUT: '{{ .OUTPUT | default .DEFAULT_OUTPUT }}'
     env:

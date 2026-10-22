@@ -367,11 +367,29 @@ func fetchAssetBytes(ctx context.Context, rel *release, name string) ([]byte, bo
 	return nil, false
 }
 
-// verifyChecksumsSignature checks sig (raw 64 bytes or base64 text) over data
-// against the compiled-in release key. No key → never verified.
-func verifyChecksumsSignature(data, sig []byte) bool {
-	key, err := base64.StdEncoding.DecodeString(strings.TrimSpace(releasePublicKey))
-	if err != nil || len(key) != ed25519.PublicKeySize {
+// EmbeddedReleasePublicKey returns the release key compiled into this build
+// ("" when none). The release tooling uses it to prove the -ldflags -X path
+// is right: a wrong path silently leaves the key empty.
+func EmbeddedReleasePublicKey() string { return strings.TrimSpace(releasePublicKey) }
+
+// ParsePublicKey decodes a base64 ed25519 public key (32 raw bytes).
+func ParsePublicKey(b64 string) (ed25519.PublicKey, error) {
+	key, err := base64.StdEncoding.DecodeString(strings.TrimSpace(b64))
+	if err != nil {
+		return nil, fmt.Errorf("release public key: %w", err)
+	}
+	if len(key) != ed25519.PublicKeySize {
+		return nil, fmt.Errorf("release public key: want %d bytes, got %d", ed25519.PublicKeySize, len(key))
+	}
+	return ed25519.PublicKey(key), nil
+}
+
+// VerifyChecksumsSignature checks sig (raw 64 bytes or base64 text) over
+// data against the base64 public key pubB64. An empty or malformed key never
+// verifies.
+func VerifyChecksumsSignature(pubB64 string, data, sig []byte) bool {
+	key, err := ParsePublicKey(pubB64)
+	if err != nil {
 		return false
 	}
 	if len(sig) != ed25519.SignatureSize {
@@ -381,7 +399,13 @@ func verifyChecksumsSignature(data, sig []byte) bool {
 		}
 		sig = dec
 	}
-	return len(sig) == ed25519.SignatureSize && ed25519.Verify(ed25519.PublicKey(key), data, sig)
+	return len(sig) == ed25519.SignatureSize && ed25519.Verify(key, data, sig)
+}
+
+// verifyChecksumsSignature checks sig against the compiled-in release key.
+// No key → never verified.
+func verifyChecksumsSignature(data, sig []byte) bool {
+	return VerifyChecksumsSignature(releasePublicKey, data, sig)
 }
 
 // fetchChecksums downloads checksums.txt and checksums.txt.sig from the
