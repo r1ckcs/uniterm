@@ -10,6 +10,8 @@ interface SessionData {
   // Detected remote OS (e.g. "windows-openssh") reported by the backend on
   // connect. Empty when unknown or not applicable.
   remoteOS?: string
+  // Epoch ms of the last transition into 'connected' (status bar uptime).
+  connectedAt?: number
   data: string[]
   // Monotonically increasing count of chunks ever appended to this session.
   // Unlike data.length, it is NOT reset when `data` is trimmed from the front,
@@ -61,6 +63,14 @@ function pushChunk(s: SessionData, chunk: string) {
   }
 }
 
+// Keeps connectedAt in step with the status: stamped on entering
+// 'connected', cleared on leaving it.
+function setStatus(s: SessionData, status: SessionStatus) {
+  if (status === 'connected' && s.status !== 'connected') s.connectedAt = Date.now()
+  else if (status !== 'connected') s.connectedAt = undefined
+  s.status = status
+}
+
 // Module-level reactive state (shared across all store instances)
 const sessionState = reactive<{
   sessions: Map<string, SessionData>
@@ -81,7 +91,7 @@ unsubSessionStatus =Events.On('session:status', (ev) => { const payload: { id: s
     s = { id: payload.id, status: 'connecting', data: [], seq: 0, bytes: 0 }
     sessionState.sessions.set(payload.id, s)
   }
-  s.status = payload.status
+  setStatus(s, payload.status)
   if (payload.remoteOS !== undefined) {
     s.remoteOS = payload.remoteOS
   }
@@ -129,8 +139,12 @@ export const useSessionStore = defineStore('session', () => {
   function updateStatus(id: string, status: SessionStatus) {
     const s = sessionState.sessions.get(id)
     if (s) {
-      s.status = status
+      setStatus(s, status)
     }
+  }
+
+  function getConnectedAt(id: string): number | undefined {
+    return sessionState.sessions.get(id)?.connectedAt
   }
 
   function getStatus(id: string): SessionStatus {
@@ -213,6 +227,7 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   return {
+    getConnectedAt,
     sessions: sessionState.sessions,
     initSession,
     updateStatus,

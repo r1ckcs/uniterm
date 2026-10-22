@@ -1788,3 +1788,9 @@ html[data-theme^="flexterm"] .el-table__body tr.el-table__row--striped.current-r
   font-family: var(--font-mono);
   font-size: 0.625rem;
 }
+/* Tab icons that use the accent (broadcast, transfer) sit on the header
+   color, where the light theme's navy accent disappears. */
+html[data-theme^="flexterm"] .app-header .tab-item .tab-broadcast-icon,
+html[data-theme^="flexterm"] .app-header .tab-item .transfer-indicator {
+  color: var(--header-text);
+}

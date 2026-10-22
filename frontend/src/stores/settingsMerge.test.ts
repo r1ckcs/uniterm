@@ -4,10 +4,11 @@ import { DEFAULT_SETTINGS, type AppSettings } from '../types/settings'
 
 describe('mergeSettings', () => {
   it('keeps optional fields whose absence has a meaning', () => {
-    const loaded = { ...DEFAULT_SETTINGS, listDensity: 'compact', connStatusCheck: false } as AppSettings
+    const loaded = { ...DEFAULT_SETTINGS, listDensity: 'compact', connStatusCheck: false, terminalStatusBar: false } as AppSettings
     const merged = mergeSettings(loaded)
     expect(merged.listDensity).toBe('compact')
     expect(merged.connStatusCheck).toBe(false)
+    expect(merged.terminalStatusBar).toBe(false)
   })
 
   it('leaves them absent when the file has none', () => {

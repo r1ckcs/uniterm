@@ -219,6 +219,9 @@ type AppSettings struct {
 	// "compact". Empty (older settings.json, fresh install) means
 	// comfortable.
 	ListDensity string `json:"listDensity,omitempty"`
+	// TerminalStatusBar shows the status footer under terminal tabs. nil
+	// (older settings.json, fresh install) means on.
+	TerminalStatusBar *bool `json:"terminalStatusBar,omitempty"`
 	// SidebarTabs toggles which connection-sidebar tab icons are visible,
 	// keyed by view id (connections/files/monitor/tunnels/quickCommands/
 	// history/personalization). "connections" is always shown in the UI and

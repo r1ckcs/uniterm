@@ -304,6 +304,8 @@ export interface AppSettings {
   // (name over host, the classic look) or 'compact' (one line per
   // connection). Absent means comfortable.
   listDensity?: 'comfortable' | 'compact'
+  // Status footer under terminal tabs. Absent means on.
+  terminalStatusBar?: boolean
   // Which connection-sidebar tab icons are visible, keyed by view id.
   // Missing keys fall back to SIDEBAR_TAB_DEFAULTS.
   sidebarTabs: Record<string, boolean>

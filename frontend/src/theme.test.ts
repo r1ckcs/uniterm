@@ -22,8 +22,9 @@ const TEXT_PAIRS: Array<[string, string[]]> = [
   ['--accent-text', ['--bg-base', '--bg-surface', '--bg-sunken', '--accent-subtle']],
   ['--on-accent', ['--accent']],
   ['--success', ['--bg-base', '--bg-surface', '--success-subtle']],
-  ['--warning', ['--bg-base', '--bg-surface', '--warning-subtle']],
-  ['--error', ['--bg-base', '--bg-surface', '--error-subtle']],
+  // --bg-elevated: the terminal status bar paints LOG / broadcast on it.
+  ['--warning', ['--bg-base', '--bg-surface', '--bg-elevated', '--warning-subtle']],
+  ['--error', ['--bg-base', '--bg-surface', '--bg-elevated', '--error-subtle']],
   ['--alert-text', ['--alert-card', '--alert-row', '--alert-badge']],
   ['--ok-text', ['--ok-badge', '--bg-surface']],
   ['--tag-olt', ['--bg-sunken', '--alert-row']],

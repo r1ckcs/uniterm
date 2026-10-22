@@ -83,6 +83,7 @@ func TestSettingsStore_PreservesAppearanceF3Settings(t *testing.T) {
 
 	settings := defaultSettings()
 	settings.ListDensity = "compact"
+	settings.TerminalStatusBar = boolPtr(false)
 	settings.Terminal.LineHeight = floatPtr(1.35)
 	if err := s.Save(settings); err != nil {
 		t.Fatalf("Save: %v", err)
@@ -93,6 +94,9 @@ func TestSettingsStore_PreservesAppearanceF3Settings(t *testing.T) {
 	}
 	if got.ListDensity != "compact" {
 		t.Errorf("ListDensity: got %q, want %q", got.ListDensity, "compact")
+	}
+	if got.TerminalStatusBar == nil || *got.TerminalStatusBar {
+		t.Errorf("TerminalStatusBar: got %v, want preserved false", got.TerminalStatusBar)
 	}
 	if got.Terminal.LineHeight == nil || *got.Terminal.LineHeight != 1.35 {
 		t.Errorf("Terminal.LineHeight: got %v, want 1.35", got.Terminal.LineHeight)

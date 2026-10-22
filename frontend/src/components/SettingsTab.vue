@@ -503,6 +503,19 @@
 
           <div class="setting-card">
             <div class="setting-info">
+              <div class="setting-title">{{ t('settings.terminalStatusBar') }}</div>
+              <div class="setting-desc">{{ t('settings.terminalStatusBarDesc') }}</div>
+            </div>
+            <div class="setting-control">
+              <el-switch
+                :model-value="settingsStore.settings.terminalStatusBar !== false"
+                @change="(v: string | number | boolean) => { settingsStore.settings.terminalStatusBar = !!v; settingsStore.save() }"
+              />
+            </div>
+          </div>
+
+          <div class="setting-card">
+            <div class="setting-info">
               <div class="setting-title">{{ t('settings.cursorBlink') }}</div>
               <div class="setting-desc">{{ t('settings.cursorBlinkDesc') }}</div>
             </div>

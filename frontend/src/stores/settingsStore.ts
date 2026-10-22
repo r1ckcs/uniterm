@@ -382,6 +382,7 @@ export function mergeSettings(loaded: AppSettings): AppSettings {
     // later save would drop them (connStatusCheck false would turn back on).
     listDensity: loaded.listDensity,
     connStatusCheck: loaded.connStatusCheck,
+    terminalStatusBar: loaded.terminalStatusBar,
     // Per-key merge so a settings.json written before a view existed (or
     // with a key dropped) still gets the default for that view.
     sidebarTabs: {
