@@ -289,6 +289,10 @@ export interface AppSettings {
   // Whether the per-tab numeric shortcut hint (e.g. Ctrl+1) is drawn on the
   // tab itself; the hover tooltips elsewhere are unaffected.
   showTabShortcutHints: boolean
+  // Start screen reachability probe (CONTRATO-status): a TCP connect to each
+  // saved host every minute while the start screen is visible. Absent means
+  // on; must stay in this type or a frontend Save would drop a saved false.
+  connStatusCheck?: boolean
   // How the host list opens the connection menu: hover "⋯"/star buttons
   // ("button") or right-click only, with the hover buttons hidden
   // ("rightclick"). The right-click menu works in both modes.

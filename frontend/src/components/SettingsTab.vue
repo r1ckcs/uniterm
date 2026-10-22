@@ -194,6 +194,19 @@
 
           <div class="setting-card">
             <div class="setting-info">
+              <div class="setting-title">{{ t('settings.connStatusCheck') }}</div>
+              <div class="setting-desc">{{ t('settings.connStatusCheckDesc') }}</div>
+            </div>
+            <div class="setting-control">
+              <el-switch
+                :model-value="settingsStore.settings.connStatusCheck !== false"
+                @change="(v: string | number | boolean) => { settingsStore.settings.connStatusCheck = !!v; settingsStore.save() }"
+              />
+            </div>
+          </div>
+
+          <div class="setting-card">
+            <div class="setting-info">
               <div class="setting-title">{{ t('settings.hostListMenuStyle') }}</div>
               <div class="setting-desc">{{ t('settings.hostListMenuStyleDesc') }}</div>
             </div>
