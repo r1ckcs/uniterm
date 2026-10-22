@@ -252,7 +252,7 @@
           <el-input v-model="newDbName" :placeholder="t('db.databases')" />
         </el-form-item>
         <el-form-item :label="t('mongodb.collection')">
-          <el-input v-model="newDbFirstCol" placeholder="optional" />
+          <el-input v-model="newDbFirstCol" :placeholder="t('mongodb.optional')" />
         </el-form-item>
       </el-form>
       <template #footer>

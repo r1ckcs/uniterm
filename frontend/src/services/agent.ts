@@ -8,6 +8,7 @@ import { useTabStore } from '../stores/tabStore'
 import { usePanelStore } from '../stores/panelStore'
 import { useSessionStore } from '../stores/sessionStore'
 import { useSkillStore } from '../stores/skillStore'
+import { t } from '../i18n'
 import { GetSkillFile, ListSkillFiles } from '../../bindings/github.com/ys-ll/uniterm/app'
 import type { AIMessage } from '../types/ai'
 import { Events } from '@wailsio/runtime'
@@ -1085,7 +1086,7 @@ export async function runAgent(userInput: string, skillName?: string, skillBody?
     store.addMessage({
       id: `msg-${Date.now()}`,
       role: 'assistant',
-      content: `已达到最大对话轮次限制（${maxTurns}轮）。点击"继续"或发送任意消息以继续。`,
+      content: t('ai.maxTurnsReached', { max: maxTurns }),
       needsContinue: true
     })
   }

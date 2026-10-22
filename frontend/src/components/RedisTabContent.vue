@@ -120,7 +120,7 @@
                 </el-table-column>
                 <el-table-column :width="uiPx(50)">
                   <template #default="{ $index }">
-                    <button class="btn btn-ghost btn-icon btn-sm danger" title="Delete" @click="hashEntries.splice($index, 1)"><Trash2 :size="'0.875rem'" /></button>
+                    <button class="btn btn-ghost btn-icon btn-sm danger" :title="t('common.delete')" @click="hashEntries.splice($index, 1)"><Trash2 :size="'0.875rem'" /></button>
                   </template>
                 </el-table-column>
               </el-table>
@@ -143,7 +143,7 @@
                 </el-table-column>
                 <el-table-column :width="uiPx(50)">
                   <template #default="{ $index }">
-                    <button class="btn btn-ghost btn-icon btn-sm danger" title="Delete" @click="listEntries.splice($index, 1)"><Trash2 :size="'0.875rem'" /></button>
+                    <button class="btn btn-ghost btn-icon btn-sm danger" :title="t('common.delete')" @click="listEntries.splice($index, 1)"><Trash2 :size="'0.875rem'" /></button>
                   </template>
                 </el-table-column>
               </el-table>
@@ -161,7 +161,7 @@
                 </el-table-column>
                 <el-table-column :width="uiPx(50)">
                   <template #default="{ $index }">
-                    <button class="btn btn-ghost btn-icon btn-sm danger" title="Delete" @click="setEntries.splice($index, 1)"><Trash2 :size="'0.875rem'" /></button>
+                    <button class="btn btn-ghost btn-icon btn-sm danger" :title="t('common.delete')" @click="setEntries.splice($index, 1)"><Trash2 :size="'0.875rem'" /></button>
                   </template>
                 </el-table-column>
               </el-table>
@@ -184,7 +184,7 @@
                 </el-table-column>
                 <el-table-column :width="uiPx(50)">
                   <template #default="{ $index }">
-                    <button class="btn btn-ghost btn-icon btn-sm danger" title="Delete" @click="zsetEntries.splice($index, 1)"><Trash2 :size="'0.875rem'" /></button>
+                    <button class="btn btn-ghost btn-icon btn-sm danger" :title="t('common.delete')" @click="zsetEntries.splice($index, 1)"><Trash2 :size="'0.875rem'" /></button>
                   </template>
                 </el-table-column>
               </el-table>
@@ -237,7 +237,7 @@
                 <template #default="{ $index }"><el-input v-model="newHashEntries[$index].value" size="small" type="textarea" :rows="1" autosize /></template>
               </el-table-column>
               <el-table-column :width="uiPx(50)">
-                <template #default="{ $index }"><button class="btn btn-ghost btn-icon btn-sm danger" title="Delete" @click="newHashEntries.splice($index, 1)"><Trash2 :size="'0.875rem'" /></button></template>
+                <template #default="{ $index }"><button class="btn btn-ghost btn-icon btn-sm danger" :title="t('common.delete')" @click="newHashEntries.splice($index, 1)"><Trash2 :size="'0.875rem'" /></button></template>
               </el-table-column>
             </el-table>
             <el-button size="small" style="margin-top: 0.25rem" @click="newHashEntries.push({ field: '', value: '' })"><Plus :size="'0.875rem'" /></el-button>
@@ -257,7 +257,7 @@
                 <template #default="{ $index }"><el-input v-model="newListEntries[$index]" size="small" type="textarea" :rows="1" autosize /></template>
               </el-table-column>
               <el-table-column :width="uiPx(50)">
-                <template #default="{ $index }"><button class="btn btn-ghost btn-icon btn-sm danger" title="Delete" @click="newListEntries.splice($index, 1)"><Trash2 :size="'0.875rem'" /></button></template>
+                <template #default="{ $index }"><button class="btn btn-ghost btn-icon btn-sm danger" :title="t('common.delete')" @click="newListEntries.splice($index, 1)"><Trash2 :size="'0.875rem'" /></button></template>
               </el-table-column>
             </el-table>
             <el-button size="small" style="margin-top: 0.25rem" @click="newListEntries.push('')"><Plus :size="'0.875rem'" /></el-button>
@@ -272,7 +272,7 @@
                 <template #default="{ $index }"><el-input v-model="newSetEntries[$index]" size="small" type="textarea" :rows="1" autosize /></template>
               </el-table-column>
               <el-table-column :width="uiPx(50)">
-                <template #default="{ $index }"><button class="btn btn-ghost btn-icon btn-sm danger" title="Delete" @click="newSetEntries.splice($index, 1)"><Trash2 :size="'0.875rem'" /></button></template>
+                <template #default="{ $index }"><button class="btn btn-ghost btn-icon btn-sm danger" :title="t('common.delete')" @click="newSetEntries.splice($index, 1)"><Trash2 :size="'0.875rem'" /></button></template>
               </el-table-column>
             </el-table>
             <el-button size="small" style="margin-top: 0.25rem" @click="newSetEntries.push('')"><Plus :size="'0.875rem'" /></el-button>
@@ -289,7 +289,7 @@
                 <template #default="{ $index }"><el-input-number v-model="newZSetEntries[$index].score" size="small" controls-position="right" style="width: 100%" /></template>
               </el-table-column>
               <el-table-column :width="uiPx(50)">
-                <template #default="{ $index }"><button class="btn btn-ghost btn-icon btn-sm danger" title="Delete" @click="newZSetEntries.splice($index, 1)"><Trash2 :size="'0.875rem'" /></button></template>
+                <template #default="{ $index }"><button class="btn btn-ghost btn-icon btn-sm danger" :title="t('common.delete')" @click="newZSetEntries.splice($index, 1)"><Trash2 :size="'0.875rem'" /></button></template>
               </el-table-column>
             </el-table>
             <el-button size="small" style="margin-top: 0.25rem" @click="newZSetEntries.push({ member: '', score: 0 })"><Plus :size="'0.875rem'" /></el-button>

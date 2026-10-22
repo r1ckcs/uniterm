@@ -89,7 +89,7 @@
               <el-input v-model="form.user" :placeholder="form.type === 's3' ? 'Access Key ID' : t('conn.userPlaceholder')" />
             </el-form-item>
             <el-form-item v-if="form.type === 'rdp' && isWindows && form.authType !== 'identity'" :label="t('conn.rdpDomain')">
-              <el-input v-model="form.rdpDomain" placeholder="e.g. WORKGROUP or WIN-ABC123" />
+              <el-input v-model="form.rdpDomain" :placeholder="t('conn.rdpDomainPlaceholder')" />
             </el-form-item>
             <el-form-item
               v-if="form.authType === 'identity' && (form.type === 'ssh' || form.type === 'scp' || form.type === 'sftp' || form.type === 'mosh' || form.type === 'x11-desktop')"
@@ -264,10 +264,10 @@
             </template>
             <template v-if="form.type === 'smb'">
               <el-form-item :label="t('conn.smbDomain')" required>
-                <el-input v-model="form.smbDomain" placeholder="e.g. WORKGROUP" />
+                <el-input v-model="form.smbDomain" :placeholder="t('conn.smbDomainPlaceholder')" />
               </el-form-item>
               <el-form-item :label="t('conn.smbShare')">
-                <el-input v-model="form.smbShare" placeholder="Share name (leave empty to browse all)" />
+                <el-input v-model="form.smbShare" :placeholder="t('conn.smbSharePlaceholder')" />
               </el-form-item>
             </template>
             <template v-if="form.type === 's3'">
@@ -275,12 +275,12 @@
                 <el-input v-model="form.s3Region" placeholder="us-east-1" />
               </el-form-item>
               <el-form-item :label="t('conn.s3Bucket')">
-                <el-input v-model="form.s3Bucket" placeholder="my-bucket (leave empty to list all buckets)" />
+                <el-input v-model="form.s3Bucket" :placeholder="t('conn.s3BucketPlaceholder')" />
               </el-form-item>
               <el-form-item :label="t('conn.s3UrlStyle')">
                 <el-select v-model="form.s3UrlStyle">
-                  <el-option label="Virtual-hosted (https://bucket.endpoint/key)" value="virtual" />
-                  <el-option label="Path (https://endpoint/bucket/key)" value="path" />
+                  <el-option :label="t('conn.s3UrlStyleVirtual')" value="virtual" />
+                  <el-option :label="t('conn.s3UrlStylePath')" value="path" />
                 </el-select>
               </el-form-item>
             </template>
@@ -509,13 +509,13 @@
             >
               <el-select v-model="form.encoding" placeholder="Unicode (UTF-8)">
                 <el-option label="Unicode (UTF-8)" value="utf-8" />
-                <el-option label="Simplified Chinese (GBK)" value="gbk" />
-                <el-option label="Simplified Chinese (GB2312)" value="gb2312" />
-                <el-option label="Simplified Chinese (GB18030)" value="gb18030" />
-                <el-option label="Traditional Chinese (Big5)" value="big5" />
-                <el-option label="Japanese (Shift-JIS)" value="shift-jis" />
-                <el-option label="Japanese (EUC-JP)" value="euc-jp" />
-                <el-option label="Korean (EUC-KR)" value="euc-kr" />
+                <el-option :label="`${t('conn.encSimplifiedChinese')} (GBK)`" value="gbk" />
+                <el-option :label="`${t('conn.encSimplifiedChinese')} (GB2312)`" value="gb2312" />
+                <el-option :label="`${t('conn.encSimplifiedChinese')} (GB18030)`" value="gb18030" />
+                <el-option :label="`${t('conn.encTraditionalChinese')} (Big5)`" value="big5" />
+                <el-option :label="`${t('conn.encJapanese')} (Shift-JIS)`" value="shift-jis" />
+                <el-option :label="`${t('conn.encJapanese')} (EUC-JP)`" value="euc-jp" />
+                <el-option :label="`${t('conn.encKorean')} (EUC-KR)`" value="euc-kr" />
               </el-select>
             </el-form-item>
             <template v-if="form.type === 'telnet'">
@@ -1038,9 +1038,9 @@ const isEsApiKey = computed(() =>
 
 const defaultParamsHint = computed(() => {
   switch (form.dbType) {
-    case 'mysql': return '默认: charset=utf8mb4'
-    case 'postgres': return '默认: sslmode=disable'
-    case 'sqlserver': return '默认: encrypt=disable'
+    case 'mysql': return t('conn.dbParamsDefault', { params: 'charset=utf8mb4' })
+    case 'postgres': return t('conn.dbParamsDefault', { params: 'sslmode=disable' })
+    case 'sqlserver': return t('conn.dbParamsDefault', { params: 'encrypt=disable' })
     default: return ''
   }
 })

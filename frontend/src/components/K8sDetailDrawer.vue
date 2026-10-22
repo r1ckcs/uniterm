@@ -23,7 +23,7 @@
         </div>
         <!-- Pod events (async) -->
         <div v-if="isPod" class="detail-section">
-          <div class="detail-section-title">Events</div>
+          <div class="detail-section-title">{{ t('k8s.events') }}</div>
           <div v-if="eventsError" class="detail-row"><span class="detail-value">{{ eventsError }}</span></div>
           <div v-else-if="!events.length" class="detail-row"><span class="detail-value">—</span></div>
           <div v-else v-for="(ev, i) in events" :key="i" class="detail-row">

@@ -33,7 +33,7 @@
       <span v-else-if="!isActive && hasNotification && !tab.locked" class="tab-notification-dot" />
     </span>
     <span v-if="!editing" class="tab-name" :class="{ 'tab-disconnected': isDisconnected }" :title="tab.name + (tabShortcut ? ` (${tabShortcut})` : '')" @dblclick.stop="startEdit">
-      <ArrowDownUp v-if="hasActiveTransfers" class="transfer-indicator" :size="'0.875rem'" title="Transferring..." />
+      <ArrowDownUp v-if="hasActiveTransfers" class="transfer-indicator" :size="'0.875rem'" :title="t('tab.transferring')" />
       <span class="tab-name-text">{{ tab.name }}</span>
     </span>
     <input

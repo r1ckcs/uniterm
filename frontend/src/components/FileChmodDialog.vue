@@ -13,20 +13,20 @@
       <span v-if="owner || group" class="chmod-ownergroup">{{ owner || '-' }}:{{ group || '-' }}</span>
     </div>
     <el-form class="chmod-form" label-width="5rem">
-      <el-form-item label="Owner">
-        <el-checkbox v-model="ownerR">Read</el-checkbox>
-        <el-checkbox v-model="ownerW">Write</el-checkbox>
-        <el-checkbox v-model="ownerX">Execute</el-checkbox>
+      <el-form-item :label="t('sftp.chmod.owner')">
+        <el-checkbox v-model="ownerR">{{ t('sftp.chmod.read') }}</el-checkbox>
+        <el-checkbox v-model="ownerW">{{ t('sftp.chmod.write') }}</el-checkbox>
+        <el-checkbox v-model="ownerX">{{ t('sftp.chmod.execute') }}</el-checkbox>
       </el-form-item>
-      <el-form-item label="Group">
-        <el-checkbox v-model="groupR">Read</el-checkbox>
-        <el-checkbox v-model="groupW">Write</el-checkbox>
-        <el-checkbox v-model="groupX">Execute</el-checkbox>
+      <el-form-item :label="t('sftp.chmod.group')">
+        <el-checkbox v-model="groupR">{{ t('sftp.chmod.read') }}</el-checkbox>
+        <el-checkbox v-model="groupW">{{ t('sftp.chmod.write') }}</el-checkbox>
+        <el-checkbox v-model="groupX">{{ t('sftp.chmod.execute') }}</el-checkbox>
       </el-form-item>
-      <el-form-item label="Other">
-        <el-checkbox v-model="otherR">Read</el-checkbox>
-        <el-checkbox v-model="otherW">Write</el-checkbox>
-        <el-checkbox v-model="otherX">Execute</el-checkbox>
+      <el-form-item :label="t('sftp.chmod.other')">
+        <el-checkbox v-model="otherR">{{ t('sftp.chmod.read') }}</el-checkbox>
+        <el-checkbox v-model="otherW">{{ t('sftp.chmod.write') }}</el-checkbox>
+        <el-checkbox v-model="otherX">{{ t('sftp.chmod.execute') }}</el-checkbox>
       </el-form-item>
       <el-form-item :label="t('sftp.dialog.chmodOctal')">
         <el-input v-model="octalInput" class="chmod-octal-input" maxlength="3" placeholder="644" @input="onOctalInput" />
