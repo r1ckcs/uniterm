@@ -2,10 +2,13 @@ package update
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -17,9 +20,8 @@ import (
 	"github.com/ys-ll/uniterm/backend/log"
 )
 
-// release mirrors the GitHub/Gitee release payload subset. Both APIs expose
-// the same shape: tag_name, body and an assets list of
-// {name, browser_download_url}.
+// release mirrors the GitHub release payload subset: tag_name, body and an
+// assets list of {name, browser_download_url}.
 type release struct {
 	TagName string         `json:"tag_name"`
 	Body    string         `json:"body"`
@@ -32,8 +34,11 @@ type releaseAsset struct {
 }
 
 type cacheEntry struct {
-	Release   release   `json:"release"`
-	Source    string    `json:"source"`
+	Release release `json:"release"`
+	Source  string  `json:"source"`
+	// Repo pins the entry to the repository it was fetched from, so a cache
+	// written by an upstream build (ys-ll/uniterm) is never served here.
+	Repo      string    `json:"repo"`
 	Timestamp time.Time `json:"timestamp"`
 	// ETag captured from the API response so a follow-up call inside the
 	// disk-cache TTL window can send If-None-Match and let the host answer
@@ -147,9 +152,34 @@ func shouldUpdate(current, latest string) bool {
 
 const cacheTTL = 5 * time.Minute
 
+// updateRepo is the only repository this fork checks for updates. The
+// upstream sources (github.com/ys-ll/uniterm and its gitee.com/ys-l mirror)
+// were removed on purpose: an upstream release would replace the binary and
+// silently undo every fix listed in SECURITY-FIXES.md.
+const updateRepo = "r1ckcs/uniterm"
+
+// SourceGitHub is the single update source. Any other value (including the
+// legacy "gitee" and "auto" settings) is normalized to it.
+const SourceGitHub = "github"
+
+// releasePublicKey is the base64 ed25519 public key that must sign
+// checksums.txt (as checksums.txt.sig) before any asset is offered for
+// install. It is empty until the fork publishes signed releases; release
+// builds inject it with
+//
+//	-ldflags "-X github.com/ys-ll/uniterm/backend/update.releasePublicKey=<base64>"
+//
+// With no key compiled in, updates can still be detected (and the release
+// page opened) but nothing is ever downloaded or installed.
+var releasePublicKey = ""
+
+// legacyCacheFiles are the upstream-era caches (keyed by source only). They
+// may hold an upstream release (e.g. v1.10.1) and are removed on first use.
+var legacyCacheFiles = []string{"update_cache_github.json", "update_cache_gitee.json"}
+
 // sharedClient is a package-level *http.Client with keep-alive enabled.
-// Reusing it avoids the per-call TCP+TLS handshake to api.github.com /
-// gitee.com on every Check() (F-409).
+// Reusing it avoids the per-call TCP+TLS handshake to api.github.com on
+// every Check() (F-409).
 var (
 	sharedClientOnce sync.Once
 	sharedClient     *http.Client
@@ -162,16 +192,32 @@ func sharedHTTPClient() *http.Client {
 	return sharedClient
 }
 
-func cachePath(source string) string {
-	dir, err := os.UserConfigDir()
+// configDir is os.UserConfigDir, swappable in tests.
+var configDir = os.UserConfigDir
+
+func normalizeSource(string) string { return SourceGitHub }
+
+func cachePath() string {
+	dir, err := configDir()
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(dir, "uniTerm", "update_cache_"+source+".json")
+	return filepath.Join(dir, "uniTerm", "update_cache_"+strings.ReplaceAll(updateRepo, "/", "-")+".json")
 }
 
-func loadCache(source string) *cacheEntry {
-	path := cachePath(source)
+// removeLegacyCaches deletes the upstream-era cache files.
+func removeLegacyCaches() {
+	dir, err := configDir()
+	if err != nil {
+		return
+	}
+	for _, name := range legacyCacheFiles {
+		_ = os.Remove(filepath.Join(dir, "uniTerm", name))
+	}
+}
+
+func loadCache() *cacheEntry {
+	path := cachePath()
 	if path == "" {
 		return nil
 	}
@@ -183,65 +229,77 @@ func loadCache(source string) *cacheEntry {
 	if err := json.Unmarshal(data, &entry); err != nil {
 		return nil
 	}
-	if time.Since(entry.Timestamp) > cacheTTL {
+	if entry.Repo != updateRepo || time.Since(entry.Timestamp) > cacheTTL {
 		return nil
 	}
 	return &entry
 }
 
-func saveCache(source string, entry *cacheEntry) {
-	path := cachePath(source)
+func saveCache(entry *cacheEntry) {
+	path := cachePath()
 	if path == "" {
 		return
 	}
+	entry.Repo = updateRepo
 	os.MkdirAll(filepath.Dir(path), 0755)
 	data, _ := json.Marshal(entry)
 	_ = os.WriteFile(path, data, 0600)
 }
 
-// sourceAPIURL returns the latest-release API endpoint for a source.
-// UNITERM_UPDATE_API_BASE overrides the API base for both sources — used by
-// the local end-to-end autotest (autotest_update.go) and by self-hosted
-// mirror setups; production builds leave it unset. The base must serve a
-// GitHub-style GET <base>/releases/latest payload.
-func sourceAPIURL(source string) string {
-	if base := os.Getenv("UNITERM_UPDATE_API_BASE"); base != "" {
-		return strings.TrimRight(base, "/") + "/releases/latest"
-	}
-	if source == "gitee" {
-		return "https://gitee.com/api/v5/repos/ys-l/uniterm/releases/latest"
-	}
-	return "https://api.github.com/repos/ys-ll/uniterm/releases/latest"
+// apiBaseOverride returns UNITERM_UPDATE_API_BASE, which replaces the API
+// base for the local end-to-end autotest (autotest_update.go); production
+// builds leave it unset. The base must serve a GitHub-style
+// GET <base>/releases/latest payload.
+func apiBaseOverride() string {
+	return strings.TrimRight(os.Getenv("UNITERM_UPDATE_API_BASE"), "/")
 }
 
-// sourceReleaseURL returns the human-facing release page for a source.
-func sourceReleaseURL(source string) string {
-	if source == "gitee" {
-		return "https://gitee.com/ys-l/uniterm/releases/latest"
+// sourceAPIURL returns the latest-release API endpoint of the fork.
+func sourceAPIURL(string) string {
+	if base := apiBaseOverride(); base != "" {
+		return base + "/releases/latest"
 	}
-	return "https://github.com/ys-ll/uniterm/releases/latest"
+	return "https://api.github.com/repos/" + updateRepo + "/releases/latest"
 }
 
-// fetchRelease fetches the latest release from a source, honouring the
-// per-source disk cache + ETag/304 protocol.
-func fetchRelease(source string) (*release, error) {
-	apiURL := sourceAPIURL(source)
+// sourceReleaseURL returns the human-facing release page of the fork.
+func sourceReleaseURL(string) string {
+	return "https://github.com/" + updateRepo + "/releases/latest"
+}
 
-	if cached := loadCache(source); cached != nil {
-		log.Writef("[update] returning disk-cached release, source=%s, age=%s", source, time.Since(cached.Timestamp))
+// assetURLAllowed accepts only download URLs under the fork's own GitHub
+// release path (plus the loopback autotest server when the API base is
+// overridden). GitHub redirects these to its asset CDN over https.
+func assetURLAllowed(raw string) bool {
+	if strings.HasPrefix(raw, "https://github.com/"+updateRepo+"/releases/download/") {
+		return true
+	}
+	if apiBaseOverride() == "" {
+		return false
+	}
+	u, err := url.Parse(raw)
+	return err == nil && allowInsecureUpdateURL(u)
+}
+
+// fetchRelease fetches the fork's latest release, honouring the disk cache +
+// ETag/304 protocol. It returns (nil, nil) when the repository has no
+// published release yet (GitHub answers 404): that is "no update", never a
+// reason to look elsewhere.
+func fetchRelease() (*release, error) {
+	apiURL := sourceAPIURL(SourceGitHub)
+
+	if cached := loadCache(); cached != nil {
+		log.Writef("[update] returning disk-cached release, repo=%s, age=%s", updateRepo, time.Since(cached.Timestamp))
 		return &cached.Release, nil
 	}
 
-	log.Writef("[update] fetching latest release, source=%s", source)
+	log.Writef("[update] fetching latest release, repo=%s", updateRepo)
 
 	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("User-Agent", "uniTerm")
-	if prev := loadCache(source); prev != nil && prev.ETag != "" {
-		req.Header.Set("If-None-Match", prev.ETag)
-	}
 
 	resp, err := sharedHTTPClient().Do(req)
 	if err != nil {
@@ -250,32 +308,25 @@ func fetchRelease(source string) (*release, error) {
 	}
 	defer resp.Body.Close()
 
-	// 304: nothing changed since our cached ETag. Refresh the timestamp so
-	// the disk TTL window slides forward and reuse the cached payload.
-	if resp.StatusCode == http.StatusNotModified {
-		if prev := loadCache(source); prev != nil {
-			prev.Timestamp = time.Now()
-			saveCache(source, prev)
-			return &prev.Release, nil
-		}
-		return nil, fmt.Errorf("unexpected status: 304 (no prior cache)")
+	if resp.StatusCode == http.StatusNotFound {
+		log.Writef("[update] %s has no published release", updateRepo)
+		return nil, nil
 	}
-
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status: %d", resp.StatusCode)
 	}
 
 	var rel release
-	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&rel); err != nil {
 		log.Writef("[update] decode error: %v", err)
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 
-	log.Writef("[update] latest=%s, assets=%d (source=%s)", rel.TagName, len(rel.Assets), source)
+	log.Writef("[update] latest=%s, assets=%d (repo=%s)", rel.TagName, len(rel.Assets), updateRepo)
 
-	saveCache(source, &cacheEntry{
+	saveCache(&cacheEntry{
 		Release:   rel,
-		Source:    source,
+		Source:    SourceGitHub,
 		Timestamp: time.Now(),
 		ETag:      resp.Header.Get("ETag"),
 	})
@@ -283,25 +334,19 @@ func fetchRelease(source string) (*release, error) {
 	return &rel, nil
 }
 
-func otherSource(source string) string {
-	if source == "gitee" {
-		return "github"
-	}
-	return "gitee"
-}
-
-// fetchChecksums downloads checksums.txt from the given release (if present)
-// and parses it into name → sha256. Returns an empty map when unavailable.
-func fetchChecksums(rel *release) map[string]string {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
+// fetchAssetBytes downloads a small release asset (checksums or signature).
+func fetchAssetBytes(ctx context.Context, rel *release, name string) ([]byte, bool) {
 	for _, a := range rel.Assets {
-		if a.Name != "checksums.txt" {
+		if a.Name != name {
 			continue
+		}
+		if !assetURLAllowed(a.BrowserDownloadURL) {
+			log.Writef("[update] %s url outside %s releases; ignored", name, updateRepo)
+			return nil, false
 		}
 		req, err := http.NewRequestWithContext(ctx, "GET", a.BrowserDownloadURL, nil)
 		if err != nil {
-			continue
+			return nil, false
 		}
 		req.Header.Set("User-Agent", "uniTerm")
 		resp, err := downloadHTTPClient().Do(req)
@@ -309,19 +354,65 @@ func fetchChecksums(rel *release) map[string]string {
 			if resp != nil {
 				resp.Body.Close()
 			}
-			log.Writef("[update] checksums fetch failed: %v", err)
-			continue
+			log.Writef("[update] %s fetch failed: %v", name, err)
+			return nil, false
 		}
-		data, err := io.ReadAll(resp.Body)
+		data, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 		resp.Body.Close()
 		if err != nil {
-			continue
+			return nil, false
 		}
-		sums := parseChecksums(data)
-		log.Writef("[update] parsed %d checksums", len(sums))
-		return sums
+		return data, true
 	}
-	return map[string]string{}
+	return nil, false
+}
+
+// verifyChecksumsSignature checks sig (raw 64 bytes or base64 text) over data
+// against the compiled-in release key. No key → never verified.
+func verifyChecksumsSignature(data, sig []byte) bool {
+	key, err := base64.StdEncoding.DecodeString(strings.TrimSpace(releasePublicKey))
+	if err != nil || len(key) != ed25519.PublicKeySize {
+		return false
+	}
+	if len(sig) != ed25519.SignatureSize {
+		dec, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(sig)))
+		if err != nil {
+			return false
+		}
+		sig = dec
+	}
+	return len(sig) == ed25519.SignatureSize && ed25519.Verify(ed25519.PublicKey(key), data, sig)
+}
+
+// fetchChecksums downloads checksums.txt and checksums.txt.sig from the
+// release and returns name → sha256 only when the signature verifies against
+// releasePublicKey. Anything else (no key compiled in, unsigned release, bad
+// signature) yields an empty map, so no asset carries a hash and Download
+// refuses every candidate: a checksum published next to the asset it covers
+// proves integrity, not origin.
+func fetchChecksums(rel *release) map[string]string {
+	if strings.TrimSpace(releasePublicKey) == "" {
+		log.Writef("[update] no release signing key compiled in; install disabled")
+		return map[string]string{}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	data, ok := fetchAssetBytes(ctx, rel, "checksums.txt")
+	if !ok {
+		return map[string]string{}
+	}
+	sig, ok := fetchAssetBytes(ctx, rel, "checksums.txt.sig")
+	if !ok {
+		log.Writef("[update] release has no checksums.txt.sig; refusing its checksums")
+		return map[string]string{}
+	}
+	if !verifyChecksumsSignature(data, sig) {
+		log.Writef("[update] checksums.txt signature invalid; refusing its checksums")
+		return map[string]string{}
+	}
+	sums := parseChecksums(data)
+	log.Writef("[update] parsed %d signed checksums", len(sums))
+	return sums
 }
 
 // classifyAsset buckets an asset name by its update payload kind. Any .zip is
@@ -362,104 +453,66 @@ func kindPreference(ch Channel) []string {
 	}
 }
 
-// candidatesFor orders the updateable assets for a platform and channel:
-// preferred kind first, and within each kind the primary source's asset
-// before the fallback mirror's.
-func candidatesFor(osName, arch string, ch Channel, primary string, rels map[string]*release, sums map[string]string) []UpdateAsset {
+// candidatesFor orders the installable assets for a platform and channel,
+// preferred kind first. Only assets with a signed checksum and a download URL
+// under the fork's releases are returned.
+func candidatesFor(osName, arch string, ch Channel, rel *release, sums map[string]string) []UpdateAsset {
 	var out []UpdateAsset
+	if rel == nil {
+		return nil
+	}
 	for _, kind := range kindPreference(ch) {
-		for _, src := range []string{primary, otherSource(primary)} {
-			rel, ok := rels[src]
-			if !ok {
+		for _, a := range rel.Assets {
+			if classifyAsset(a.Name) != kind || !assetMatchesPlatform(osName, arch, a.Name) {
 				continue
 			}
-			for _, a := range rel.Assets {
-				if classifyAsset(a.Name) != kind || !assetMatchesPlatform(osName, arch, a.Name) {
-					continue
-				}
-				out = append(out, UpdateAsset{
-					Name:   a.Name,
-					URL:    a.BrowserDownloadURL,
-					SHA256: sums[a.Name],
-					Source: src,
-				})
+			if sums[a.Name] == "" || !assetURLAllowed(a.BrowserDownloadURL) {
+				continue
 			}
+			out = append(out, UpdateAsset{
+				Name:   a.Name,
+				URL:    a.BrowserDownloadURL,
+				SHA256: sums[a.Name],
+				Source: SourceGitHub,
+			})
 		}
 	}
 	return out
 }
 
-// Check compares the current version against the latest release from the given
-// source. When an update is available it also collects downloadable assets for
-// the current platform from BOTH sources (primary first, fallback mirror
-// second) so the downloader can fail over automatically.
+// Check compares the current version against the fork's latest release. The
+// source argument is kept for API compatibility and ignored: there is a single
+// source and no fallback mirror. Assets are only listed when the release's
+// checksums are signed by releasePublicKey.
 func Check(currentVersion, source string) (*UpdateInfo, error) {
-	if source == "" {
-		source = "github"
-	}
+	source = normalizeSource(source)
+	removeLegacyCaches()
 
-	log.Writef("[update] Check called, current=%s, source=%s", currentVersion, source)
+	log.Writef("[update] Check called, current=%s, repo=%s", currentVersion, updateRepo)
 
-	primary, err := fetchRelease(source)
+	rel, err := fetchRelease()
 	if err != nil {
-		// The preferred source is unreachable — fail the whole check over to
-		// the mirror instead of erroring out.
-		if rel2, err2 := fetchRelease(otherSource(source)); err2 == nil {
-			log.Writef("[update] %s failed (%v); using %s", source, err, otherSource(source))
-			source = otherSource(source)
-			primary = rel2
-		} else {
-			return nil, err
-		}
+		return nil, err
 	}
 
 	result := UpdateInfo{
 		Current:    currentVersion,
-		Latest:     primary.TagName,
 		ReleaseURL: sourceReleaseURL(source),
-		Changelog:  primary.Body,
-		HasUpdate:  shouldUpdate(currentVersion, primary.TagName),
 	}
+	if rel == nil || rel.TagName == "" {
+		return &result, nil
+	}
+	result.Latest = rel.TagName
+	result.Changelog = rel.Body
+	result.HasUpdate = shouldUpdate(currentVersion, rel.TagName)
 
 	if !result.HasUpdate {
 		return &result, nil
 	}
 
-	// Collect assets from both sources: primary first, then the mirror. The
-	// mirror fetch is capped at 3s so a blocked source (e.g. GitHub behind
-	// the GFW when Gitee is primary) never stalls the check response; the
-	// goroutine still finishes in the background and warms the disk cache.
-	other := otherSource(source)
-	rels := map[string]*release{source: primary}
-	mirrorCh := make(chan *release, 1)
-	go func() {
-		rel2, err := fetchRelease(other)
-		if err == nil {
-			mirrorCh <- rel2
-		} else {
-			mirrorCh <- nil
-		}
-	}()
-	select {
-	case rel2 := <-mirrorCh:
-		if rel2 != nil {
-			rels[other] = rel2
-		}
-	case <-time.After(3 * time.Second):
-		log.Writef("[update] %s release fetch still in flight; continuing without it", other)
-	}
-
-	// Checksums: prefer the primary source's checksums.txt, fall back to the
-	// mirror's. Either may be absent on older releases.
-	sums := fetchChecksums(primary)
-	if len(sums) == 0 {
-		if rel2, ok := rels[otherSource(source)]; ok {
-			sums = fetchChecksums(rel2)
-		}
-	}
-
-	result.Assets = candidatesFor(runtime.GOOS, runtime.GOARCH, DetectChannel(), source, rels, sums)
-	log.Writef("[update] %d candidate asset(s) for channel %s", len(result.Assets), DetectChannel())
+	sums := fetchChecksums(rel)
+	result.Assets = candidatesFor(runtime.GOOS, runtime.GOARCH, DetectChannel(), rel, sums)
+	log.Writef("[update] %d verified candidate asset(s) for channel %s", len(result.Assets), DetectChannel())
 
 	return &result, nil
 }

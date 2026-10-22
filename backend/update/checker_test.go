@@ -102,60 +102,64 @@ func TestAssetMatchesPlatform(t *testing.T) {
 }
 
 func TestCandidatesForOrdering(t *testing.T) {
-	rels := map[string]*release{
-		"github": {Assets: []releaseAsset{
-			{Name: "uniterm-windows-amd64-portable-v1.9.2.zip", BrowserDownloadURL: "https://github.com/portable.zip"},
-			{Name: "uniterm-windows-amd64-installer-v1.9.2.exe", BrowserDownloadURL: "https://github.com/installer.exe"},
-			{Name: "uniterm-darwin-amd64-v1.9.2.dmg", BrowserDownloadURL: "https://github.com/x.dmg"},
-		}},
-		"gitee": {Assets: []releaseAsset{
-			{Name: "uniterm-windows-amd64-portable-v1.9.2.zip", BrowserDownloadURL: "https://gitee.com/portable.zip"},
-			{Name: "uniterm-windows-amd64-installer-v1.9.2.exe", BrowserDownloadURL: "https://gitee.com/installer.exe"},
-		}},
+	const base = "https://github.com/r1ckcs/uniterm/releases/download/v1.9.2/"
+	rel := &release{Assets: []releaseAsset{
+		{Name: "uniterm-windows-amd64-portable-v1.9.2.zip", BrowserDownloadURL: base + "uniterm-windows-amd64-portable-v1.9.2.zip"},
+		{Name: "uniterm-windows-amd64-installer-v1.9.2.exe", BrowserDownloadURL: base + "uniterm-windows-amd64-installer-v1.9.2.exe"},
+		{Name: "uniterm-darwin-amd64-v1.9.2.dmg", BrowserDownloadURL: base + "x.dmg"},
+	}}
+	sums := map[string]string{
+		"uniterm-windows-amd64-installer-v1.9.2.exe": "hash1",
+		"uniterm-windows-amd64-portable-v1.9.2.zip":  "hash2",
 	}
-	sums := map[string]string{"uniterm-windows-amd64-installer-v1.9.2.exe": "hash1"}
 
-	// Installer channel: installer kind first, primary source (github) first.
-	got := candidatesFor("windows", "amd64", ChannelInstaller, "github", rels, sums)
-	if len(got) != 4 {
-		t.Fatalf("want 4 candidates, got %d: %+v", len(got), got)
+	// Installer channel: installer kind first, then portable.
+	got := candidatesFor("windows", "amd64", ChannelInstaller, rel, sums)
+	if len(got) != 2 {
+		t.Fatalf("want 2 candidates, got %d: %+v", len(got), got)
 	}
-	if got[0].Name != "uniterm-windows-amd64-installer-v1.9.2.exe" || got[0].Source != "github" {
-		t.Errorf("first candidate should be github installer, got %+v", got[0])
+	if got[0].Kind() != "installer" || got[0].SHA256 != "hash1" || got[0].Source != SourceGitHub {
+		t.Errorf("first candidate should be the installer with its hash, got %+v", got[0])
 	}
-	if got[0].SHA256 != "hash1" {
-		t.Errorf("sha256 not attached: %+v", got[0])
-	}
-	if got[1].Source != "gitee" || got[1].Kind() != "installer" {
-		t.Errorf("second candidate should be gitee installer, got %+v", got[1])
+	if got[1].Kind() != "portable" {
+		t.Errorf("second candidate should be portable, got %+v", got[1])
 	}
 	// Portable channel: no installer candidates at all.
-	got = candidatesFor("windows", "amd64", ChannelPortable, "github", rels, sums)
-	if len(got) != 2 {
-		t.Fatalf("want 2 portable candidates, got %d: %+v", len(got), got)
-	}
-	if got[0].Kind() != "portable" || got[1].Kind() != "portable" {
-		t.Errorf("portable channel must only return portable assets: %+v", got)
-	}
-	// Gitee primary flips the ordering.
-	got = candidatesFor("windows", "amd64", ChannelPortable, "gitee", rels, sums)
-	if got[0].Source != "gitee" || got[1].Source != "github" {
-		t.Errorf("gitee primary should come first, got %+v", got)
+	got = candidatesFor("windows", "amd64", ChannelPortable, rel, sums)
+	if len(got) != 1 || got[0].Kind() != "portable" {
+		t.Fatalf("portable channel must only return portable assets: %+v", got)
 	}
 	// darwin: the .zip is the update payload (dmg is "other").
-	rels["github"].Assets = append(rels["github"].Assets,
-		releaseAsset{Name: "uniterm-darwin-amd64-v1.9.2.zip", BrowserDownloadURL: "https://github.com/darwin.zip"})
-	got = candidatesFor("darwin", "amd64", ChannelPortable, "github", rels, sums)
+	rel.Assets = append(rel.Assets,
+		releaseAsset{Name: "uniterm-darwin-amd64-v1.9.2.zip", BrowserDownloadURL: base + "uniterm-darwin-amd64-v1.9.2.zip"})
+	sums["uniterm-darwin-amd64-v1.9.2.zip"] = "hash3"
+	got = candidatesFor("darwin", "amd64", ChannelPortable, rel, sums)
 	if len(got) != 1 || got[0].Name != "uniterm-darwin-amd64-v1.9.2.zip" {
 		t.Errorf("darwin portable should match only the .zip asset, got %+v", got)
 	}
 	// linux: the bare-binary tar.gz is the update payload (deb/rpm are "other").
-	rels["github"].Assets = append(rels["github"].Assets,
-		releaseAsset{Name: "uniterm-linux-amd64-v1.9.2.tar.gz", BrowserDownloadURL: "https://github.com/linux.tar.gz"},
-		releaseAsset{Name: "uniterm-linux-amd64-v1.9.2.deb", BrowserDownloadURL: "https://github.com/linux.deb"})
-	got = candidatesFor("linux", "amd64", ChannelPortable, "github", rels, sums)
+	rel.Assets = append(rel.Assets,
+		releaseAsset{Name: "uniterm-linux-amd64-v1.9.2.tar.gz", BrowserDownloadURL: base + "uniterm-linux-amd64-v1.9.2.tar.gz"},
+		releaseAsset{Name: "uniterm-linux-amd64-v1.9.2.deb", BrowserDownloadURL: base + "linux.deb"})
+	sums["uniterm-linux-amd64-v1.9.2.tar.gz"] = "hash4"
+	got = candidatesFor("linux", "amd64", ChannelPortable, rel, sums)
 	if len(got) != 1 || got[0].Name != "uniterm-linux-amd64-v1.9.2.tar.gz" {
 		t.Errorf("linux portable should match only the .tar.gz asset, got %+v", got)
+	}
+}
+
+func TestCandidatesForDropsUnverifiedAssets(t *testing.T) {
+	rel := &release{Assets: []releaseAsset{
+		// No signed checksum.
+		{Name: "uniterm-linux-amd64-v9.tar.gz", BrowserDownloadURL: "https://github.com/r1ckcs/uniterm/releases/download/v9/uniterm-linux-amd64-v9.tar.gz"},
+		// Hashed, but served from the upstream repository.
+		{Name: "uniterm-linux-amd64-v9b.tar.gz", BrowserDownloadURL: "https://github.com/ys-ll/uniterm/releases/download/v9/uniterm-linux-amd64-v9b.tar.gz"},
+		// Hashed, but served from the old Gitee mirror.
+		{Name: "uniterm-linux-amd64-v9c.tar.gz", BrowserDownloadURL: "https://gitee.com/ys-l/uniterm/releases/download/v9/uniterm-linux-amd64-v9c.tar.gz"},
+	}}
+	sums := map[string]string{"uniterm-linux-amd64-v9b.tar.gz": "h", "uniterm-linux-amd64-v9c.tar.gz": "h"}
+	if got := candidatesFor("linux", "amd64", ChannelPortable, rel, sums); len(got) != 0 {
+		t.Fatalf("unverified or off-repo assets must not be offered: %+v", got)
 	}
 }
 

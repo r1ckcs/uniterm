@@ -1,13 +1,12 @@
 package update
 
 // UpdateAsset is one downloadable release artifact. Candidates are returned
-// ordered by preference (primary update source first, then the fallback
-// mirror), so downloaders can simply try them in order.
+// ordered by preference, so downloaders can simply try them in order.
 type UpdateAsset struct {
 	Name   string `json:"name"`   // filename, e.g. uniterm-linux-amd64-v1.9.2.tar.gz
 	URL    string `json:"url"`    // direct download URL
-	SHA256 string `json:"sha256"` // expected sha256 hex from checksums.txt; "" when unknown
-	Source string `json:"source"` // "github" | "gitee"
+	SHA256 string `json:"sha256"` // expected sha256 hex from the signed checksums.txt
+	Source string `json:"source"` // always "github" (r1ckcs/uniterm)
 }
 
 // UpdateInfo is the result returned to the frontend.

@@ -26,15 +26,20 @@ Branch: `security/hardening`.
 | Baixa | Log do app e transcrições de sessão legíveis por todos | 0600 em diretório 0700 |
 | Baixa | Nome de unit systemd podia começar com `-` (injeção de opção) | primeiro caractere alfanumérico |
 | Baixa | Panic no MCP quando `mcp.json` não existe | corrigido |
+| Alta | **Atualizador consultava o upstream** (`api.github.com/repos/ys-ll/uniterm` e `gitee.com/ys-l/uniterm`, com fallback entre os dois): uma release do upstream substituiria o binário e desfaria todas as correções deste fork (22/10/2026) | única fonte é `github.com/r1ckcs/uniterm`; Gitee e fallback removidos (`updateSource` antigo é ignorado); sem release (404) = "sem atualização"; cache por repositório e caches antigos `update_cache_github/gitee.json` apagados; assets só de `github.com/r1ckcs/uniterm/releases/download/` |
+| Alta | **Checksum não provava origem**: `checksums.txt` vinha da mesma release do binário | `checksums.txt` precisa de `checksums.txt.sig` (ed25519) válida contra a chave pública embutida no build (`-ldflags -X …/backend/update.releasePublicKey=<base64>`); sem chave, sem assinatura ou assinatura inválida → nenhum asset é oferecido e `Download` recusa antes de baixar |
+| Baixa | Extração do zip de atualização barrava só `..` | `filepath.IsLocal` + só arquivos regulares |
 
 ## Não corrigido (e por quê)
 
-- **Assinatura das atualizações**: o `checksums.txt` vem da mesma release do binário. Proteger contra conta/CI comprometidos exige uma chave ed25519 mantida offline por quem publica as releases. Se este fork publicar releases próprias, apontar o updater para o fork e assinar.
+- **Chave de assinatura das releases**: o código de verificação está pronto (22/10/2026), mas a chave ed25519 ainda não existe. Enquanto o build não embutir `releasePublicKey`, o app pode avisar que há versão nova do fork (e abrir a página da release), mas **nunca instala sozinho**. Para publicar: gerar o par offline, assinar `checksums.txt` → `checksums.txt.sig` (64 bytes crus ou base64) e compilar com a chave pública.
+- **Checagem automática de atualização**: desligada por padrão desde 22/10/2026 (o fork não tem releases; ligar só geraria tráfego). Quem já tinha `autoCheckUpdate: true` gravado continua checando — agora só o fork.
+- **Links do upstream que ficaram**: "Página inicial" e "Manual" em Sobre abrem `uniterm.net` no navegador (só documentação, nada é enviado); README/CONTRIBUTING/workflows de CI citam `ys-ll` (não rodam no app). O caminho de módulo Go `github.com/ys-ll/uniterm` é só nome de import.
 - **RDP**: a verificação de certificado ainda fica a cargo do ActiveX, e o app clica sozinho nos diálogos de segurança do próprio processo. `RedirectDrives` segue ligado. Mudar isso exige testar em Windows.
 - **AAD por arquivo no sync**: vincular o texto cifrado ao nome do arquivo quebraria aparelhos rodando a versão original no mesmo repositório.
 - **CSP no frontend**: sem rodar o app, uma CSP restritiva pode quebrar a UI. Recomendada como próximo passo.
 - **Chave mestra em cache no keychain** (modo senha mestra): comportamento documentado do upstream.
-- Variáveis `UNITERM_UPDATE_API_BASE`/`UNITERM_UPDATE_AUTOTEST` ativas em produção: quem controla o ambiente do usuário já executa código.
+- Variáveis `UNITERM_UPDATE_API_BASE`/`UNITERM_UPDATE_AUTOTEST` ativas em produção: quem controla o ambiente do usuário já executa código. Mesmo com elas, a assinatura continua obrigatória.
 
 ## Compatibilidade
 

@@ -271,9 +271,8 @@ export interface AppSettings {
   ai: AISettings
   keyboard: KeyboardSettings
   autoCheckUpdate: boolean
-  // Update source for checks and downloads: "auto" picks by UI language with
-  // cross-source fallback; "github" forces the official source; "gitee"
-  // forces the domestic mirror.
+  // Legacy update-source setting, kept so old settings files load. Ignored:
+  // the fork checks only github.com/r1ckcs/uniterm (never ys-ll or Gitee).
   updateSource: 'auto' | 'github' | 'gitee'
   closeTabPrompt: boolean
   closeAppPrompt: boolean
@@ -374,7 +373,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     activeModelId: 'model-default'
   },
   keyboard: { ...DEFAULT_KEYBOARD },
-  autoCheckUpdate: true,
+  autoCheckUpdate: false,
   updateSource: 'auto',
   closeTabPrompt: true,
   closeAppPrompt: true,
