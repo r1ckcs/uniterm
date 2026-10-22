@@ -90,12 +90,26 @@ func TestLoginPKCE(t *testing.T) {
 	}
 }
 
-func TestLoginWrongState(t *testing.T) {
+func TestLoginIgnoresWrongState(t *testing.T) {
+	// A forged answer (wrong state) gets a 400 and does not end the
+	// sign-in; the genuine one that follows does.
 	srv, ch := fakeGoogle(t)
-	_, err := Login(context.Background(), Config{ClientID: "id"}, srv.Client(),
-		browser(t, ch, func(v url.Values) { v.Set("state", "forged") }))
-	if !errors.Is(err, ErrStateMismatch) {
-		t.Fatalf("forged state = %v", err)
+	real := browser(t, ch, nil)
+	tok, err := Login(context.Background(), Config{ClientID: "id"}, srv.Client(), func(auth string) error {
+		u, _ := url.Parse(auth)
+		q := u.Query()
+		resp, err := http.Get(q.Get("redirect_uri") + "?" + url.Values{"code": {"evil"}, "state": {"forged"}}.Encode())
+		if err != nil {
+			return err
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("forged answer = HTTP %d", resp.StatusCode)
+		}
+		return real(auth)
+	})
+	if err != nil || tok.Access != "at" {
+		t.Fatalf("login after a forged answer = %+v %v", tok, err)
 	}
 }
 

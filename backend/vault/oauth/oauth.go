@@ -48,11 +48,10 @@ func (e *Error) Error() string     { return e.Msg }
 func (e *Error) VaultCode() string { return e.Code }
 
 var (
-	ErrCancelled     = &Error{"vault.oauth.cancelled", "sign-in cancelled"}
-	ErrDenied        = &Error{"vault.oauth.denied", "Google refused the sign-in"}
-	ErrTimeout       = &Error{"vault.oauth.timeout", "no answer from the browser"}
-	ErrNoClientID    = &Error{"vault.oauth.noClientId", "no Google OAuth client configured (google-oauth.json)"}
-	ErrStateMismatch = &Error{"vault.oauth.stateMismatch", "sign-in answer with a wrong state"}
+	ErrCancelled  = &Error{"vault.oauth.cancelled", "sign-in cancelled"}
+	ErrDenied     = &Error{"vault.oauth.denied", "Google refused the sign-in"}
+	ErrTimeout    = &Error{"vault.oauth.timeout", "no answer from the browser"}
+	ErrNoClientID = &Error{"vault.oauth.noClientId", "no Google OAuth client configured (google-oauth.json)"}
 	// ErrRevoked: the refresh token no longer works (sign in again).
 	ErrRevoked = &Error{"vault.drive.auth", "Google access was revoked or expired"}
 )
@@ -165,8 +164,11 @@ func Login(ctx context.Context, c Config, client *http.Client, open func(string)
 		}
 		got := q.Get("state")
 		if subtle.ConstantTimeCompare([]byte(got), []byte(state)) != 1 {
-			page(w, "Falha no login", "Resposta inválida. Volte ao FlexTerm e tente de novo.")
-			finish(result{err: ErrStateMismatch})
+			// Anything local that finds the port could send this: ignore
+			// it and keep waiting, so it can't abort the sign-in. Only the
+			// right state ends it.
+			w.WriteHeader(http.StatusBadRequest)
+			page(w, "Resposta inválida", "Volte ao FlexTerm.")
 			return
 		}
 		if e := q.Get("error"); e != "" {
