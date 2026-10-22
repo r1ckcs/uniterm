@@ -1955,5 +1955,8 @@
   "vault.role.readerHint": "可以使用连接并读取密码，但不能修改。",
   "vault.revoke.recoveryStale": "请生成新的恢复密钥：当前密钥是在此次撤销之前创建的。",
   "vault.revoke.newRecovery": "新的恢复密钥",
-  "vault.testModeStrip": "测试模式：密钥保存在文件中"
+  "vault.testModeStrip": "测试模式：密钥保存在文件中",
+  "vault.recovery.regenTitle": "新的恢复密钥",
+  "vault.recovery.regenNote": "确认后，旧的恢复短语将失效。在此之前或取消时，旧短语仍然有效。",
+  "vault.confirm.submitRegen": "替换恢复密钥"
 }
