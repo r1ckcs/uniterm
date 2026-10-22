@@ -159,6 +159,8 @@
   "tab.openTerminal": "Connect SSH",
   "tab.reconnect": "Reconnect",
   "tab.reconnectFailed": "Reconnect failed: {error}",
+  "tab.disconnected": "Disconnected",
+  "tab.disconnectedHint": "Disconnected — press Enter in the terminal to reconnect",
   "tab.transferring": "Transferring…",
   "tab.panelNotFound": "Panel not found",
   "tab.copyHostAddress": "Copy Host Address",

@@ -1186,7 +1186,7 @@ func (a *App) SaveLocalState(state store.LocalState) error {
 
 func (a *App) LoadLocalState() (store.LocalState, error) {
 	if a.localStateStore == nil {
-		return store.LocalState{SidebarVisible: true, AISidebarVisible: true}, nil
+		return store.LocalState{SidebarVisible: true}, nil
 	}
 	return a.localStateStore.Load()
 }

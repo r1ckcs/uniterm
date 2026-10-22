@@ -159,6 +159,8 @@
   "tab.openTerminal": "连接 SSH",
   "tab.reconnect": "重新连接",
   "tab.reconnectFailed": "重连失败：{error}",
+  "tab.disconnected": "已断开",
+  "tab.disconnectedHint": "已断开 — 在终端中按 Enter 重新连接",
   "tab.transferring": "传输中…",
   "tab.panelNotFound": "未找到面板",
   "tab.copyHostAddress": "复制主机地址",

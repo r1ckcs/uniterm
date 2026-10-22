@@ -84,3 +84,28 @@ func TestLocalStateSftpHiddenColumns(t *testing.T) {
 		t.Fatalf("legacy config should yield nil SftpHiddenColumns, got %v", legacy.SftpHiddenColumns)
 	}
 }
+
+func TestLocalStateAISidebarClosedOnFirstRun(t *testing.T) {
+	s := NewLocalStateStore(t.TempDir())
+
+	first, err := s.Load()
+	if err != nil {
+		t.Fatalf("initial load: %v", err)
+	}
+	if first.AISidebarVisible {
+		t.Fatalf("AI sidebar should start closed on a first run")
+	}
+
+	// A user who opened it keeps it open.
+	first.AISidebarVisible = true
+	if err := s.Save(first); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	again, err := s.Load()
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if !again.AISidebarVisible {
+		t.Fatalf("saved AI sidebar state was not kept")
+	}
+}

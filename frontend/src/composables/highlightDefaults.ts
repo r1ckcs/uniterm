@@ -8,18 +8,23 @@
 import type { UserHighlightRule } from './userHighlightRules'
 import { mobaxtermStandardRules } from './mobaxtermStandard'
 
-// Palette chosen to stay readable on dark themes; the terminal's
-// minimumContrast setting still applies to override colors.
+// Colors come from the terminal theme's palette ("theme:<key>"), so each
+// theme decides how its red or yellow reads on its own background — the old
+// fixed hex palette was tuned for dark themes and vanished on light ones
+// (yellow at 1.1:1). Two exceptions keep a fixed mid tone checked at >= 3:1
+// on both uniTerm themes (test in highlightDefaults.test.ts): orange, which
+// the ANSI palette lacks, and gray, since several themes make brightBlack
+// the background color. The terminal's minimumContrast setting still applies.
 const C = {
   theme: (key: string) => `theme:${key}`,
-  red: '#ff4d4f',
-  orange: '#fa8c16',
-  yellow: '#fadb14',
-  green: '#52c41a',
-  blue: '#4096ff',
-  gray: '#8c8c8c',
-  purple: '#b37feb',
-  teal: '#36cfc9',
+  red: 'theme:red',
+  orange: '#d9480f',
+  yellow: 'theme:yellow',
+  green: 'theme:green',
+  blue: 'theme:blue',
+  gray: '#7a7a7a',
+  purple: 'theme:magenta',
+  teal: 'theme:cyan',
 }
 
 // Every default rule has a fixed id ("d" + number). Saved files are merged
@@ -161,7 +166,7 @@ const MOBA_IDS = [56, 57, 58, 59, 60, 61, 62]
 /** Version of the default list. Saved files record the version they were
  * last merged with; bump it on any change to buildDefaultRules' output
  * (a test pins the list's signature to it). */
-export const DEFAULTS_VERSION = 1
+export const DEFAULTS_VERSION = 2
 /** Next unused default rule number (see the note on ids above). */
 export const NEXT_DEFAULT_ID = 63
 

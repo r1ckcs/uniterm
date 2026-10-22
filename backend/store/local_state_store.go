@@ -60,8 +60,10 @@ func (s *LocalStateStore) Save(state LocalState) error {
 
 func defaultLocalState() LocalState {
 	return LocalState{
-		SidebarVisible:                true,
-		AISidebarVisible:              true,
+		SidebarVisible: true,
+		// The AI sidebar starts closed so the terminal gets the width on a
+		// first run; once toggled, the saved value wins.
+		AISidebarVisible:              false,
 		CollapsedQuickCommandGroupIds: []string{},
 		BackgroundOpacity:             60,
 		BackgroundBlur:                3,

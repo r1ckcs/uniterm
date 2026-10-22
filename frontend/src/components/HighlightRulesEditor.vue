@@ -29,10 +29,10 @@
         </el-select>
         <el-input v-model="row.rule.pattern" size="small" class="hl-pattern" :placeholder="row.rule.kind === 'regex' ? 'gpon-onu_\\d+/\\d+/\\d+' : 'LOS'" />
         <span v-if="isTheme(row.rule.color)" class="hl-theme" :title="t('hl.themeColorDesc')">
-          <i :style="{ background: themeColorFallback(row.rule.color.slice(6)) }" />{{ t('hl.themeColor') }}
+          <i :style="{ background: themeSwatch(row.rule.color.slice(6)) }" />{{ t('hl.themeColor') }}
         </span>
         <el-color-picker
-          :model-value="isTheme(row.rule.color) ? themeColorFallback(row.rule.color.slice(6)) : row.rule.color"
+          :model-value="isTheme(row.rule.color) ? themeSwatch(row.rule.color.slice(6)) : row.rule.color"
           size="small"
           @update:model-value="(c: string | null) => { if (c) row.rule.color = c.toLowerCase() }"
         />
@@ -55,7 +55,7 @@
 
     <div class="hl-preview-head">{{ t('hl.preview') }}</div>
     <el-input v-model="sample" type="textarea" :rows="4" :placeholder="t('hl.previewPlaceholder')" class="hl-sample" />
-    <pre class="hl-preview"><template v-for="(line, li) in previewLines" :key="li"><span
+    <pre class="hl-preview" :style="{ background: previewTheme.background, color: previewTheme.foreground }"><template v-for="(line, li) in previewLines" :key="li"><span
       v-for="(seg, si) in line"
       :key="si"
       :style="seg.color ? { color: seg.color } : undefined"
@@ -69,11 +69,15 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from '../i18n'
 import { matchTextSpans } from '../composables/highlightRules'
 import { compileRules, validateRule, type RuleValidation, type UserHighlightRule } from '../composables/userHighlightRules'
-import { themeColorFallback } from '../composables/overlayHighlight'
+import { themeColorFallback, resolveHighlightColors, resolveSpanColor } from '../composables/overlayHighlight'
+import { getXtermTheme } from '../composables/useTerminal'
+import { resolveTerminalThemeName } from '../composables/useTerminalTheme'
+import { useSettingsStore } from '../stores/settingsStore'
 import { useHighlightRuleStore, migrateLegacy } from '../stores/highlightRuleStore'
 
 const { t } = useI18n()
 const store = useHighlightRuleStore()
+const settingsStore = useSettingsStore()
 
 const clone = (rules: UserHighlightRule[]): UserHighlightRule[] => JSON.parse(JSON.stringify(rules))
 
@@ -115,7 +119,7 @@ function addRule() {
     id: newId(),
     pattern: '',
     kind: 'keyword',
-    color: '#ff4d4f',
+    color: 'theme:red',
     caseSensitive: false,
     wholeWord: true,
     enabled: true,
@@ -233,9 +237,24 @@ const sample = ref([
   'ssh user@10.0.0.1 "cat /etc/hosts"',
 ].join('\n'))
 
+// The preview paints with the terminal's current theme (background and
+// "theme:<key>" colors), so a rule that is unreadable on a light terminal
+// shows up as such here.
+const previewTheme = computed(() => getXtermTheme(
+  resolveTerminalThemeName(settingsStore.settings.terminal.theme, settingsStore.resolvedAppTheme),
+  settingsStore.settings.customTerminalThemes,
+))
+
+/** Color a "theme:<key>" rule shows in the current terminal theme. */
+function themeSwatch(key: string): string {
+  return (previewTheme.value as Record<string, string | undefined>)[key] ?? themeColorFallback(key)
+}
+
 // Preview of the draft (valid rules only) as plain text segments — never
 // v-html, the sample is arbitrary pasted text.
 const previewLines = computed(() => {
+  const theme = previewTheme.value
+  const categories = resolveHighlightColors(theme)
   const rules = compileRules(clone(draft.value))
   return sample.value.split('\n').slice(0, 50).map((line) => {
     const { spans } = matchTextSpans(line, rules)
@@ -243,7 +262,7 @@ const previewLines = computed(() => {
     let pos = 0
     for (const s of spans) {
       if (s.start > pos) segs.push({ text: line.slice(pos, s.start) })
-      const c = s.color && s.color.startsWith('theme:') ? themeColorFallback(s.color.slice(6)) : s.color
+      const c = s.color ? resolveSpanColor(s.color, s.category, theme, categories) : undefined
       segs.push({ text: line.slice(s.start, s.end), color: c })
       pos = s.end
     }
