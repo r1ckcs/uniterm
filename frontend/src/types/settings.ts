@@ -72,6 +72,9 @@ export interface TerminalSettings {
   // to their nearest available weight). ANSI-bold text stays a step heavier.
   fontWeight: number
   fontSize: number
+  // xterm line height multiplier, 1.0–1.5 in 0.05 steps. Absent means 1.0
+  // (installs from before the setting); new installs get 1.1 (Go defaults).
+  lineHeight?: number
   selectionAction: 'none' | 'copy'
   rightClickAction: 'menu' | 'paste'
   middleClickAction: 'paste' | 'menu'
@@ -347,7 +350,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     fontFamily: 'JetBrains Mono Variable',
     fallbackFont: '',
     fontWeight: 400,
-    fontSize: 14,
+    fontSize: 13,
     selectionAction: 'none',
     rightClickAction: 'menu',
     middleClickAction: 'paste',

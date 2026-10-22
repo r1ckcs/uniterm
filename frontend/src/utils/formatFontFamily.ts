@@ -33,6 +33,9 @@ export function formatFontFamily(first?: string, second?: string): string {
     parts.push(
       cleaned.includes(',') ? cleaned : /\s/.test(cleaned) ? `"${cleaned}"` : cleaned
     )
+    // macOS has SF Mono only as a hidden system face; WebKit reaches it
+    // through the ui-monospace generic.
+    if (cleaned === 'SF Mono') parts.push('ui-monospace')
   }
   parts.push('monospace')
   return parts.join(', ')

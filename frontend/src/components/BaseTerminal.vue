@@ -175,6 +175,7 @@ import { resolveXtermBackground, applyTerminalBgVar, resolveTerminalThemeName } 
 import { stripCursorBlink } from '../utils/cursor'
 import { applyBackspaceKey } from '../utils/backspaceKey'
 import { formatFontFamily } from '../utils/formatFontFamily'
+import { terminalLineHeight } from '../utils/terminalFonts'
 import { normalizePastedText, pasteWithScroll } from '../utils/terminalPaste'
 import {
   sanitizeTerminalOutput,
@@ -613,6 +614,7 @@ function getTerminalOptions() {
     fontFamily: ts.fontFamily,
     fallbackFont: ts.fallbackFont || '',
     fontWeight: ts.fontWeight || 400,
+    lineHeight: terminalLineHeight(ts.lineHeight),
     themeName: ts.theme || 'dark',
     scrollback: ts.maxHistoryLines || 2500,
   }
@@ -2062,6 +2064,7 @@ watch(() => settingsStore.settings.terminal, (ts) => {
   if (ts.fontSize) terminal.options.fontSize = ts.fontSize
   if (ts.fontFamily) terminal.options.fontFamily = formatFontFamily(ts.fontFamily, ts.fallbackFont)
   if (ts.fontWeight) terminal.options.fontWeight = ts.fontWeight
+  if (terminal.options.lineHeight !== terminalLineHeight(ts.lineHeight)) terminal.options.lineHeight = terminalLineHeight(ts.lineHeight)
   if (ts.maxHistoryLines) terminal.options.scrollback = ts.maxHistoryLines
   if (ts.theme) applyXtermTheme(ts.theme)
   if (typeof ts.cursorBlink === 'boolean') {

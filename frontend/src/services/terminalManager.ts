@@ -31,6 +31,7 @@ export interface TerminalOptions {
   fallbackFont?: string
   // Weight for regular terminal text (variable-font weights for JetBrains).
   fontWeight?: number
+  lineHeight?: number
   themeName?: string
   scrollback?: number
 }
@@ -325,6 +326,7 @@ export function acquireTerminal(
       fontSize: options.fontSize ?? 13,
       fontFamily: formatFontFamily(options.fontFamily ?? 'JetBrains Mono Variable', options.fallbackFont),
       fontWeight: options.fontWeight ?? 400,
+      lineHeight: options.lineHeight ?? 1,
       theme,
       cursorBlink,
       cursorStyle: useSettingsStore().settings.terminal.cursorStyle ?? 'block',

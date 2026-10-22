@@ -483,6 +483,8 @@
   "settings.restartNow": "Restart Now",
   "settings.colorScheme": "Color Scheme",
   "settings.font": "Font",
+  "settings.lineHeight": "Line height",
+  "settings.lineHeightDesc": "Space between terminal lines (1.0 = font default).",
   "settings.fontSize": "Font Size",
   "settings.selectionAction": "Selection Action",
   "settings.selectionNone": "None",

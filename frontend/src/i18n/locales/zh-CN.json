@@ -483,6 +483,8 @@
   "settings.restartNow": "立即重启",
   "settings.colorScheme": "配色方案",
   "settings.font": "字体",
+  "settings.lineHeight": "行高",
+  "settings.lineHeightDesc": "终端行之间的间距（1.0 = 字体默认）。",
   "settings.fontSize": "字体大小",
   "settings.selectionAction": "选中后执行",
   "settings.selectionNone": "无动作",

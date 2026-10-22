@@ -83,6 +83,7 @@ func TestSettingsStore_PreservesAppearanceF3Settings(t *testing.T) {
 
 	settings := defaultSettings()
 	settings.ListDensity = "compact"
+	settings.Terminal.LineHeight = floatPtr(1.35)
 	if err := s.Save(settings); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
@@ -92,6 +93,29 @@ func TestSettingsStore_PreservesAppearanceF3Settings(t *testing.T) {
 	}
 	if got.ListDensity != "compact" {
 		t.Errorf("ListDensity: got %q, want %q", got.ListDensity, "compact")
+	}
+	if got.Terminal.LineHeight == nil || *got.Terminal.LineHeight != 1.35 {
+		t.Errorf("Terminal.LineHeight: got %v, want 1.35", got.Terminal.LineHeight)
+	}
+}
+
+// New installs: 13 pt, line height 1.1, the bundled font. A settings.json
+// from before LineHeight existed keeps nil (= 1.0 in the frontend).
+func TestSettingsStore_TerminalTypographyDefaults(t *testing.T) {
+	d := defaultSettings()
+	if d.Terminal.FontSize != 13 || d.Terminal.LineHeight == nil || *d.Terminal.LineHeight != 1.1 {
+		t.Errorf("defaults: fontSize %d lineHeight %v, want 13 / 1.1", d.Terminal.FontSize, d.Terminal.LineHeight)
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, settingsFileName), []byte(`{"theme":"dark","terminal":{"fontSize":15}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := (&SettingsStore{configDir: dir}).Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got.Terminal.FontSize != 15 || got.Terminal.LineHeight != nil {
+		t.Errorf("existing file: fontSize %d lineHeight %v, want 15 / nil", got.Terminal.FontSize, got.Terminal.LineHeight)
 	}
 }
 
