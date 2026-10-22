@@ -266,7 +266,7 @@ async function onSignOut() {
 }
 .vault-card-body { padding: 1rem 1.125rem; }
 .vault-empty { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; text-align: center; padding: 1.75rem 1.125rem; }
-.vault-empty-icon { color: var(--accent); }
+.vault-empty-icon { color: var(--accent-text); }
 .vault-rows { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.875rem; }
 .vault-row { display: flex; align-items: center; gap: 0.5rem 0.75rem; font-size: 0.8125rem; flex-wrap: wrap; }
 .vault-label { color: var(--text-muted); min-width: 7rem; flex-shrink: 0; }

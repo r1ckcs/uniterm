@@ -590,7 +590,7 @@ onUnmounted(() => {
 }
 
 .full-monitor-btn:hover {
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-subtle);
   border-color: var(--accent-subtle);
   box-shadow: 0 0 0 1px var(--accent-subtle) inset;

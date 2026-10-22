@@ -6,13 +6,16 @@ import { FOLLOW_APP_THEME } from '../types/settings'
  *
  * When the user picks an explicit palette it is returned unchanged; only the
  * special FOLLOW_APP_THEME value is derived from the app theme. `appTheme` here
- * is expected to be already resolved to a concrete light/dark choice.
+ * is the applied app theme ('system' already resolved): the FlexTerm themes
+ * follow with the FlexTerm palettes, the classic ones with the classic palettes.
  */
 export function resolveTerminalThemeName(
   terminalTheme: string | undefined,
-  appTheme: 'dark' | 'light'
+  appTheme: string
 ): string {
-  if (terminalTheme !== FOLLOW_APP_THEME) return terminalTheme || 'uniterm-dark'
+  if (terminalTheme !== FOLLOW_APP_THEME) return terminalTheme || 'flexterm-dark'
+  if (appTheme === 'flexterm') return 'flexterm-dark'
+  if (appTheme === 'flexterm-light') return 'flexterm-light'
   return appTheme === 'light' ? 'uniterm-light' : 'uniterm-dark'
 }
 

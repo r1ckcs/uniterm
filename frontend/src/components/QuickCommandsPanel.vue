@@ -687,7 +687,7 @@ watch(searchQuery, (q) => {
 }
 
 .qc-item.active .qc-item-name {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .qc-item-content {

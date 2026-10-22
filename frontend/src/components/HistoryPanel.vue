@@ -341,7 +341,7 @@ watch(searchQuery, () => {
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 
-.qc-item.active .history-command { color: var(--accent); }
+.qc-item.active .history-command { color: var(--accent-text); }
 
 .qc-item-actions {
   display: flex;

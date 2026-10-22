@@ -256,7 +256,7 @@ function onResizeStart(e: MouseEvent) {
 .task-type {
   display: inline-flex;
   align-items: center;
-  color: var(--accent);
+  color: var(--accent-text);
   flex-shrink: 0;
 }
 .task-name {
@@ -302,7 +302,7 @@ function onResizeStart(e: MouseEvent) {
   color: var(--text-disabled);
 }
 .task-file.f-done .task-file-status {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .task-file.f-failed .task-file-status {
   color: var(--error);
@@ -342,7 +342,7 @@ function onResizeStart(e: MouseEvent) {
   flex-shrink: 0;
 }
 .status-text.done {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .status-text.error {
   color: var(--error);

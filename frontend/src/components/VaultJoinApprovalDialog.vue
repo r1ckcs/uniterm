@@ -159,7 +159,7 @@ function onLater() {
 .vault-remote-name { font-weight: 600; }
 .mono { font-family: var(--font-mono); }
 .vault-waiting { display: flex; align-items: center; gap: 0.5rem; color: var(--text-secondary); font-size: 0.8125rem; }
-.vault-spin { color: var(--accent); animation: vault-rotate 1s linear infinite; }
+.vault-spin { color: var(--accent-text); animation: vault-rotate 1s linear infinite; }
 @keyframes vault-rotate { to { transform: rotate(360deg); } }
 .vault-code-label { color: var(--text-primary); font-size: 0.8125rem; }
 .vault-code-input { width: 13rem; align-self: center; }

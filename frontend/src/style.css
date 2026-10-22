@@ -71,6 +71,43 @@
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
 
+  /* Shape tokens (D1c). Legacy themes keep the old small radii; the
+     flexterm themes override them. */
+  --radius-card: var(--radius-lg);
+  --radius-bar: var(--radius-lg);
+  --radius-btn: var(--radius-sm);
+  --radius-row: var(--radius-sm);
+  --radius-badge: var(--radius-sm);
+
+  /* Accent used as a text/icon color. Same as --accent in the legacy themes;
+     the flexterm themes split it because their --accent is a fill that only
+     reads under white text. */
+  --accent-text: var(--accent);
+
+  /* Sunken surfaces (list rows, inputs) and the app header. */
+  --bg-sunken: var(--bg-elevated);
+  --bg-input: var(--bg-base);
+  --header-bg: var(--bg-elevated);
+  --header-border: var(--border-subtle);
+  --header-text: var(--text-primary);
+  --header-text-2: var(--text-secondary);
+  --header-tab-active: var(--bg-active);
+
+  /* Status colors for the start screen (alert card, ok badge) and the
+     connection type tags. */
+  --alert-card: var(--error-subtle);
+  --alert-border: var(--error);
+  --alert-row: var(--error-subtle);
+  --alert-text: var(--error);
+  --alert-badge: var(--error-glow);
+  --ok-text: var(--success);
+  --ok-badge: var(--success-subtle);
+  --tag-olt: #fb923c;
+  --tag-pe: #818cf8;
+  --tag-mk: #34d399;
+  --tag-sw: #c084fc;
+  --tag-other: var(--text-secondary);
+
   /* Scrollbar */
   --scrollbar-thumb: rgba(255, 255, 255, 0.18);
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
@@ -261,6 +298,266 @@
   --scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
 }
 
+/* FlexTerm (D1c, solid colors). No shadows, no transparency, no blur, no
+   gradients: a 1px border does the separation. Default for new installs. */
+[data-theme="flexterm"] {
+  --bg-base: #0a1120;
+  --bg-elevated: #141f3a;
+  --bg-surface: #16223f;
+  --bg-overlay: #1a2747;
+  --bg-hover: #1f2d52;
+  --bg-active: #24335c;
+  --bg-sunken: #0f1830;
+  --bg-input: #0d1528;
+
+  --text-primary: #eef2ff;
+  --text-secondary: #c7d0ee;
+  --text-muted: #a3aed6;
+  --text-disabled: #6d79a3;
+
+  --accent: #4f63e6;
+  --accent-text: #aab6ff;
+  --accent-glow: #24335c;
+  --accent-subtle: #24335c;
+  --on-accent: #ffffff;
+
+  --info: #9cc0ff;
+  --info-subtle: #15264a;
+
+  --chart-1: #6ff0a8;
+  --chart-2: #8fb0ff;
+  --chart-3: #ffc96b;
+  --chart-4: #c6a8ff;
+  --chart-4-alt: #dcc4ff;
+
+  --success: #6ff0a8;
+  --success-dim: #2fbf7a;
+  --success-subtle: #0d3a26;
+  --success-glow: #0d3a26;
+  --warning: #ffc96b;
+  --warning-subtle: #33270f;
+  --warning-tab: #3a2d12;
+  --warning-tab-hover: #47381a;
+  --warning-tab-active: #433418;
+  --error: #ffb0b0;
+  --error-subtle: #2a0f17;
+  --error-glow: #5c1a26;
+
+  --border-subtle: #24335c;
+  --border-hover: #34477a;
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+
+  --font-ui: 'Manrope Variable', -apple-system, 'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+
+  --radius-sm: 0.625rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 0.875rem;
+  --radius-card: 1.375rem;
+  --radius-bar: 1.125rem;
+  --radius-btn: 0.875rem;
+  --radius-row: 0.75rem;
+  --radius-badge: 0.625rem;
+
+  --header-bg: #141f3a;
+  --header-border: #24335c;
+  --header-text: #eef2ff;
+  --header-text-2: #c7d0ee;
+  --header-tab-active: #24335c;
+
+  --alert-card: #3a1520;
+  --alert-border: #6a2633;
+  --alert-row: #2a0f17;
+  --alert-text: #ffb0b0;
+  --alert-badge: #5c1a26;
+  --ok-text: #6ff0a8;
+  --ok-badge: #0d3a26;
+  --tag-olt: #ffc49b;
+  --tag-pe: #c3ccff;
+  --tag-mk: #8ff0c4;
+  --tag-sw: #dcc4ff;
+  --tag-other: #c7d0ee;
+
+  --scrollbar-thumb: #24335c;
+  --scrollbar-thumb-hover: #34477a;
+
+  --el-color-primary-light-3: #3d4db3;
+  --el-color-primary-light-5: #2f3b8a;
+  --el-color-primary-light-7: #212a61;
+  --el-color-primary-light-8: #1b234f;
+  --el-color-primary-light-9: #151c3d;
+  --el-color-primary-dark-2: #7282eb;
+  --el-color-success: #2fbf7a;
+  --el-color-warning: #e0a030;
+  --el-color-danger: #e5535f;
+  --el-color-info: #8a96bf;
+  --el-bg-color: #0a1120;
+  --el-bg-color-page: #0a1120;
+  --el-bg-color-overlay: #16223f;
+  --el-fill-color-blank: #0d1528;
+  --el-fill-color: #141f3a;
+  --el-fill-color-light: #1a2747;
+  --el-fill-color-lighter: #1f2d52;
+  --el-fill-color-extra-light: #16223f;
+  --el-fill-color-dark: #24335c;
+  --el-text-color-primary: #eef2ff;
+  --el-text-color-regular: #c7d0ee;
+  --el-text-color-secondary: #a3aed6;
+  --el-text-color-placeholder: #6d79a3;
+  --el-text-color-disabled: #6d79a3;
+  --el-border-color: #24335c;
+  --el-border-color-light: #24335c;
+  --el-border-color-lighter: #1f2d52;
+  --el-border-color-extra-light: #1a2747;
+  --el-border-color-dark: #34477a;
+  --el-border-color-hover: #34477a;
+  --el-border-radius-base: 0.75rem;
+  --el-border-radius-small: 0.625rem;
+  --el-border-radius-round: 1.25rem;
+  --el-box-shadow: none;
+  --el-box-shadow-light: none;
+  --el-box-shadow-lighter: none;
+  --el-box-shadow-dark: none;
+  --el-font-family: var(--font-ui);
+  --el-switch-off-color: #24335c;
+
+  --el-input-height: 1.75rem;
+  --el-component-size: 1.75rem;
+}
+
+/* FlexTerm light: same hierarchy as the dark one, derived from the D light
+   mock (navy header, white surfaces on a cool gray page). */
+[data-theme="flexterm-light"] {
+  --bg-base: #f4f6fb;
+  --bg-elevated: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-overlay: #eef1f8;
+  --bg-hover: #e8ecf6;
+  --bg-active: #dfe4f0;
+  --bg-sunken: #f4f6fb;
+  --bg-input: #ffffff;
+
+  --text-primary: #0f2351;
+  --text-secondary: #4a5470;
+  --text-muted: #56607d;
+  --text-disabled: #8a93ad;
+
+  --accent: #2b3dbc;
+  --accent-text: #2b3dbc;
+  --accent-glow: #d5daf3;
+  --accent-subtle: #e6e9f8;
+  --on-accent: #ffffff;
+
+  --info: #1f5fb8;
+  --info-subtle: #e6eefa;
+
+  --chart-1: #17703f;
+  --chart-2: #2b3dbc;
+  --chart-3: #b4501c;
+  --chart-4: #6b4bbd;
+  --chart-4-alt: #9c86d6;
+
+  --success: #17703f;
+  --success-dim: #105430;
+  --success-subtle: #e3f5ea;
+  --success-glow: #c8ebd5;
+  --warning: #8f4a00;
+  --warning-subtle: #fdf0dc;
+  --warning-tab: #fbe6c4;
+  --warning-tab-hover: #f8dcae;
+  --warning-tab-active: #f9e0b6;
+  --error: #b4232a;
+  --error-subtle: #fdf1f1;
+  --error-glow: #fde8e9;
+
+  --border-subtle: #dfe4f0;
+  --border-hover: #c9d2e6;
+
+  --scrim: rgba(255, 255, 255, 0.6);
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+
+  --font-ui: 'Manrope Variable', -apple-system, 'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+
+  --radius-sm: 0.625rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 0.875rem;
+  --radius-card: 1.375rem;
+  --radius-bar: 1.125rem;
+  --radius-btn: 0.875rem;
+  --radius-row: 0.75rem;
+  --radius-badge: 0.625rem;
+
+  --header-bg: #0f2351;
+  --header-border: #0f2351;
+  --header-text: #ffffff;
+  --header-text-2: #c9d2ee;
+  --header-tab-active: #2a3a63;
+
+  --alert-card: #ffffff;
+  --alert-border: #f3b9bd;
+  --alert-row: #fdf1f1;
+  --alert-text: #b4232a;
+  --alert-badge: #fde8e9;
+  --ok-text: #17703f;
+  --ok-badge: #e3f5ea;
+  --tag-olt: #b4501c;
+  --tag-pe: #2b3dbc;
+  --tag-mk: #17703f;
+  --tag-sw: #6b4bbd;
+  --tag-other: #4a5470;
+
+  --scrollbar-thumb: #c9d2e6;
+  --scrollbar-thumb-hover: #a9b4cf;
+
+  --el-color-primary-light-3: #6b77d0;
+  --el-color-primary-light-5: #959ede;
+  --el-color-primary-light-7: #bfc5eb;
+  --el-color-primary-light-8: #d5d8f2;
+  --el-color-primary-light-9: #eaecf8;
+  --el-color-primary-dark-2: #222f96;
+  --el-color-success: #17703f;
+  --el-color-warning: #b86a00;
+  --el-color-danger: #b4232a;
+  --el-color-info: #56607d;
+  --el-bg-color: #ffffff;
+  --el-bg-color-page: #f4f6fb;
+  --el-bg-color-overlay: #ffffff;
+  --el-fill-color-blank: #ffffff;
+  --el-fill-color: #f4f6fb;
+  --el-fill-color-light: #eef1f8;
+  --el-fill-color-lighter: #e8ecf6;
+  --el-fill-color-extra-light: #f8f9fc;
+  --el-fill-color-dark: #dfe4f0;
+  --el-text-color-primary: #0f2351;
+  --el-text-color-regular: #4a5470;
+  --el-text-color-secondary: #56607d;
+  --el-text-color-placeholder: #8a93ad;
+  --el-text-color-disabled: #8a93ad;
+  --el-border-color: #dfe4f0;
+  --el-border-color-light: #dfe4f0;
+  --el-border-color-lighter: #e8ecf6;
+  --el-border-color-extra-light: #eef1f8;
+  --el-border-color-dark: #c9d2e6;
+  --el-border-color-hover: #c9d2e6;
+  --el-border-radius-base: 0.75rem;
+  --el-border-radius-small: 0.625rem;
+  --el-border-radius-round: 1.25rem;
+  --el-box-shadow: none;
+  --el-box-shadow-light: none;
+  --el-box-shadow-lighter: none;
+  --el-box-shadow-dark: none;
+  --el-font-family: var(--font-ui);
+  --el-switch-off-color: #c9d2e6;
+
+  --el-input-height: 1.75rem;
+  --el-component-size: 1.75rem;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -333,6 +630,14 @@ body::before {
 
 [data-theme="light"] body::before {
   opacity: 0.006;
+}
+
+/* D1c: flat page color, no noise. */
+[data-theme^="flexterm"] body {
+  background: var(--bg-base);
+}
+[data-theme^="flexterm"] body::before {
+  display: none;
 }
 
 /* Scrollbar - minimal */
@@ -424,7 +729,7 @@ body::before {
 .el-dialog {
   background: var(--bg-surface) !important;
   border: none !important;
-  border-radius: var(--radius-lg) !important;
+  border-radius: var(--radius-card) !important;
   box-shadow: var(--shadow-lg) !important;
 }
 .el-dialog__header {
@@ -454,7 +759,7 @@ body::before {
 .el-message-box {
   background: var(--bg-surface) !important;
   border: none !important;
-  border-radius: var(--radius-lg) !important;
+  border-radius: var(--radius-card) !important;
   box-shadow: var(--shadow-lg) !important;
 }
 .el-message-box__header {
@@ -520,7 +825,7 @@ body::before {
   box-sizing: border-box !important;
   font-family: var(--font-ui);
   font-size: 0.75rem !important;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-btn);
   transition: all 0.15s ease;
 }
 
@@ -540,7 +845,7 @@ body::before {
   padding: 0 0.75rem;
   box-sizing: border-box;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-btn);
   background: transparent;
   color: var(--text-secondary);
   font-family: var(--font-ui);
@@ -592,7 +897,7 @@ body::before {
 }
 .btn-ghost.is-active {
   background: var(--accent-subtle);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 /* Ghost variant that turns red on hover instead of neutral - the common
    pattern for a delete/remove icon sitting among other row-level actions */
@@ -634,7 +939,7 @@ body::before {
 /* Ghost hover-tint modifiers for a row of mixed-purpose icon actions
    (e.g. run/paste/copy sitting next to a plain delete) */
 .btn-ghost.run:hover:not(:disabled) { color: var(--success); }
-.btn-ghost.paste:hover:not(:disabled) { color: var(--accent); }
+.btn-ghost.paste:hover:not(:disabled) { color: var(--accent-text); }
 
 .el-radio-button__inner {
   height: 1.75rem !important;
@@ -643,7 +948,7 @@ body::before {
   line-height: 1.25rem !important;
   font-family: var(--font-ui);
   font-size: 0.75rem !important;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-btn);
   transition: all 0.15s ease;
   background: var(--bg-base) !important;
   border-color: var(--border-subtle) !important;
@@ -713,7 +1018,7 @@ body::before {
 /* --- input focus / hover --- */
 .el-input__wrapper,
 .el-textarea__inner {
-  border-radius: var(--radius-sm) !important;
+  border-radius: var(--radius-row) !important;
   box-shadow: 0 0 0 1px var(--border-subtle) inset !important;
   transition: box-shadow 0.15s ease;
 }
@@ -758,7 +1063,7 @@ body::before {
   transition: none !important;
 }
 .el-select-dropdown__item.selected {
-  color: var(--accent) !important;
+  color: var(--accent-text) !important;
   background: var(--accent-subtle) !important;
 }
 
@@ -812,7 +1117,7 @@ body::before {
 }
 .el-tree-select__popper .el-select-dropdown__item.selected,
 .el-tree-select__popper .el-select-dropdown__item.is-selected {
-  color: var(--accent) !important;
+  color: var(--accent-text) !important;
   background: var(--accent-subtle) !important;
 }
 .el-tree-select__popper .el-tree {
@@ -1128,4 +1433,100 @@ body.drag-active .zone {
 /* Cover the case where autocomplete reuses select-dropdown */
 .el-autocomplete-suggestion .el-select-dropdown__item {
   font-size: 0.75rem !important;
+}
+
+/* ============================================================
+   FlexTerm (D1c) component overrides. The tokens carry most of the
+   look; these cover what Element Plus and the legacy rules paint with
+   shadows, glows or blur.
+   ============================================================ */
+[data-theme^="flexterm"] .el-dialog,
+[data-theme^="flexterm"] .el-message-box {
+  border: 1px solid var(--border-subtle) !important;
+}
+[data-theme^="flexterm"] .el-dialog__header,
+[data-theme^="flexterm"] .el-message-box__header {
+  padding-top: 0.625rem;
+  padding-bottom: 0.625rem;
+}
+[data-theme^="flexterm"] .el-dialog__title,
+[data-theme^="flexterm"] .el-message-box__title {
+  font-weight: 700;
+}
+[data-theme^="flexterm"] .el-select-dropdown,
+[data-theme^="flexterm"] .el-dropdown-menu,
+[data-theme^="flexterm"] .el-autocomplete-suggestion,
+[data-theme^="flexterm"] .el-tree-select__popper,
+[data-theme^="flexterm"] .el-popper.is-dark,
+[data-theme^="flexterm"] .el-popper.is-light {
+  border: 1px solid var(--border-subtle) !important;
+  backdrop-filter: none;
+}
+[data-theme^="flexterm"] .el-select-dropdown__item.selected,
+[data-theme^="flexterm"] .el-tree-select__popper .el-select-dropdown__item.is-selected {
+  color: var(--text-primary) !important;
+  font-weight: 700;
+}
+[data-theme^="flexterm"] .btn-primary,
+[data-theme^="flexterm"] .el-button--primary {
+  font-weight: 700;
+}
+[data-theme^="flexterm"] .btn-primary:hover:not(:disabled),
+[data-theme^="flexterm"] .el-button--primary:hover {
+  background: var(--el-color-primary-dark-2) !important;
+  border-color: var(--el-color-primary-dark-2) !important;
+  box-shadow: none;
+}
+[data-theme="flexterm-light"] .btn-primary:hover:not(:disabled),
+[data-theme="flexterm-light"] .el-button--primary:hover {
+  background: #22309a !important;
+  border-color: #22309a !important;
+}
+[data-theme^="flexterm"] .btn-ghost.is-active {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+[data-theme^="flexterm"] .el-input__wrapper,
+[data-theme^="flexterm"] .el-select .el-input__wrapper,
+[data-theme^="flexterm"] .el-input-number .el-input__wrapper,
+[data-theme^="flexterm"] .el-textarea__inner {
+  background-color: var(--bg-input) !important;
+}
+/* Solid focus ring instead of the translucent glow. */
+[data-theme^="flexterm"] .el-input__wrapper.is-focus,
+[data-theme^="flexterm"] .el-input-number .el-input__wrapper.is-focus,
+[data-theme^="flexterm"] .el-select .el-input.is-focus .el-input__wrapper,
+[data-theme^="flexterm"] .el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--accent) inset !important;
+}
+[data-theme^="flexterm"] .el-radio-button__inner {
+  background: var(--bg-input) !important;
+}
+[data-theme^="flexterm"] .el-tag {
+  border-radius: var(--radius-badge);
+}
+[data-theme^="flexterm"] .el-message {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-btn);
+  box-shadow: none;
+}
+[data-theme^="flexterm"] .el-message .el-message__content {
+  color: var(--text-primary);
+}
+[data-theme^="flexterm"] .el-table {
+  --el-table-header-bg-color: var(--bg-elevated);
+  --el-table-tr-bg-color: var(--bg-surface);
+  --el-table-bg-color: var(--bg-surface);
+  background: var(--bg-surface);
+}
+[data-theme^="flexterm"] .el-tabs__item.is-active {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+[data-theme^="flexterm"] .el-tabs__active-bar {
+  background-color: var(--accent);
+}
+[data-theme^="flexterm"] .xterm-link-tooltip {
+  border-color: var(--border-subtle);
 }

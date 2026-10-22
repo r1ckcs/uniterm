@@ -32,6 +32,8 @@
             </div>
             <div class="setting-control">
               <el-select v-model="settingsStore.settings.theme" @change="settingsStore.save()">
+                <el-option :label="t('settings.themeFlexterm')" value="flexterm" />
+                <el-option :label="t('settings.themeFlextermLight')" value="flexterm-light" />
                 <el-option :label="t('settings.themeDark')" value="dark" />
                 <el-option :label="t('settings.themeDeepBlue')" value="deep-blue" />
                 <el-option :label="t('settings.themeLight')" value="light" />
@@ -2673,7 +2675,7 @@ async function onToggleSystemTitleBar(v: boolean) {
 
 .settings-category.active {
   background: var(--accent-subtle);
-  color: var(--accent);
+  color: var(--accent-text);
   border-left-color: var(--accent);
   backdrop-filter: blur(0.5rem);
 }
@@ -2922,7 +2924,7 @@ async function onToggleSystemTitleBar(v: boolean) {
   align-items: center;
   gap: 0.375rem;
   font-size: 0.75rem;
-  color: var(--accent);
+  color: var(--accent-text);
   text-decoration: none;
   transition: opacity 0.12s ease;
 }

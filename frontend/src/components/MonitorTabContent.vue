@@ -1682,7 +1682,7 @@ watch(activeTab, (tab) => {
 }
 
 .tab-item.active {
-  color: var(--accent);
+  color: var(--accent-text);
   border-bottom-color: var(--accent);
 }
 
@@ -2330,7 +2330,7 @@ watch(activeTab, (tab) => {
 }
 
 .svc-tab.active {
-  color: var(--accent);
+  color: var(--accent-text);
   border-bottom-color: var(--accent);
 }
 

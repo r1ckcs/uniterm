@@ -754,7 +754,7 @@ watch(() => [props.dbName, props.collectionName], () => {
   color: var(--on-accent);
 }
 .result-footer :deep(.el-pager li:hover) {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .result-footer :deep(.el-pagination .el-select .el-input.is-focus .el-input__wrapper) {
   box-shadow: 0 0 0 1px var(--accent) inset;

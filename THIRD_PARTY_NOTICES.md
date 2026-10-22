@@ -3,6 +3,18 @@
 uniterm bundles fonts and other software from the projects listed below. This file
 satisfies the attribution requirements of those upstream licenses.
 
+## Manrope Variable
+
+- **Upstream:** https://github.com/sharanda/manrope
+- **npm package:** `@fontsource-variable/manrope`
+- **License:** SIL Open Font License, Version 1.1 (OFL-1.1); same license text as
+  JetBrains Mono below.
+- **Bundled in:** `frontend/src/main.ts` (woff2 files emitted into `frontend/dist/`
+  by Vite and shipped with the desktop binary; never fetched at runtime).
+- **UI font of:** the FlexTerm themes (`--font-ui` in `frontend/src/style.css`).
+
+Copyright 2019 The Manrope Project Authors (https://github.com/sharanda/manrope)
+
 ## JetBrains Mono Variable
 
 - **Upstream:** https://github.com/JetBrains/JetBrainsMono

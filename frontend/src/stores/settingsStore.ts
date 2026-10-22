@@ -29,10 +29,15 @@ export const useSettingsStore = defineStore('settings', () => {
   // The app theme collapsed to a concrete light/dark choice (never 'system').
   // Used by the terminal to resolve FOLLOW_APP_THEME.
   const resolvedAppTheme = computed<'dark' | 'light'>(() => {
-    if (settings.value.theme === 'light') return 'light'
-    if (settings.value.theme === 'system') return systemPrefersDark.value ? 'dark' : 'light'
-    // 'dark' and 'deep-blue' are both dark.
-    return 'dark'
+    const c = concreteAppTheme.value
+    return c === 'light' || c === 'flexterm-light' ? 'light' : 'dark'
+  })
+  // The data-theme actually applied ('system' resolved). The terminal's
+  // FOLLOW_APP_THEME needs it to pick the FlexTerm palette over the classic one.
+  const concreteAppTheme = computed<Exclude<AppSettings['theme'], 'system'>>(() => {
+    const th = settings.value.theme
+    if (th === 'system') return systemPrefersDark.value ? 'dark' : 'light'
+    return th || 'flexterm'
   })
 
   const activeModel = computed(() =>
@@ -312,6 +317,7 @@ export const useSettingsStore = defineStore('settings', () => {
     availableShells,
     theme,
     resolvedAppTheme,
+    concreteAppTheme,
     language,
     terminal,
     ai,

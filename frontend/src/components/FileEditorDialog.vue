@@ -516,7 +516,7 @@ defineExpose({ open })
   color: var(--text-muted);
 }
 .toolbar-icon-btn.active {
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-subtle);
 }
 .font-size-label {

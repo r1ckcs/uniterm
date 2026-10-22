@@ -1952,7 +1952,7 @@ function onConnect() {
 }
 
 .cat-item.active {
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-subtle);
   border-left-color: var(--accent);
 }
@@ -2117,7 +2117,7 @@ function onConnect() {
 }
 
 .advanced-toggle:hover {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .advanced-arrow {

@@ -297,7 +297,7 @@ export function acquireTerminal(
       || '\\ :;~`!@#$%^&*()=+|[]{}\'",<>?'
     const ls = useLocalStateStore()
     const theme = resolveXtermBackground(
-      getXtermTheme(resolveTerminalThemeName(options.themeName, useSettingsStore().resolvedAppTheme), customThemes),
+      getXtermTheme(resolveTerminalThemeName(options.themeName, useSettingsStore().concreteAppTheme), customThemes),
       ls.state.backgroundEnabled,
       ls.state.backgroundImage
     )

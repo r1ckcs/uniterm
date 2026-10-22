@@ -280,7 +280,7 @@ async function onCreateTable() {
   transition: color 0.15s ease;
 }
 .object-name:hover {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .object-icon {
   color: var(--text-muted);

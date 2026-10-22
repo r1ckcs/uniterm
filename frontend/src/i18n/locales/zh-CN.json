@@ -448,6 +448,8 @@
   "settings.uiFontSize": "界面字体大小",
   "settings.uiFontSizeDesc": "调整应用界面文字的基准大小",
   "settings.theme": "主题",
+  "settings.themeFlexterm": "FlexTerm（深色）",
+  "settings.themeFlextermLight": "FlexTerm（浅色）",
   "settings.themeDark": "暗色",
   "settings.themeDeepBlue": "深蓝",
   "settings.themeLight": "浅色",

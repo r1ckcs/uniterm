@@ -1071,7 +1071,7 @@ watch(() => props.sessionId, () => {
   cursor: pointer;
   transition: color 0.15s ease;
 }
-.object-name:hover { color: var(--accent); }
+.object-name:hover { color: var(--accent-text); }
 .object-icon {
   color: var(--text-muted);
   flex-shrink: 0;

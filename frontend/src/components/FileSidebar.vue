@@ -626,7 +626,7 @@ onUnmounted(() => {
   cursor: default;
 }
 .filter-icon-btn.active {
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-subtle);
 }
 .transfer-badge {

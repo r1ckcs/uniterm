@@ -241,7 +241,7 @@ const sample = ref([
 // "theme:<key>" colors), so a rule that is unreadable on a light terminal
 // shows up as such here.
 const previewTheme = computed(() => getXtermTheme(
-  resolveTerminalThemeName(settingsStore.settings.terminal.theme, settingsStore.resolvedAppTheme),
+  resolveTerminalThemeName(settingsStore.settings.terminal.theme, settingsStore.concreteAppTheme),
   settingsStore.settings.customTerminalThemes,
 ))
 

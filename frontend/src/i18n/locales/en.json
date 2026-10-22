@@ -448,6 +448,8 @@
   "settings.uiFontSize": "UI Font Size",
   "settings.uiFontSizeDesc": "Adjust the baseline size of UI text.",
   "settings.theme": "Theme",
+  "settings.themeFlexterm": "FlexTerm (dark)",
+  "settings.themeFlextermLight": "FlexTerm (light)",
   "settings.themeDark": "Dark",
   "settings.themeDeepBlue": "Deep Blue",
   "settings.themeLight": "Light",

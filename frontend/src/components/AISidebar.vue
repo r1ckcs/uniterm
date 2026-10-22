@@ -1852,7 +1852,7 @@ defineExpose({ focusInput })
   color: var(--success);
 }
 .mode-write {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .mode-warning {
   color: var(--warning);
@@ -1877,7 +1877,7 @@ defineExpose({ focusInput })
   padding: 1px 0.375rem;
   font-size: 0.6875rem;
   background: var(--accent-subtle);
-  color: var(--accent);
+  color: var(--accent-text);
   border: 1px solid var(--accent-glow);
   border-radius: var(--radius-sm);
   line-height: 1.5;
@@ -1921,7 +1921,7 @@ defineExpose({ focusInput })
 }
 .panel-tag-add-btn:hover {
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .no-terminal-hint {
   font-size: 0.6875rem;
@@ -1960,7 +1960,7 @@ defineExpose({ focusInput })
   background: var(--accent-subtle);
 }
 .hash-panel-name {
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 500;
 }
 .hash-panel-hint {
@@ -1970,7 +1970,7 @@ defineExpose({ focusInput })
 }
 .hash-associated-badge {
   font-size: 0.5625rem;
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-subtle);
   padding: 0 0.25rem;
   border-radius: 0.125rem;
@@ -2012,7 +2012,7 @@ defineExpose({ focusInput })
   background: var(--accent-subtle);
 }
 .skill-dropdown-name {
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 500;
   font-family: var(--font-mono);
   flex-shrink: 0;

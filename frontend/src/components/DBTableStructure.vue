@@ -632,7 +632,7 @@ async function onAddIndex() {
   padding: 1px 0.375rem;
   border-radius: var(--radius-sm);
 }
-.idx-type-pk { color: var(--accent); }
+.idx-type-pk { color: var(--accent-text); }
 .idx-type-uq { color: var(--info); }
 .idx-type-idx { color: var(--text-secondary); }
 </style>

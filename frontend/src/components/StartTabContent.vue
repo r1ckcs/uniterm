@@ -1095,7 +1095,7 @@ function doEditConnection(config: ConnectionConfig | null) {
   text-align: center;
   font-size: 2rem;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-text);
   margin-top: 4rem;
   margin-bottom: 2.25rem;
   user-select: none;
@@ -1125,7 +1125,7 @@ function doEditConnection(config: ConnectionConfig | null) {
 .start-filter-btn:hover,
 .start-filter-btn.active {
   background: var(--bg-hover);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .start-search-input {
@@ -1224,7 +1224,7 @@ function doEditConnection(config: ConnectionConfig | null) {
   color: var(--text-disabled);
 }
 .start-breadcrumb .link {
-  color: var(--accent);
+  color: var(--accent-text);
   cursor: pointer;
 }
 .start-breadcrumb .link:hover {
@@ -1398,17 +1398,17 @@ function doEditConnection(config: ConnectionConfig | null) {
 }
 .start-card-icon.ssh,
 .start-card-icon.telnet,
-.start-card-icon.mosh { color: var(--accent); }
+.start-card-icon.mosh { color: var(--accent-text); }
 .start-card-icon.local { color: var(--success); }
 .start-card-icon.database { color: var(--warning); }
 .start-card-icon.rdp,
 .start-card-icon.vnc,
-.start-card-icon.spice { color: var(--accent); }
-.start-card-icon.k8s { color: var(--accent); }
+.start-card-icon.spice { color: var(--accent-text); }
+.start-card-icon.k8s { color: var(--accent-text); }
 .start-card-icon.serial { color: var(--success-dim); }
 .start-card-icon.group { color: var(--text-secondary); }
 .start-card-icon.ungrouped { color: var(--text-muted); }
-.start-card-icon.quick { background: var(--accent-subtle); color: var(--accent); }
+.start-card-icon.quick { background: var(--accent-subtle); color: var(--accent-text); }
 
 .start-card-name {
   font-weight: 600;
@@ -1447,7 +1447,7 @@ function doEditConnection(config: ConnectionConfig | null) {
   background: var(--accent-subtle);
 }
 .quick-name {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .start-empty-hint,

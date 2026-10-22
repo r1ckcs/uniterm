@@ -829,7 +829,7 @@ onMounted(async () => {
   align-items: center;
   flex-shrink: 0;
   margin-left: auto;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .tab-notification-dot {
   position: absolute;
@@ -878,7 +878,7 @@ onMounted(async () => {
   pointer-events: auto;
 }
 .tab-item.active .tab-type-icon {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 /* Locked wins over the active accent: the AI state must stay visible when the
    tab is selected. */
@@ -886,7 +886,7 @@ onMounted(async () => {
   color: var(--warning);
 }
 .transfer-indicator {
-  color: var(--accent);
+  color: var(--accent-text);
   flex-shrink: 0;
   line-height: 1;
 }

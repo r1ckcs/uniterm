@@ -448,6 +448,8 @@
   "settings.uiFontSize": "Tamanho da fonte da interface",
   "settings.uiFontSizeDesc": "Ajuste o tamanho base do texto da interface.",
   "settings.theme": "Tema",
+  "settings.themeFlexterm": "FlexTerm (escuro)",
+  "settings.themeFlextermLight": "FlexTerm (claro)",
   "settings.themeDark": "Escuro",
   "settings.themeDeepBlue": "Azul profundo",
   "settings.themeLight": "Claro",

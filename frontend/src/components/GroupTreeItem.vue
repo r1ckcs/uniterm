@@ -274,7 +274,7 @@ function onMoreClick(e: MouseEvent, conn: ConnectionConfig) {
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 .connection-item.active .name {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* Connection has an open session → highlight its icon with the AI-lock amber */

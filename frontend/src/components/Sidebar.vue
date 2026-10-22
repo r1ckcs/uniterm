@@ -229,6 +229,8 @@
         <div class="persist-section">
           <div class="persist-label">{{ t('settings.theme') }}</div>
           <el-select v-model="settingsStore.settings.theme" @change="settingsStore.save()">
+            <el-option :label="t('settings.themeFlexterm')" value="flexterm" />
+            <el-option :label="t('settings.themeFlextermLight')" value="flexterm-light" />
             <el-option :label="t('settings.themeDark')" value="dark" />
             <el-option :label="t('settings.themeDeepBlue')" value="deep-blue" />
             <el-option :label="t('settings.themeLight')" value="light" />
@@ -1786,7 +1788,7 @@ defineExpose({ focusSearch, openQuickCommands, openChangeGroupFor, openChangeGro
 }
 
 .sidebar-tab.active {
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-subtle);
 }
 
@@ -1896,7 +1898,7 @@ defineExpose({ focusSearch, openQuickCommands, openChangeGroupFor, openChangeGro
 }
 
 .connection-item.active .name {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* Connection has an open session → highlight its icon with the AI-lock amber */
@@ -2017,7 +2019,7 @@ defineExpose({ focusSearch, openQuickCommands, openChangeGroupFor, openChangeGro
 }
 
 .virtual-new-conn .virtual-name {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .filter-trigger {
@@ -2037,11 +2039,11 @@ defineExpose({ focusSearch, openQuickCommands, openChangeGroupFor, openChangeGro
 }
 
 .filter-trigger.active {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .filter-trigger.active:hover {
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-subtle);
 }
 
@@ -2104,7 +2106,7 @@ defineExpose({ focusSearch, openQuickCommands, openChangeGroupFor, openChangeGro
   background: var(--bg-hover);
 }
 .tree-option.active {
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-subtle);
 }
 </style>
