@@ -5,7 +5,7 @@ type T = (key: string, params?: Record<string, string | number>) => string
 
 export const VAULT_ERROR_CODES = [
   'vault.oauth.cancelled', 'vault.oauth.denied', 'vault.oauth.timeout', 'vault.oauth.noClientId',
-  'vault.oauth.stateMismatch', 'vault.drive.offline', 'vault.drive.auth', 'vault.drive.quota',
+  'vault.drive.offline', 'vault.drive.auth', 'vault.drive.quota',
   'vault.state.wrongPhase', 'vault.recovery.mismatch', 'vault.recovery.badWords', 'vault.recovery.notThisVault',
   'vault.join.badCode', 'vault.join.tooManyAttempts', 'vault.join.expired', 'vault.join.notFound',
   'vault.join.notReady', 'vault.perm.notAdmin', 'vault.perm.readOnly', 'vault.revoke.self',

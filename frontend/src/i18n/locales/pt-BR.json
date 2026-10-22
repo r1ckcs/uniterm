@@ -1827,7 +1827,7 @@
   "pwsave.offerToggle": "Oferecer salvar a senha após o login",
   "vault.title": "Cofre",
   "vault.close": "Fechar",
-  "vault.testMode": "Modo de teste: pasta local no lugar do Google Drive",
+  "vault.testMode": "MODO DE TESTE: chaves em arquivo, pasta local no lugar do Google Drive",
   "vault.thisDevice": "Este aparelho",
   "vault.fingerprint": "Impressão digital",
   "vault.signOut": "Sair",
@@ -1926,7 +1926,6 @@
   "vault.err.oauth.denied": "O Google não liberou o acesso.",
   "vault.err.oauth.timeout": "O navegador demorou demais para responder. Tente de novo.",
   "vault.err.oauth.noClientId": "O login do Google não está configurado nesta versão. Use o modo de teste.",
-  "vault.err.oauth.stateMismatch": "A resposta do login não corresponde a este pedido e foi recusada por segurança.",
   "vault.err.drive.offline": "O Google Drive está inalcançável. As alterações esperam aqui e sobem depois.",
   "vault.err.drive.auth": "O acesso ao Google expirou. Entre de novo.",
   "vault.err.drive.quota": "O Google Drive está cheio ou ocupado. Tente mais tarde.",
@@ -1955,5 +1954,6 @@
   "vault.role.writerHint": "Pode editar conexões; não aprova nem revoga aparelhos.",
   "vault.role.readerHint": "Usa as conexões e lê as senhas; não altera nada.",
   "vault.revoke.recoveryStale": "Gere uma nova chave de recuperação: a atual foi criada antes desta revogação.",
-  "vault.revoke.newRecovery": "Nova chave de recuperação"
+  "vault.revoke.newRecovery": "Nova chave de recuperação",
+  "vault.testModeStrip": "MODO DE TESTE: chaves em arquivo"
 }

@@ -1827,7 +1827,7 @@
   "pwsave.offerToggle": "Offer to save the password after login",
   "vault.title": "Vault",
   "vault.close": "Close",
-  "vault.testMode": "Test mode: local folder instead of Google Drive",
+  "vault.testMode": "TEST MODE: keys in a file, local folder instead of Google Drive",
   "vault.thisDevice": "This device",
   "vault.fingerprint": "Fingerprint",
   "vault.signOut": "Sign out",
@@ -1926,7 +1926,6 @@
   "vault.err.oauth.denied": "Google did not allow access.",
   "vault.err.oauth.timeout": "The browser took too long to answer. Try again.",
   "vault.err.oauth.noClientId": "Google sign-in is not configured in this build. Use the test mode.",
-  "vault.err.oauth.stateMismatch": "The sign-in answer did not match this request and was refused for safety.",
   "vault.err.drive.offline": "Google Drive is unreachable. Changes wait here and go up later.",
   "vault.err.drive.auth": "Google access expired. Sign in again.",
   "vault.err.drive.quota": "Google Drive is full or busy. Try again later.",
@@ -1955,5 +1954,6 @@
   "vault.role.writerHint": "Can edit connections; cannot approve or revoke devices.",
   "vault.role.readerHint": "Can use connections and read their passwords; cannot change them.",
   "vault.revoke.recoveryStale": "Generate a new recovery key: the current one was created before this revocation.",
-  "vault.revoke.newRecovery": "New recovery key"
+  "vault.revoke.newRecovery": "New recovery key",
+  "vault.testModeStrip": "TEST MODE: keys in a file"
 }

@@ -11,6 +11,9 @@
       @toggle-ai-lock="onToggleAiLock"
       @tab-dragstart="onTabDragStart"
     />
+    <!-- Vault test mode keeps the device key in a file, not the Keychain:
+         never let it stay on unnoticed (CONTRATO v5). -->
+    <div v-if="vaultStore.status.testMode" class="vault-test-strip" role="status">{{ t('vault.testModeStrip') }}</div>
     <div class="main-content">
       <Sidebar ref="sidebarRef" :visible="sidebarVisible" @toggle="sidebarVisible = !sidebarVisible" @connect="onSidebarConnect" @connect-to-workspace="({ config, workspaceId }: any) => onConnect(config, undefined, undefined, true, workspaceId)" @create-workspace="(configs: any) => onCreateWorkspaceFromConfigs(configs)" @connect-only="onConnectOnly" />
       <div class="tab-area">
@@ -394,6 +397,7 @@ const dataDirVisible = ref(false)
 const encryptVisible = ref(false)
 const unlockVisible = ref(false)
 const keychainLostVisible = ref(false)
+const vaultStore = useVaultStore()
 
 // Determine which credential dialog (keychain-lost / setup / unlock) to show
 // based on the current store status. Shared by startup and by the first-run
@@ -963,7 +967,7 @@ onMounted(async () => {
   // Pre-load tunnels so auto-start state and the panel are ready
   useTunnelStore().load()
   // Credential vault: status, join requests and "changed by" badges
-  useVaultStore().start()
+  vaultStore.start()
   // Auto-open start tab if no tabs are open
   if (tabStore.tabs.length === 0) {
     tabStore.createStartTab()
@@ -1995,6 +1999,18 @@ watch(
   background: var(--bg-base);
   border: 1px solid var(--border-subtle);
   position: relative;
+}
+.vault-test-strip {
+  flex-shrink: 0;
+  padding: 0.1875rem 0.75rem;
+  background: var(--warning);
+  color: #1a1300;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+  position: relative;
+  z-index: 2;
 }
 .main-content {
   display: flex;
