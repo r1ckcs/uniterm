@@ -1,9 +1,17 @@
 export type SessionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 
+/** Palette key, '#rrggbb' or 'none' (no color, don't inherit). See CONTRATO-cor-icone.md. */
+export type ConnectionColor = 'red' | 'orange' | 'amber' | 'green' | 'cyan' | 'blue' | 'purple' | 'gray' | 'none' | `#${string}`
+/** Closed icon list, or 'none' (type icon, don't inherit). */
+export type ConnectionIcon = 'olt' | 'mikrotik' | 'huawei' | 'juniper' | 'switch' | 'router' | 'server' | 'firewall' | 'radio' | 'generic' | 'none'
+
 export interface ConnectionGroup {
   id: string
   name: string
   parentId?: string
+  /** Inherited by connections and subgroups without their own. */
+  color?: ConnectionColor
+  icon?: ConnectionIcon
 }
 
 export interface PostLoginExpectStep {
@@ -32,6 +40,9 @@ export interface ConnectionConfig {
   id: string
   name: string
   remark?: string
+  /** Empty inherits from the group (nearest ancestor with one). */
+  color?: ConnectionColor
+  icon?: ConnectionIcon
   type: 'ssh' | 'telnet' | 'mosh' | 'rdp' | 'vnc' | 'spice' | 'database' | 'redis' | 'mongodb' | 'elasticsearch' | 'local' | 'wsl' | 'wsl-file' | 'sftp' | 'scp' | 'monitor' | 'ftp' | 'serial' | 'smb' | 'webdav' | 's3' | 'tcp' | 'k8s' | 'container' | 'x11-desktop' | 'workspace'
   host: string
   port: number

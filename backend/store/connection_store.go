@@ -143,9 +143,10 @@ func (s *ConnectionStore) Save(data session.ConnectionStoreData) error {
 	}
 
 	saveData := session.ConnectionStoreData{
-		Groups:      data.Groups,
+		Groups:      append([]session.ConnectionGroup(nil), data.Groups...),
 		Connections: connections,
 	}
+	session.SanitizeStyles(&saveData)
 	if err := s.writeJSONLocked(saveData); err != nil {
 		return err
 	}
@@ -228,6 +229,7 @@ func (s *ConnectionStore) Load() (session.ConnectionStoreData, error) {
 
 func (s *ConnectionStore) populatePasswords(data *session.ConnectionStoreData) error {
 	needsSave := false
+	session.SanitizeStyles(data) // a hand-edited file gets the same check
 
 	for i := range data.Connections {
 		conn := &data.Connections[i]
