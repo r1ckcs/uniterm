@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/ys-ll/uniterm/backend/container"
+	"github.com/ys-ll/uniterm/backend/connstatus"
 	"github.com/ys-ll/uniterm/backend/credentials"
 	"github.com/ys-ll/uniterm/backend/importer"
 	"github.com/ys-ll/uniterm/backend/k8s"
@@ -51,6 +52,8 @@ type App struct {
 	aiConfigStore        *store.AIConfigStore
 	identityStore        *store.IdentityStore
 	vaultService         *service.Service
+	connStatus           *connstatus.Monitor
+	connStatusOn         atomic.Bool
 	proxyStore           *store.ProxyStore
 	localStateStore      *store.LocalStateStore
 	quickCommandsStore   *store.QuickCommandsStore
@@ -165,6 +168,7 @@ func NewApp(webviewDataPath string) *App {
 // an App without a running Wails runtime), matching the previous
 // `if a.ctx != nil` defensiveness.
 func (a *App) emit(name string, data ...any) {
+	a.connStatusNotify(name)
 	if a.app == nil {
 		return
 	}
@@ -339,6 +343,9 @@ func (a *App) initStores(dataDir string, upgrade bool) {
 
 	// Credential vault (connections + identities through the vault log).
 	a.initVault(dataDir)
+
+	// Start-screen reachability (CONTRATO-status.md).
+	a.initConnStatus()
 
 	// Sync service: sync metadata (sync-config.json + local repo clone) lives
 	// in the system user-config dir; the config files it encrypts/decrypts are
@@ -746,6 +753,12 @@ func (a *App) shutdown() {
 	if a.vaultService != nil {
 		a.vaultService.Close()
 	}
+	if a.connStatus != nil {
+		a.connStatus.Close()
+	}
+	if a.recentStore != nil {
+		_ = a.recentStore.Close() // writes a Record still in its debounce
+	}
 	a.unsubclassMainWindow()
 	if a.mcpServer != nil {
 		a.mcpServer.Stop()
@@ -834,7 +847,11 @@ func (a *App) SaveProxies(data session.ProxyStoreData) error {
 	if a.proxyStore == nil {
 		return fmt.Errorf("proxy store not initialized")
 	}
-	return a.proxyStore.Save(data)
+	err := a.proxyStore.Save(data)
+	if err == nil && a.connStatus != nil {
+		a.connStatus.Changed()
+	}
+	return err
 }
 
 // ExportConnections writes the full store to destPath as a .utm file. When
@@ -1523,6 +1540,7 @@ func (a *App) SaveSettings(settings store.AppSettings) error {
 	if err == nil {
 		a.SetDefaultSessionLogDir(settings.Terminal.SessionLogDir)
 		a.setSessionLogFilename(settings.Terminal.SessionLogFilename)
+		a.connStatusSettings(settings)
 		a.triggerAutoSync()
 		// Re-apply the global show/hide hotkey so binding changes (and the
 		// enable switch) take effect immediately. No-op when unchanged.

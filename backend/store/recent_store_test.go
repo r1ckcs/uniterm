@@ -1,9 +1,11 @@
 package store
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestRecentStore_Record_Deduplicates(t *testing.T) {
@@ -86,5 +88,60 @@ func TestRecentStore_Persistence(t *testing.T) {
 	}
 	if ids[0] != "conn-2" {
 		t.Errorf("expected 'conn-2' first, got %v", ids)
+	}
+}
+
+func TestRecentStore_AccessTimes(t *testing.T) {
+	dir := t.TempDir()
+	// An entry from a build that kept no times.
+	if err := os.WriteFile(filepath.Join(dir, "recent.json"), []byte(`["old"]`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	s := NewRecentStore(dir)
+	if _, err := s.Load(); err != nil {
+		t.Fatal(err)
+	}
+	t0 := time.Date(2026, 10, 22, 13, 4, 5, 0, time.UTC)
+	s.now = func() time.Time { return t0 }
+	s.Record("a")
+	got := s.GetAccess()
+	if len(got) != 2 || got[0].ID != "a" || got[0].At != "2026-10-22T13:04:05Z" || got[1].ID != "old" || got[1].At != "" {
+		t.Fatalf("got %+v", got)
+	}
+	b, _ := json.Marshal(got)
+	if string(b) != `[{"id":"a","at":"2026-10-22T13:04:05Z"},{"id":"old","at":""}]` {
+		t.Fatalf("json %s", b)
+	}
+	s.Close()
+
+	// recent.json keeps the old format; the times live beside it.
+	ids, _ := os.ReadFile(filepath.Join(dir, "recent.json"))
+	if string(ids) != `["a","old"]` {
+		t.Fatalf("recent.json %s", ids)
+	}
+	s2 := NewRecentStore(dir)
+	defer s2.Close()
+	if _, err := s2.Load(); err != nil {
+		t.Fatal(err)
+	}
+	if got := s2.GetAccess(); len(got) != 2 || got[0].At != "2026-10-22T13:04:05Z" {
+		t.Fatalf("after reload %+v", got)
+	}
+}
+
+func TestRecentStore_AccessFileNullOrCorrupt(t *testing.T) {
+	for _, body := range []string{"null", "{bad"} {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "recent.json"), []byte(`["a"]`), 0644)
+		os.WriteFile(filepath.Join(dir, "recent-access.json"), []byte(body), 0600)
+		s := NewRecentStore(dir)
+		if _, err := s.Load(); err != nil {
+			t.Fatal(err)
+		}
+		s.Record("b") // must not panic on a nil map
+		if got := s.GetAccess(); len(got) != 2 || got[1].ID != "a" || got[1].At != "" {
+			t.Fatalf("%s: %+v", body, got)
+		}
+		s.Close()
 	}
 }

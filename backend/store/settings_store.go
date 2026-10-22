@@ -221,6 +221,15 @@ type AppSettings struct {
 	// Pointer + omitempty so settings.json written by older builds still
 	// loads; nil means the feature is off with defaults.
 	MCP *MCPSettings `json:"mcp,omitempty"`
+	// ConnStatusCheck is "Check connection reachability" (start screen TCP
+	// check, see backend/connstatus). nil (older settings.json, fresh
+	// install) means on.
+	ConnStatusCheck *bool `json:"connStatusCheck,omitempty"`
+}
+
+// ConnStatusCheckOn reports the effective reachability setting.
+func (s AppSettings) ConnStatusCheckOn() bool {
+	return s.ConnStatusCheck == nil || *s.ConnStatusCheck
 }
 
 type SFTPBookmarks struct {
