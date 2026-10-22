@@ -9,6 +9,8 @@ build/windows/installer/*
 !build/appicon.png
 !build/appicon_tray.png
 !build/appicon_tray_template.png
+# Release signing public key (RELEASES.md); the private key never lives here
+!build/release-pubkey.txt
 !build/linux/
 # Wails v3 task-driven build config (must be tracked so `wails3 build` works)
 !build/Taskfile.yml

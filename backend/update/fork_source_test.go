@@ -257,3 +257,24 @@ func TestDownloadRefusesOffRepoURL(t *testing.T) {
 		t.Fatalf("refused asset must not be fetched, got %v", rt.urls)
 	}
 }
+
+// A plain build (no -ldflags key, as `go test` and dev builds are) must ship
+// with no release key, so even a correctly signed release is not installable.
+func TestDefaultBuildHasNoKeyAndRefusesSignedRelease(t *testing.T) {
+	if got := EmbeddedReleasePublicKey(); got != "" {
+		t.Fatalf("default build embeds a release key %q", got)
+	}
+	_, priv, _ := ed25519.GenerateKey(rand.Reader)
+	isolate(t, nil)
+	fakeRelease(t, func(b []byte) []byte { return ed25519.Sign(priv, b) })
+	info, err := Check("1.9.5+security", "github")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(info.Assets) != 0 {
+		t.Fatalf("no key compiled in: nothing may be installable, got %+v", info.Assets)
+	}
+	if VerifyChecksumsSignature("", []byte("x"), ed25519.Sign(priv, []byte("x"))) {
+		t.Fatal("an empty key must never verify")
+	}
+}

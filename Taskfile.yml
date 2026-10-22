@@ -18,6 +18,8 @@ vars:
   # Extra Go build tags appended to the production build, e.g. gtk3 for the
   # legacy WebKit2GTK 4.1 Linux stack.
   EXTRA_TAGS: '{{.EXTRA_TAGS | default ""}}'
+  # Staging directory for signed release assets (RELEASES.md).
+  RELEASE_DIR: dist/release
 
 includes:
   common: ./build/Taskfile.yml
@@ -52,6 +54,53 @@ tasks:
     summary: Runs the application in development mode
     cmds:
       - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+
+  # --- Signed fork releases (RELEASES.md) -----------------------------------
+  # The private key never touches this machine: release:package writes
+  # dist/release/checksums.txt, which is signed on the offline machine with
+  # scripts/release/offline-sign.sh; release:publish verifies and uploads.
+
+  release:package:
+    summary: Builds the macOS update assets (arm64 + amd64) and checksums.txt into dist/release
+    preconditions:
+      - sh: test -n "{{.VERSION}}"
+        msg: "VERSION is required, e.g. wails3 task release:package VERSION=1.9.6"
+      - sh: go run ./scripts/release/sigtool fingerprint -pub @build/release-pubkey.txt
+        msg: "build/release-pubkey.txt is missing or invalid; see RELEASES.md (a build without it never installs updates)"
+    cmds:
+      - rm -rf "{{.RELEASE_DIR}}" && mkdir -p "{{.RELEASE_DIR}}"
+      - task: release:package:darwin-arch
+        vars: { ARCH: arm64, VERSION: '{{.VERSION}}' }
+      - task: release:package:darwin-arch
+        vars: { ARCH: amd64, VERSION: '{{.VERSION}}' }
+      - go run ./scripts/release/sigtool checksums "{{.RELEASE_DIR}}"
+      - echo "Next - offline machine:" sh offline-sign.sh uniterm-release.key checksums.txt
+
+  release:package:darwin-arch:
+    internal: true
+    cmds:
+      - task: darwin:build
+        vars: { ARCH: '{{.ARCH}}', VERSION: '{{.VERSION}}', OUTPUT: 'bin/release-{{.ARCH}}/uniTerm' }
+      # Refuse to ship a binary whose updater would not trust the release key.
+      - go run ./scripts/release/sigtool binkey -expect @build/release-pubkey.txt "bin/release-{{.ARCH}}/uniTerm"
+      # Bare executable at the zip root: the updater extracts "uniterm" from it.
+      - zip -q -j "{{.RELEASE_DIR}}/uniterm-darwin-{{.ARCH}}-v{{.VERSION}}.zip" "bin/release-{{.ARCH}}/uniTerm"
+
+  release:verify:
+    summary: Verifies checksums.txt.sig and every asset hash in dist/release
+    cmds:
+      - go run ./scripts/release/sigtool verify -pub @build/release-pubkey.txt "{{.RELEASE_DIR}}"
+
+  release:publish:
+    summary: Verifies dist/release and uploads it as a DRAFT release on r1ckcs/uniterm (publish it in the browser)
+    preconditions:
+      - sh: test -n "{{.VERSION}}"
+        msg: "VERSION is required (same as release:package)"
+      - sh: gh auth status
+        msg: "gh is not logged in (gh auth login)"
+    cmds:
+      - task: release:verify
+      - gh release create "v{{.VERSION}}" "{{.RELEASE_DIR}}"/uniterm-* "{{.RELEASE_DIR}}/checksums.txt" "{{.RELEASE_DIR}}/checksums.txt.sig" --repo r1ckcs/uniterm --draft --title "uniTerm v{{.VERSION}}" {{if .NOTES_FILE}}--notes-file "{{.NOTES_FILE}}"{{else}}--generate-notes{{end}}
 
   android:compile:check:
     summary: Cross-compiles all Go packages for android (no SDK needed; CGO off)

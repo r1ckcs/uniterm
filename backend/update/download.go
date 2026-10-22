@@ -67,8 +67,10 @@ func updateCacheDir() (string, error) {
 	return dir, nil
 }
 
-// parseChecksums parses a GNU `sha256sum`-style checksums.txt into
+// ParseChecksums parses a GNU `sha256sum`-style checksums.txt into
 // filename → lowercase hex digest.
+func ParseChecksums(data []byte) map[string]string { return parseChecksums(data) }
+
 func parseChecksums(data []byte) map[string]string {
 	sums := map[string]string{}
 	for _, line := range strings.Split(string(data), "\n") {
