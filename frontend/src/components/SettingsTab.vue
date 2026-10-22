@@ -220,6 +220,22 @@
 
           <div class="setting-card">
             <div class="setting-info">
+              <div class="setting-title">{{ t('settings.listDensity') }}</div>
+              <div class="setting-desc">{{ t('settings.listDensityDesc') }}</div>
+            </div>
+            <div class="setting-control">
+              <el-select
+                :model-value="settingsStore.settings.listDensity || 'comfortable'"
+                @change="(v: 'comfortable' | 'compact') => { settingsStore.settings.listDensity = v; settingsStore.save() }"
+              >
+                <el-option :label="t('settings.listDensityComfortable')" value="comfortable" />
+                <el-option :label="t('settings.listDensityCompact')" value="compact" />
+              </el-select>
+            </div>
+          </div>
+
+          <div class="setting-card">
+            <div class="setting-info">
               <div class="setting-title">{{ t('settings.sidebarTabs') }}</div>
               <div class="setting-desc">{{ t('settings.sidebarTabsDesc') }}</div>
             </div>

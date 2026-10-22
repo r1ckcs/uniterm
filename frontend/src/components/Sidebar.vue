@@ -46,7 +46,7 @@
         </Menu>
       </div>
 
-    <div class="connection-list" tabindex="0" @keydown="onListKeydown" @contextmenu.prevent="onEmptyAreaContextMenu">
+    <div class="connection-list" :class="{ 'density-compact': settingsStore.settings.listDensity === 'compact' }" tabindex="0" @keydown="onListKeydown" @contextmenu.prevent="onEmptyAreaContextMenu">
       <!-- Virtual favorites group — persisted in favorites.json, rendered above all groups -->
       <template v-if="favoriteConns.length > 0">
         <div class="group-header" @click="favoritesExpanded = !favoritesExpanded" @contextmenu.prevent>

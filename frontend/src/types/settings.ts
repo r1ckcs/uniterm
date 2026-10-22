@@ -297,6 +297,10 @@ export interface AppSettings {
   // ("button") or right-click only, with the hover buttons hidden
   // ("rightclick"). The right-click menu works in both modes.
   hostListMenuStyle: 'button' | 'rightclick'
+  // Connection list density in the sidebar and group tree: 'comfortable'
+  // (name over host, the classic look) or 'compact' (one line per
+  // connection). Absent means comfortable.
+  listDensity?: 'comfortable' | 'compact'
   // Which connection-sidebar tab icons are visible, keyed by view id.
   // Missing keys fall back to SIDEBAR_TAB_DEFAULTS.
   sidebarTabs: Record<string, boolean>

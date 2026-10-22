@@ -346,7 +346,7 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 })
 
-function mergeSettings(loaded: AppSettings): AppSettings {
+export function mergeSettings(loaded: AppSettings): AppSettings {
   return {
     theme: loaded.theme || DEFAULT_SETTINGS.theme,
     language: loaded.language || DEFAULT_SETTINGS.language,
@@ -378,6 +378,10 @@ function mergeSettings(loaded: AppSettings): AppSettings {
     tabCloseButton: loaded.tabCloseButton || DEFAULT_SETTINGS.tabCloseButton,
     showTabShortcutHints: loaded.showTabShortcutHints ?? DEFAULT_SETTINGS.showTabShortcutHints,
     hostListMenuStyle: loaded.hostListMenuStyle || DEFAULT_SETTINGS.hostListMenuStyle,
+    // Optional fields with an "absent" meaning: carry them as loaded, or a
+    // later save would drop them (connStatusCheck false would turn back on).
+    listDensity: loaded.listDensity,
+    connStatusCheck: loaded.connStatusCheck,
     // Per-key merge so a settings.json written before a view existed (or
     // with a key dropped) still gets the default for that view.
     sidebarTabs: {

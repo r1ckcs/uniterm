@@ -210,6 +210,10 @@ type AppSettings struct {
 	// menu: "button" (hover buttons) or "rightclick". Empty means the
 	// frontend falls back to `button`.
 	HostListMenuStyle string `json:"hostListMenuStyle,omitempty"`
+	// ListDensity is the connection list density: "comfortable" or
+	// "compact". Empty (older settings.json, fresh install) means
+	// comfortable.
+	ListDensity string `json:"listDensity,omitempty"`
 	// SidebarTabs toggles which connection-sidebar tab icons are visible,
 	// keyed by view id (connections/files/monitor/tunnels/quickCommands/
 	// history/personalization). "connections" is always shown in the UI and

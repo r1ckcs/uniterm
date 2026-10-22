@@ -75,6 +75,26 @@ func TestSettingsStore_PreservesTabAppearanceSettings(t *testing.T) {
 	}
 }
 
+// Appearance phase 3 fields must survive a Save/Load round trip; Go drops
+// JSON keys the struct lacks.
+func TestSettingsStore_PreservesAppearanceF3Settings(t *testing.T) {
+	dir := t.TempDir()
+	s := &SettingsStore{configDir: dir}
+
+	settings := defaultSettings()
+	settings.ListDensity = "compact"
+	if err := s.Save(settings); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	got, err := s.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got.ListDensity != "compact" {
+		t.Errorf("ListDensity: got %q, want %q", got.ListDensity, "compact")
+	}
+}
+
 func TestSettingsStore_LoadMissingFile(t *testing.T) {
 	dir := t.TempDir()
 	s := &SettingsStore{configDir: dir}
