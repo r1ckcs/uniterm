@@ -17,6 +17,15 @@ type IdentityStore struct {
 	configDir     string
 	passwordStore PasswordStore // nil = refuse to write plaintext passwords
 	mu            sync.Mutex    // serializes Save + Load password rewrites
+	onSave        func()        // called after each successful Save (vault sync)
+}
+
+// SetOnSave registers a callback run after each successful Save (the vault
+// syncs local edits). It must not call back into the store synchronously.
+func (s *IdentityStore) SetOnSave(fn func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onSave = fn
 }
 
 func NewIdentityStore(configDir string) (*IdentityStore, error) {
@@ -63,7 +72,13 @@ func (s *IdentityStore) Save(data session.IdentityStoreData) error {
 	if err != nil {
 		return err
 	}
-	return atomicWriteFile(s.filePath(), jsonData, 0600)
+	if err := atomicWriteFile(s.filePath(), jsonData, 0600); err != nil {
+		return err
+	}
+	if s.onSave != nil {
+		s.onSave()
+	}
+	return nil
 }
 
 // Load reads identities.json, returning an empty store when the file does not

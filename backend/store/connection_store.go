@@ -30,6 +30,7 @@ type ConnectionStore struct {
 	pwdMu         sync.RWMutex  // guards pwdCache for F-110 async keychain fill.
 	pwdCache      map[string]string
 	lastSavedHash string // F-105: skip no-op rewrites keyed by canonical content hash.
+	onSave        func() // called after each successful Save (vault sync)
 }
 
 func NewConnectionStore(configDir string) (*ConnectionStore, error) {
@@ -50,6 +51,14 @@ func (s *ConnectionStore) SetPasswordStore(ps PasswordStore) {
 // entry. Lazy-migrates the value into enc:v1 on the next save.
 func (s *ConnectionStore) SetLegacyKeychain(kc LegacyPasswordSource) {
 	s.legacy = kc
+}
+
+// SetOnSave registers a callback run after each successful Save (the vault
+// syncs local edits). It must not call back into the store synchronously.
+func (s *ConnectionStore) SetOnSave(fn func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onSave = fn
 }
 
 func (s *ConnectionStore) filePath() string {
@@ -137,7 +146,13 @@ func (s *ConnectionStore) Save(data session.ConnectionStoreData) error {
 		Groups:      data.Groups,
 		Connections: connections,
 	}
-	return s.writeJSONLocked(saveData)
+	if err := s.writeJSONLocked(saveData); err != nil {
+		return err
+	}
+	if s.onSave != nil {
+		s.onSave()
+	}
+	return nil
 }
 
 // writeJSONLocked serializes data to the connections file atomically.

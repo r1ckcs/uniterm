@@ -19,6 +19,7 @@ import (
 	"github.com/ys-ll/uniterm/backend/session"
 	"github.com/ys-ll/uniterm/backend/store"
 	"github.com/ys-ll/uniterm/backend/sync"
+	"github.com/ys-ll/uniterm/backend/vault/service"
 	"github.com/ys-ll/uniterm/backend/update"
 	"github.com/ys-ll/uniterm/backend/utils"
 	"golang.org/x/crypto/ssh"
@@ -49,6 +50,7 @@ type App struct {
 	settingsStore        *store.SettingsStore
 	aiConfigStore        *store.AIConfigStore
 	identityStore        *store.IdentityStore
+	vaultService         *service.Service
 	proxyStore           *store.ProxyStore
 	localStateStore      *store.LocalStateStore
 	quickCommandsStore   *store.QuickCommandsStore
@@ -334,6 +336,9 @@ func (a *App) initStores(dataDir string, upgrade bool) {
 	// Credential store + auto-unlock / upgrade (wires PasswordStore into
 	// connection + settings stores).
 	a.initCredentials(dataDir, upgrade)
+
+	// Credential vault (connections + identities through the vault log).
+	a.initVault(dataDir)
 
 	// Sync service: sync metadata (sync-config.json + local repo clone) lives
 	// in the system user-config dir; the config files it encrypts/decrypts are
@@ -738,6 +743,9 @@ func (a *App) watchForeground(ctx context.Context) {
 }
 
 func (a *App) shutdown() {
+	if a.vaultService != nil {
+		a.vaultService.Close()
+	}
 	a.unsubclassMainWindow()
 	if a.mcpServer != nil {
 		a.mcpServer.Stop()
