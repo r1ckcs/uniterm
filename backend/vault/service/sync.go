@@ -145,18 +145,34 @@ func (s *Service) syncLocked() (SyncResult, error) {
 	for _, q := range s.queue {
 		merged.Apply("queued", vault.IDOf(s.dev), q.Payload)
 	}
+	// The baseline is what the stores hold after the write, read back: they
+	// drop fields this build doesn't know and values it doesn't accept (a
+	// newer palette), and neither may come back next round as a null.
+	// applied.json keeps the last snapshot written, so a snapshot the
+	// stores can't hold verbatim is not written again every round.
 	snap := merged.Snapshot()
-	kept := snap // what the stores hold once snap is written
+	kept := snap
 	if fk, ok := s.o.Bridge.(FieldKeeper); ok {
 		kept = snap.Keep(fk.Keeps)
 	}
-	if d := records.LocalChanges(local.Digest(key), key, kept); len(d) > 0 {
+	keptD := kept.Digest(key)
+	var applied records.Digest
+	if err := readJSON(s.path("applied.json"), &applied); err != nil {
+		return res, err
+	}
+	if d := records.LocalChanges(local.Digest(key), key, kept); len(d) > 0 && !sameDigest(keptD, applied) {
 		res.Pulled = len(d)
 		if err := s.o.Bridge.Apply(snap); err != nil {
 			return res, err
 		}
+		if local, err = s.o.Bridge.Local(); err != nil {
+			return res, err
+		}
 	}
-	if err := writeJSON(s.path("baseline.json"), kept.Digest(key)); err != nil {
+	if err := writeJSON(s.path("applied.json"), keptD); err != nil {
+		return res, err
+	}
+	if err := writeJSON(s.path("baseline.json"), local.Digest(key)); err != nil {
 		return res, err
 	}
 	s.updateMetaLocked(merged)
@@ -517,3 +533,7 @@ func (s *Service) RejectJoin(id string) error {
 }
 
 var _ = json.Valid
+
+func sameDigest(a, b records.Digest) bool {
+	return maps.EqualFunc(a, b, func(x, y map[string]string) bool { return maps.Equal(x, y) })
+}
