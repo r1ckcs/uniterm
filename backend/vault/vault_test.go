@@ -967,3 +967,73 @@ func TestSupersedeOwnAncestorRefused(t *testing.T) {
 		t.Fatalf("accepted a version superseding its own ancestor: %+v", v.Trust())
 	}
 }
+
+// --- CachedStore ---
+
+// flaky is a Store that can go offline.
+type flaky struct {
+	Store
+	down bool
+}
+
+func (f *flaky) List(p string) ([]Entry, error) {
+	if f.down {
+		return nil, fmt.Errorf("dial: %w", ErrUnavailable)
+	}
+	return f.Store.List(p)
+}
+
+func (f *flaky) Get(id string) ([]byte, Version, error) {
+	if f.down {
+		return nil, "", fmt.Errorf("dial: %w", ErrUnavailable)
+	}
+	return f.Store.Get(id)
+}
+
+func (f *flaky) Create(n string, d []byte) (Entry, error) {
+	if f.down {
+		return Entry{}, fmt.Errorf("dial: %w", ErrUnavailable)
+	}
+	return f.Store.Create(n, d)
+}
+
+func TestCachedStoreReadsOffline(t *testing.T) {
+	remote := &flaky{Store: NewMemStore()}
+	tm := newTeam(t, remote)
+	_, err := tm.vw.Append([]byte("w1"))
+	must(t, err)
+	cs, err := NewCachedStore(remote, t.TempDir())
+	must(t, err)
+	st := NewMemState(State{})
+	must(t, Join(st, "pessoal", tm.genesis))
+	v, err := Open(cs, st, tm.r)
+	must(t, err)
+	if got := payloads(logOf(t, v).Ops); got != "w1" {
+		t.Fatalf("online log = %q", got)
+	}
+	remote.down = true
+	must(t, v.Refresh())
+	if got := payloads(logOf(t, v).Ops); got != "w1" || !cs.Offline() {
+		t.Fatalf("offline log = %q, offline = %v", got, cs.Offline())
+	}
+	// A writer through the cache: offline appends fail with ErrUnavailable
+	// (the service queues them) and do not burn the reserved seq twice.
+	remote.down = false
+	cw, err := NewCachedStore(remote, t.TempDir())
+	must(t, err)
+	stw := NewMemState(State{})
+	must(t, Join(stw, "pessoal", tm.genesis))
+	vw, err := Open(cw, stw, tm.w)
+	must(t, err)
+	remote.down = true
+	if _, err := vw.Append([]byte("w2")); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("offline append = %v, want ErrUnavailable", err)
+	}
+	remote.down = false
+	_, err = vw.Append([]byte("w2"))
+	must(t, err)
+	must(t, v.Refresh())
+	if got := payloads(logOf(t, v).Ops); got != "w1,w2" {
+		t.Fatalf("log after reconnect = %q", got)
+	}
+}
