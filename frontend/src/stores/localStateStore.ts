@@ -28,7 +28,7 @@ interface LocalState {
 
 const DEFAULT: LocalState = {
   sidebarVisible: true,
-  aiSidebarVisible: true,
+  aiSidebarVisible: false,
   collapsedGroupIds: [],
   collapsedQuickCommandGroupIds: [],
   windowX: 0,
