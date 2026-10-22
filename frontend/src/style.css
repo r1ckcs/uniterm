@@ -1753,3 +1753,44 @@ html[data-theme^="flexterm"] .el-table__body tr.current-row > td.el-table__cell,
 html[data-theme^="flexterm"] .el-table__body tr.el-table__row--striped.current-row > td.el-table__cell {
   background: var(--bg-active);
 }
+
+/* Compact connection list (settings.listDensity): one line per connection,
+   host dimmed in mono beside the name. Sidebar and group tree alike. */
+.connection-list.density-compact .connection-item {
+  padding-top: 0.1875rem;
+  padding-bottom: 0.1875rem;
+  margin-bottom: 0;
+}
+/* The hover buttons set the row's minimum height; shrink them too. */
+.connection-list.density-compact .conn-fav-btn,
+.connection-list.density-compact .conn-more-btn {
+  height: 1.125rem;
+}
+.connection-list.density-compact .group-header {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+.connection-list.density-compact .conn-details {
+  flex: 1;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.connection-list.density-compact .conn-details .name {
+  flex: 0 1 auto;
+  min-width: 2.5rem;
+}
+.connection-list.density-compact .conn-details .conn-meta {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.connection-list.density-compact .conn-details .host {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+}
+/* Tab icons that use the accent (broadcast, transfer) sit on the header
+   color, where the light theme's navy accent disappears. */
+html[data-theme^="flexterm"] .app-header .tab-item .tab-broadcast-icon,
+html[data-theme^="flexterm"] .app-header .tab-item .transfer-indicator {
+  color: var(--header-text);
+}

@@ -133,12 +133,15 @@
       :workspace-id="workspaceId"
       :panel-id="panel.id"
     />
+    <!-- Status footer on terminal tabs (workspace panes have a header) -->
+    <TerminalStatusBar v-if="!showHeader && settingsStore.settings.terminalStatusBar !== false" :panel="panel" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, computed, nextTick, onMounted, onUnmounted, inject } from 'vue'
 import { Radio, Sparkles, MoreHorizontal, X, SquareTerminal, Laptop, LaptopMinimal, Cable, Terminal, Zap, Maximize2, Minimize2 } from '@lucide/vue'
+import TerminalStatusBar from './TerminalStatusBar.vue'
 import BaseTerminal from './BaseTerminal.vue'
 import Menu from './Menu.vue'
 import MenuItem from './MenuItem.vue'

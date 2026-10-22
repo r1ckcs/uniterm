@@ -72,6 +72,9 @@ export interface TerminalSettings {
   // to their nearest available weight). ANSI-bold text stays a step heavier.
   fontWeight: number
   fontSize: number
+  // xterm line height multiplier, 1.0–1.5 in 0.05 steps. Absent means 1.0
+  // (installs from before the setting); new installs get 1.1 (Go defaults).
+  lineHeight?: number
   selectionAction: 'none' | 'copy'
   rightClickAction: 'menu' | 'paste'
   middleClickAction: 'paste' | 'menu'
@@ -297,6 +300,12 @@ export interface AppSettings {
   // ("button") or right-click only, with the hover buttons hidden
   // ("rightclick"). The right-click menu works in both modes.
   hostListMenuStyle: 'button' | 'rightclick'
+  // Connection list density in the sidebar and group tree: 'comfortable'
+  // (name over host, the classic look) or 'compact' (one line per
+  // connection). Absent means comfortable.
+  listDensity?: 'comfortable' | 'compact'
+  // Status footer under terminal tabs. Absent means on.
+  terminalStatusBar?: boolean
   // Which connection-sidebar tab icons are visible, keyed by view id.
   // Missing keys fall back to SIDEBAR_TAB_DEFAULTS.
   sidebarTabs: Record<string, boolean>
@@ -343,7 +352,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     fontFamily: 'JetBrains Mono Variable',
     fallbackFont: '',
     fontWeight: 400,
-    fontSize: 14,
+    fontSize: 13,
     selectionAction: 'none',
     rightClickAction: 'menu',
     middleClickAction: 'paste',

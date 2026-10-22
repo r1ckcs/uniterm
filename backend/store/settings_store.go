@@ -13,21 +13,26 @@ import (
 
 const settingsFileName = "settings.json"
 
-func boolPtr(b bool) *bool    { return &b }
-func intPtr(i int) *int       { return &i }
-func strPtr(s string) *string { return &s }
+func boolPtr(b bool) *bool        { return &b }
+func intPtr(i int) *int           { return &i }
+func strPtr(s string) *string     { return &s }
+func floatPtr(f float64) *float64 { return &f }
 
 type TerminalSettings struct {
-	Theme             string `json:"theme"`
-	FontFamily        string `json:"fontFamily"`
-	FontSize          int    `json:"fontSize"`
-	SelectionAction   string `json:"selectionAction"`
-	RightClickAction  string `json:"rightClickAction"`
-	MiddleClickAction string `json:"middleClickAction"`
-	MaxHistoryLines   int    `json:"maxHistoryLines"`
-	SmartCompletion   *bool  `json:"smartCompletion"`
-	AiTranscription   *bool  `json:"aiTranscription"`
-	HighlightEnabled  *bool  `json:"highlightEnabled"`
+	Theme      string `json:"theme"`
+	FontFamily string `json:"fontFamily"`
+	FontSize   int    `json:"fontSize"`
+	// LineHeight is xterm's line height multiplier (1.0–1.5). Pointer +
+	// omitempty: nil (settings.json from before the field) means 1.0, so
+	// existing installs keep their spacing; new installs default to 1.1.
+	LineHeight        *float64 `json:"lineHeight,omitempty"`
+	SelectionAction   string   `json:"selectionAction"`
+	RightClickAction  string   `json:"rightClickAction"`
+	MiddleClickAction string   `json:"middleClickAction"`
+	MaxHistoryLines   int      `json:"maxHistoryLines"`
+	SmartCompletion   *bool    `json:"smartCompletion"`
+	AiTranscription   *bool    `json:"aiTranscription"`
+	HighlightEnabled  *bool    `json:"highlightEnabled"`
 	// CursorBlink controls xterm.js's cursor blink. Pointer + omitempty so
 	// settings.json written by older builds (which lack this field) still
 	// load; the frontend falls back to `true` when nil, matching the
@@ -210,6 +215,13 @@ type AppSettings struct {
 	// menu: "button" (hover buttons) or "rightclick". Empty means the
 	// frontend falls back to `button`.
 	HostListMenuStyle string `json:"hostListMenuStyle,omitempty"`
+	// ListDensity is the connection list density: "comfortable" or
+	// "compact". Empty (older settings.json, fresh install) means
+	// comfortable.
+	ListDensity string `json:"listDensity,omitempty"`
+	// TerminalStatusBar shows the status footer under terminal tabs. nil
+	// (older settings.json, fresh install) means on.
+	TerminalStatusBar *bool `json:"terminalStatusBar,omitempty"`
 	// SidebarTabs toggles which connection-sidebar tab icons are visible,
 	// keyed by view id (connections/files/monitor/tunnels/quickCommands/
 	// history/personalization). "connections" is always shown in the UI and
@@ -384,8 +396,9 @@ func defaultSettings() AppSettings {
 		UiFontSize: &n,
 		Terminal: TerminalSettings{
 			Theme:            "follow-app",
-			FontFamily:       "Consolas, \"Courier New\", monospace",
-			FontSize:         14,
+			FontFamily:       "JetBrains Mono Variable",
+			FontSize:         13,
+			LineHeight:       floatPtr(1.1),
 			SelectionAction:  "none",
 			RightClickAction: "menu",
 			MaxHistoryLines:  5000,

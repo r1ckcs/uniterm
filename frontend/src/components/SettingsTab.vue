@@ -220,6 +220,22 @@
 
           <div class="setting-card">
             <div class="setting-info">
+              <div class="setting-title">{{ t('settings.listDensity') }}</div>
+              <div class="setting-desc">{{ t('settings.listDensityDesc') }}</div>
+            </div>
+            <div class="setting-control">
+              <el-select
+                :model-value="settingsStore.settings.listDensity || 'comfortable'"
+                @change="(v: 'comfortable' | 'compact') => { settingsStore.settings.listDensity = v; settingsStore.save() }"
+              >
+                <el-option :label="t('settings.listDensityComfortable')" value="comfortable" />
+                <el-option :label="t('settings.listDensityCompact')" value="compact" />
+              </el-select>
+            </div>
+          </div>
+
+          <div class="setting-card">
+            <div class="setting-info">
               <div class="setting-title">{{ t('settings.sidebarTabs') }}</div>
               <div class="setting-desc">{{ t('settings.sidebarTabsDesc') }}</div>
             </div>
@@ -464,6 +480,36 @@
                 :min="8"
                 :max="32"
                 @change="settingsStore.save()"
+              />
+            </div>
+          </div>
+
+          <div class="setting-card">
+            <div class="setting-info">
+              <div class="setting-title">{{ t('settings.lineHeight') }}</div>
+              <div class="setting-desc">{{ t('settings.lineHeightDesc') }}</div>
+            </div>
+            <div class="setting-control">
+              <el-input-number
+                :model-value="terminalLineHeight(settingsStore.settings.terminal.lineHeight)"
+                :min="LINE_HEIGHT_MIN"
+                :max="LINE_HEIGHT_MAX"
+                :step="LINE_HEIGHT_STEP"
+                :precision="2"
+                @change="(v: number | undefined) => { settingsStore.settings.terminal.lineHeight = terminalLineHeight(v); settingsStore.save() }"
+              />
+            </div>
+          </div>
+
+          <div class="setting-card">
+            <div class="setting-info">
+              <div class="setting-title">{{ t('settings.terminalStatusBar') }}</div>
+              <div class="setting-desc">{{ t('settings.terminalStatusBarDesc') }}</div>
+            </div>
+            <div class="setting-control">
+              <el-switch
+                :model-value="settingsStore.settings.terminalStatusBar !== false"
+                @change="(v: string | number | boolean) => { settingsStore.settings.terminalStatusBar = !!v; settingsStore.save() }"
               />
             </div>
           </div>
@@ -1451,6 +1497,7 @@ import { useLocalStateStore } from '../stores/localStateStore'
 import { useUpdateCheck } from '../composables/useUpdateCheck'
 import { useI18n, locale } from '../i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { terminalFontChoices, terminalLineHeight, LINE_HEIGHT_MIN, LINE_HEIGHT_MAX, LINE_HEIGHT_STEP } from '../utils/terminalFonts'
 import { FONT_OPTIONS, FONT_WEIGHT_OPTIONS, LANGUAGE_OPTIONS, DEFAULT_KEYBOARD, DEFAULT_SETTINGS, SHORTCUT_LABELS, USER_AGENT_PRESETS, FOLLOW_APP_THEME, CURSOR_STYLES, TIMESTAMP_FORMATS, SIDEBAR_TAB_ORDER, SIDEBAR_TAB_DEFAULTS } from '../types/settings'
 import { formatFontFamily, normalizeFontFamilyValue } from '../utils/formatFontFamily'
 import { backendErrorText } from '../utils/backendError'
@@ -1662,14 +1709,17 @@ const firstMonoOnly = ref(true)
 const secondMonoOnly = ref(true)
 
 const toFontOption = (name: string) => ({ label: name, value: name })
+// System fonts with the hidden faces dropped and SF Mono / Menlo / Cascadia
+// pinned after the bundled font when installed (see terminalFontChoices).
+const fontChoices = computed(() => terminalFontChoices(allFonts.value))
 const fontOptions = computed(() =>
-  allFonts.value.length > 0
-    ? allFonts.value.filter(f => !firstMonoOnly.value || f.IsMono).map(f => toFontOption(f.Name))
+  fontChoices.value.length > 0
+    ? fontChoices.value.filter(f => !firstMonoOnly.value || f.IsMono).map(f => toFontOption(f.Name))
     : FONT_OPTIONS
 )
 const secondFontOptions = computed(() =>
-  allFonts.value.length > 0
-    ? allFonts.value.filter(f => !secondMonoOnly.value || f.IsMono).map(f => toFontOption(f.Name))
+  fontChoices.value.length > 0
+    ? fontChoices.value.filter(f => !secondMonoOnly.value || f.IsMono).map(f => toFontOption(f.Name))
     : FONT_OPTIONS
 )
 
@@ -1820,7 +1870,7 @@ onMounted(async () => {
       // Migrate a legacy full-stack fontFamily down to its bare family name so
       // it matches a dropdown option (and the new single-name default) — the
       // old stored value was a raw CSS stack this picker can't show cleanly.
-      const names = new Set(allFonts.value.map(f => f.Name))
+      const names = new Set(terminalFontChoices(allFonts.value).map(f => f.Name))
       const cur = settingsStore.settings.terminal.fontFamily
       const normalized = normalizeFontFamilyValue(cur, names)
       if (normalized !== cur) {
