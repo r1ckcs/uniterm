@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -79,5 +80,61 @@ func TestHighlightRulesValidate(t *testing.T) {
 		if err := rule(func(r *HighlightRule) { r.Color = c }).Validate(); err != nil {
 			t.Errorf("color %q rejected: %v", c, err)
 		}
+	}
+}
+
+// The default-list bookkeeping must survive Save/Load: if a field is missing
+// from the struct, SaveHighlightRules drops it silently and every load looks
+// like a file from before the merge existed.
+func TestHighlightRulesDefaultsRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	s := NewHighlightRulesStore(dir)
+	data := HighlightRulesData{
+		Version:         2,
+		Rules:           []HighlightRule{{ID: "d1", Pattern: "LOS", Kind: "keyword", Color: "#ff0000"}},
+		DefaultsVersion: 3,
+		Defaults:        map[string]string{"d1": "1a2b3c4d5e6f7", "d2": "abc"},
+	}
+	if err := s.Save(data); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, highlightRulesFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"defaultsVersion": 3`, `"d1": "1a2b3c4d5e6f7"`, `"d2": "abc"`} {
+		if !strings.Contains(string(raw), want) {
+			t.Errorf("saved JSON lacks %s:\n%s", want, raw)
+		}
+	}
+	got, err := s.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.DefaultsVersion != 3 || len(got.Defaults) != 2 || got.Defaults["d1"] != "1a2b3c4d5e6f7" {
+		t.Fatalf("round trip = %+v", got)
+	}
+}
+
+func TestHighlightRulesValidateDefaults(t *testing.T) {
+	long := strings.Repeat("x", maxHighlightDefaultBytes+1)
+	for name, defaults := range map[string]map[string]string{
+		"empty id":         {"": "abc"},
+		"long id":          {long: "abc"},
+		"long fingerprint": {"d1": long},
+	} {
+		if err := (HighlightRulesData{Defaults: defaults}).Validate(); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+	many := map[string]string{}
+	for i := 0; i <= maxHighlightRules; i++ {
+		many[fmt.Sprintf("d%d", i)] = "f"
+	}
+	if err := (HighlightRulesData{Defaults: many}).Validate(); err == nil {
+		t.Error("too many fingerprints accepted")
+	}
+	if err := (HighlightRulesData{Defaults: map[string]string{"d1": "abc"}}).Validate(); err != nil {
+		t.Errorf("valid fingerprint rejected: %v", err)
 	}
 }

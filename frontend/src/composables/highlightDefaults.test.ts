@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { matchTextSpans } from './highlightRules'
 import { compileRules, validateRule } from './userHighlightRules'
-import { buildDefaultRules } from './highlightDefaults'
+import { buildDefaultRules, DEFAULTS_VERSION, NEXT_DEFAULT_ID } from './highlightDefaults'
+import { defaultsSignature, isDefaultId } from './highlightMerge'
 import en from '../i18n/locales/en.json'
 import ptBR from '../i18n/locales/pt-BR.json'
 import zhCN from '../i18n/locales/zh-CN.json'
@@ -49,6 +50,23 @@ describe('default list', () => {
     expect(a.map(r => r.id)).toEqual(b.map(r => r.id))
     expect(new Set(a.map(r => r.id)).size).toBe(a.length)
     expect(a.every(r => r.group!.startsWith('L:'))).toBe(true)
+  })
+
+  it('ids are "d" + a number below NEXT_DEFAULT_ID', () => {
+    for (const r of DEFAULTS) {
+      expect(isDefaultId(r.id), r.id).toBe(true)
+      expect(Number(r.id.slice(1)), r.id).toBeLessThan(NEXT_DEFAULT_ID)
+    }
+  })
+
+  // Saved files are merged with the default list only when their
+  // defaultsVersion is older. Changed the list? Bump DEFAULTS_VERSION, add
+  // its signature here, and never change or reuse an existing rule id.
+  it('the list matches the signature pinned to DEFAULTS_VERSION', () => {
+    const SIGNATURES: Record<number, string> = {
+      1: '19e174513f8654',
+    }
+    expect(defaultsSignature(DEFAULTS), `DEFAULTS_VERSION ${DEFAULTS_VERSION}`).toBe(SIGNATURES[DEFAULTS_VERSION])
   })
 
   it('every default group has a label in en, pt-BR and zh-CN', () => {

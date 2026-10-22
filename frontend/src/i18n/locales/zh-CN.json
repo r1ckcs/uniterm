@@ -1771,6 +1771,7 @@
   "hl.saved": "高亮规则已保存",
   "hl.restoreDefaults": "恢复默认",
   "hl.restoreConfirm": "用默认规则替换整个列表？自定义规则将被删除——如需保留请先导出。",
+  "hl.defaultsAdded": "已向你的列表添加 {count} 条新的默认高亮规则。",
   "hl.group.optical": "光功率",
   "hl.group.macVlan": "MAC / VLAN",
   "hl.group.zteOlt": "OLT ZTE",

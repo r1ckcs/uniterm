@@ -1771,6 +1771,7 @@
   "hl.saved": "Highlight rules saved",
   "hl.restoreDefaults": "Restore defaults",
   "hl.restoreConfirm": "Replace the whole list with the default rules? Your own rules will be removed — export them first if you want to keep them.",
+  "hl.defaultsAdded": "{count} new default highlight rule(s) added to your list.",
   "hl.group.optical": "Optical power",
   "hl.group.macVlan": "MAC / VLAN",
   "hl.group.zteOlt": "OLT ZTE",
