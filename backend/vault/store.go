@@ -25,6 +25,9 @@ var (
 	ErrExists = errors.New("vault: object already exists")
 	// ErrBadName: the name is not a valid object name.
 	ErrBadName = errors.New("vault: invalid object name")
+	// ErrUnavailable: the remote store can't be reached (offline, server
+	// down, rate limited). Remote stores wrap their transport errors in it.
+	ErrUnavailable = errors.New("vault: storage unavailable")
 )
 
 // Version identifies one content of an object (a content hash for the local

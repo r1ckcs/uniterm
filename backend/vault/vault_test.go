@@ -838,3 +838,366 @@ func TestOldVersionIsPinned(t *testing.T) {
 		t.Fatalf("Open = %v, want ErrRollback", err)
 	}
 }
+
+// --- Supersedes (re-anchoring off a dead branch) ---
+
+// pinnedLoser sets up an admin race at roster 5 whose loser a client has
+// pinned (its listing showed only the loser for longer than PinDelay).
+func pinnedLoser(t *testing.T) (s *MemStore, tm *team, va2 *Vault, pinned *MemState, loser TrustState) {
+	t.Helper()
+	s = NewMemStore()
+	tm = newTeam(t, s)
+	a2 := newKey(t)
+	must(t, tm.va.AddMember(MemberOf(a2, "reserva", "mac-reserva", RoleAdmin)))
+	va2 = tm.join(t, a2)
+	must(t, tm.va.AddMember(MemberOf(newKey(t), "h", "x", RoleReader)))
+	winner, _ := candidates(s, rosterName(5))
+	s.Hide(winner[0].ID)
+	must(t, va2.AddMember(MemberOf(newKey(t), "h", "y", RoleReader)))
+	loser = va2.Trust()
+	s.Show(winner[0].ID)
+	pinned = NewMemState(State{Trust: loser, NextSeq: 1})
+	return s, tm, va2, pinned, loser
+}
+
+func TestSupersededLoserReanchors(t *testing.T) {
+	_, tm, _, pinned, loser := pinnedLoser(t)
+	v, err := Open(tm.store, pinned, tm.r)
+	must(t, err)
+	if v.Trust() != loser {
+		t.Fatalf("before supersede: %+v, want the pinned loser", v.Trust())
+	}
+	// The winning admin sees the race and marks the loser.
+	must(t, tm.va.Refresh())
+	must(t, tm.va.SupersedeLosers())
+	if got := tm.va.Roster().Supersedes; len(got) != 1 || got[0] != (Superseded{loser.Counter, loser.Hash}) {
+		t.Fatalf("supersedes = %+v", got)
+	}
+	must(t, v.Refresh())
+	if v.Trust() != tm.va.Trust() {
+		t.Fatalf("after supersede: %+v, want %+v", v.Trust(), tm.va.Trust())
+	}
+	if st, _ := pinned.Load(); st.Trust == loser {
+		t.Fatal("still pinned to the loser")
+	}
+	if !strings.Contains(strings.Join(logOf(t, v).Warnings, ";"), "superseded") {
+		t.Error("re-anchoring not reported")
+	}
+	// Nothing left to mark: no new version.
+	before := tm.va.Trust()
+	must(t, tm.va.SupersedeLosers())
+	if tm.va.Trust() != before {
+		t.Fatal("SupersedeLosers wrote a version with nothing to mark")
+	}
+}
+
+func TestLostRaceRedoSupersedes(t *testing.T) {
+	// The losing admin's redo marks its own loser.
+	s := NewMemStore()
+	tm := newTeam(t, s)
+	a2 := newKey(t)
+	must(t, tm.va.AddMember(MemberOf(a2, "reserva", "mac-reserva", RoleAdmin)))
+	va2 := tm.join(t, a2)
+	must(t, tm.va.AddMember(MemberOf(newKey(t), "h", "x", RoleReader)))
+	y := MemberOf(newKey(t), "h", "y", RoleReader)
+	if err := va2.AddMember(y); !errors.Is(err, ErrLostRace) {
+		t.Fatalf("= %v, want ErrLostRace", err)
+	}
+	must(t, va2.AddMember(y))
+	if got := va2.Roster().Supersedes; len(got) != 1 || got[0].Counter != 5 {
+		t.Fatalf("supersedes = %+v", got)
+	}
+}
+
+func TestStalledWithoutSupersedeStays(t *testing.T) {
+	// Roster 6 written by an admin that had not refreshed since the race
+	// does not mark the loser: the pinned client stays on its branch (and
+	// the version after it, which does not follow, doesn't move it either)
+	// until SupersedeLosers runs.
+	_, tm, _, pinned, loser := pinnedLoser(t)
+	must(t, tm.va.AddMember(MemberOf(newKey(t), "h", "z", RoleReader)))
+	if len(tm.va.Roster().Supersedes) != 0 {
+		t.Fatal("test premise: roster 6 should not supersede yet")
+	}
+	v, err := Open(tm.store, pinned, tm.r)
+	must(t, err)
+	if v.Trust() != loser {
+		t.Fatalf("moved without a supersede: %+v", v.Trust())
+	}
+	must(t, tm.va.SupersedeLosers())
+	must(t, v.Refresh())
+	if v.Trust() != tm.va.Trust() || v.Trust().Counter != 7 {
+		t.Fatalf("after supersede: %+v, want %+v", v.Trust(), tm.va.Trust())
+	}
+}
+
+func TestSupersedeNeedsAdminSignature(t *testing.T) {
+	s, tm, _, pinned, loser := pinnedLoser(t)
+	// A writer forges roster 6 on the winning chain claiming the loser is dead.
+	must(t, tm.va.Refresh())
+	next := cloneRoster(tm.va.Roster())
+	next.Counter, next.Prev = 6, tm.va.Trust().Hash
+	next.Supersedes = []Superseded{{loser.Counter, loser.Hash}}
+	if _, err := writeRoster(s, tm.w, &next); err != nil {
+		t.Fatal(err)
+	}
+	v, err := Open(s, pinned, tm.r)
+	must(t, err)
+	if v.Trust() != loser {
+		t.Fatalf("moved on a forged supersede: %+v", v.Trust())
+	}
+}
+
+func TestSupersedeOwnAncestorRefused(t *testing.T) {
+	s := NewMemStore()
+	tm := newTeam(t, s)
+	// An admin can't declare a version of its own chain dead.
+	next := cloneRoster(tm.va.Roster())
+	next.Counter, next.Prev = 4, tm.va.Trust().Hash
+	g, _ := candidates(s, rosterName(2))
+	data, _, _ := s.Get(g[0].ID)
+	vr, _, err := parseRoster(data, "pessoal")
+	must(t, err)
+	next.Supersedes = []Superseded{{2, vr.hash}}
+	if _, err := writeRoster(s, tm.a, &next); err != nil {
+		t.Fatal(err)
+	}
+	v := tm.join(t, tm.r)
+	if v.Trust().Counter != 3 {
+		t.Fatalf("accepted a version superseding its own ancestor: %+v", v.Trust())
+	}
+}
+
+// --- CachedStore ---
+
+// flaky is a Store that can go offline.
+type flaky struct {
+	Store
+	down bool
+}
+
+func (f *flaky) List(p string) ([]Entry, error) {
+	if f.down {
+		return nil, fmt.Errorf("dial: %w", ErrUnavailable)
+	}
+	return f.Store.List(p)
+}
+
+func (f *flaky) Get(id string) ([]byte, Version, error) {
+	if f.down {
+		return nil, "", fmt.Errorf("dial: %w", ErrUnavailable)
+	}
+	return f.Store.Get(id)
+}
+
+func (f *flaky) Create(n string, d []byte) (Entry, error) {
+	if f.down {
+		return Entry{}, fmt.Errorf("dial: %w", ErrUnavailable)
+	}
+	return f.Store.Create(n, d)
+}
+
+func TestCachedStoreReadsOffline(t *testing.T) {
+	remote := &flaky{Store: NewMemStore()}
+	tm := newTeam(t, remote)
+	_, err := tm.vw.Append([]byte("w1"))
+	must(t, err)
+	cs, err := NewCachedStore(remote, t.TempDir())
+	must(t, err)
+	st := NewMemState(State{})
+	must(t, Join(st, "pessoal", tm.genesis))
+	v, err := Open(cs, st, tm.r)
+	must(t, err)
+	if got := payloads(logOf(t, v).Ops); got != "w1" {
+		t.Fatalf("online log = %q", got)
+	}
+	remote.down = true
+	must(t, v.Refresh())
+	if got := payloads(logOf(t, v).Ops); got != "w1" || !cs.Offline() {
+		t.Fatalf("offline log = %q, offline = %v", got, cs.Offline())
+	}
+	// A writer through the cache: offline appends fail with ErrUnavailable
+	// (the service queues them) and do not burn the reserved seq twice.
+	remote.down = false
+	cw, err := NewCachedStore(remote, t.TempDir())
+	must(t, err)
+	stw := NewMemState(State{})
+	must(t, Join(stw, "pessoal", tm.genesis))
+	vw, err := Open(cw, stw, tm.w)
+	must(t, err)
+	remote.down = true
+	if _, err := vw.Append([]byte("w2")); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("offline append = %v, want ErrUnavailable", err)
+	}
+	remote.down = false
+	_, err = vw.Append([]byte("w2"))
+	must(t, err)
+	must(t, v.Refresh())
+	if got := payloads(logOf(t, v).Ops); got != "w1,w2" {
+		t.Fatalf("log after reconnect = %q", got)
+	}
+}
+
+// --- revocation dominates (review of 7b3266f6) ---
+
+// driveLike lets the creator set createdTime, as Drive does.
+type driveLike struct {
+	*MemStore
+	created map[string]int64
+}
+
+func (d *driveLike) List(prefix string) ([]Entry, error) {
+	es, err := d.MemStore.List(prefix)
+	for i := range es {
+		if c, ok := d.created[es[i].ID]; ok {
+			es[i].Created = c
+		}
+	}
+	return es, err
+}
+
+func (d *driveLike) Create(name string, data []byte) (Entry, error) {
+	e, err := d.MemStore.Create(name, data)
+	if d.created != nil && err == nil {
+		d.created[e.ID] = 1 // backdated
+	}
+	return e, err
+}
+
+// revokedAdminFork: admin A revokes admin R at counter k+1; R (stolen
+// device) then forks from k with backdated versions: k+1' adding its own
+// admin x, k+2' superseding the real k+1. Returns the pre-revocation
+// anchor and the real revocation version.
+func revokedAdminFork(t *testing.T, s *driveLike, tm *team, r *SoftwareDeviceKey, alsoRevokeA bool) (TrustState, TrustState) {
+	t.Helper()
+	must(t, tm.va.AddMember(MemberOf(r, "henrique", "mac-roubado", RoleAdmin)))
+	before := tm.va.Roster()
+	k := tm.va.Trust()
+	must(t, tm.va.Revoke(IDOf(r)))
+	real := tm.va.Trust()
+
+	s.created = map[string]int64{}
+	fa := cloneRoster(before)
+	fa.Counter, fa.Prev = k.Counter+1, k.Hash
+	fa.Members = append(fa.Members, MemberOf(newKey(t), "atacante", "x", RoleAdmin))
+	if alsoRevokeA {
+		// R revokes A in its branch too (mutual revocation).
+		vk, err := newVaultKey()
+		must(t, err)
+		fa.Members = slices.DeleteFunc(fa.Members, func(m Member) bool { return m.DeviceID == IDOf(tm.a) })
+		for _, m := range before.Members {
+			if m.DeviceID == IDOf(tm.a) {
+				fa.Former = append(fa.Former, m)
+			}
+		}
+		fa.Epoch++
+		fa.KeyChecks = append(fa.KeyChecks, keyCheck("pessoal", fa.Epoch, vk))
+		fa.Closed = append(fa.Closed, EpochClose{Epoch: before.Epoch, Seqs: map[string]Cut{}})
+	}
+	va, err := writeRoster(s, r, &fa)
+	must(t, err)
+	fb := cloneRoster(fa)
+	fb.Counter, fb.Prev = fa.Counter+1, va.hash
+	fb.Supersedes = []Superseded{{real.Counter, real.Hash}}
+	_, err = writeRoster(s, r, &fb)
+	must(t, err)
+	return k, real
+}
+
+func hasMember(v *Vault, id string) bool {
+	for _, m := range v.Roster().Members {
+		if m.DeviceID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func TestRevokedAdminCannotUndoRevocation(t *testing.T) {
+	s := &driveLike{MemStore: NewMemStore()}
+	tm := newTeam(t, s)
+	r := newKey(t)
+	k, real := revokedAdminFork(t, s, tm, r, false)
+	s2 := s
+	// A client pinned on the revocation.
+	client, err := openAt(s2, tm.w, real)
+	must(t, err)
+	must(t, client.Refresh())
+	if hasMember(client, IDOf(r)) || client.Trust() != real {
+		t.Fatalf("pinned client moved to the revoked admin's fork: %+v", client.Trust())
+	}
+	// A client anchored before the revocation (old recovery anchor, device
+	// that was offline) takes the revocation, not the backdated fork.
+	old, err := openAt(s2, tm.w, k)
+	must(t, err)
+	if hasMember(old, IDOf(r)) || old.Trust() != real {
+		t.Fatalf("pre-revocation anchor landed on the fork: %+v", old.Trust())
+	}
+	// The admin marks the fork superseded; nothing changes for the clients.
+	must(t, tm.va.Refresh())
+	must(t, tm.va.SupersedeLosers())
+	must(t, client.Refresh())
+	if hasMember(client, IDOf(r)) {
+		t.Fatal("revoked admin back after SupersedeLosers")
+	}
+}
+
+func TestMutualRevocationFailsClosed(t *testing.T) {
+	s := &driveLike{MemStore: NewMemStore()}
+	tm := newTeam(t, s)
+	r := newKey(t)
+	k, _ := revokedAdminFork(t, s, tm, r, true)
+	if _, err := openAt(s, tm.w, k); !errors.Is(err, ErrConflict) || !errors.Is(err, ErrFork) {
+		t.Fatalf("open from before the fork = %v, want ErrConflict", err)
+	}
+}
+
+func TestClientOnAttackerForkReturns(t *testing.T) {
+	// A client whose listing only showed the attacker's branch (pinned on
+	// k+1') goes back to the revocation once an admin supersedes the fork.
+	s := &driveLike{MemStore: NewMemStore()}
+	tm := newTeam(t, s)
+	r := newKey(t)
+	_, real := revokedAdminFork(t, s, tm, r, false)
+	forkV, _ := candidates(s, rosterName(real.Counter))
+	var fork TrustState
+	for _, e := range forkV {
+		data, _, _ := s.Get(e.ID)
+		vr, _, _ := parseRoster(data, "pessoal")
+		if vr.hash != real.Hash {
+			fork = TrustState{VaultID: "pessoal", Counter: vr.Counter, Hash: vr.hash}
+		}
+	}
+	must(t, tm.va.Refresh())
+	must(t, tm.va.SupersedeLosers())
+	victim, err := openAt(s, tm.w, fork)
+	must(t, err)
+	if hasMember(victim, IDOf(r)) || victim.Trust() != tm.va.Trust() {
+		t.Fatalf("victim stayed on the fork: %+v (admin at %+v)", victim.Trust(), tm.va.Trust())
+	}
+}
+
+func TestRosterFloodFailsClosed(t *testing.T) {
+	old := maxRosterNodes
+	maxRosterNodes = 8
+	defer func() { maxRosterNodes = old }()
+	s := &driveLike{MemStore: NewMemStore()}
+	tm := newTeam(t, s)
+	r := newKey(t)
+	must(t, tm.va.AddMember(MemberOf(r, "henrique", "mac-roubado", RoleAdmin)))
+	before, k := tm.va.Roster(), tm.va.Trust()
+	must(t, tm.va.Revoke(IDOf(r)))
+	// The revoked admin floods valid children of k, backdated before the
+	// real revocation.
+	s.created = map[string]int64{}
+	for i := range 10 {
+		f := cloneRoster(before)
+		f.Counter, f.Prev = k.Counter+1, k.Hash
+		f.Members = append(f.Members, MemberOf(newKey(t), "x", fmt.Sprint("x", i), RoleReader))
+		_, err := writeRoster(s, r, &f)
+		must(t, err)
+	}
+	if _, err := openAt(s, tm.w, k); !errors.Is(err, ErrRosterFlood) || !errors.Is(err, ErrFork) {
+		t.Fatalf("open from k = %v, want ErrRosterFlood", err)
+	}
+}

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"os"
@@ -184,7 +186,7 @@ func main() {
 		// is exempt. RelaunchApp sets relaunchPending and quits first; the
 		// successor is spawned after Run() returns, with the lock released.
 		SingleInstance: &application.SingleInstanceOptions{
-			UniqueID: singleInstanceID,
+			UniqueID: instanceID(),
 			OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
 				showMainWindow(window)
 			},
@@ -614,4 +616,16 @@ func trayHotkeyBinding(s *store.AppSettings) *store.KeyBinding {
 		return &b
 	}
 	return nil
+}
+
+// instanceID is the single-instance lock key. An instance started with its
+// own UNITERM_DATA_DIR (a second "device" for testing the vault) does not
+// share the stores, so it gets its own lock instead of focusing the other.
+func instanceID() string {
+	dir := os.Getenv(store.DataDirEnv)
+	if dir == "" {
+		return singleInstanceID
+	}
+	sum := sha256.Sum256([]byte(filepath.Clean(dir)))
+	return singleInstanceID + "-" + hex.EncodeToString(sum[:6])
 }
