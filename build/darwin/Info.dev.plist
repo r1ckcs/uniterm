@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>uniTerm</string>
+    <string>FlexTerm</string>
     <key>CFBundleExecutable</key>
-    <string>uniTerm</string>
+    <string>FlexTerm</string>
     <key>CFBundleDisplayName</key>
-    <string>uniTerm</string>
+    <string>FlexTerm</string>
     <key>CFBundleIdentifier</key>
-    <string>com.yourcompany.uniter</string>
+    <string>br.com.netflex.flexterm</string>
     <key>CFBundleIconFile</key>
     <string>icons.icns</string>
     <key>CFBundleVersion</key>

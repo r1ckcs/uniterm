@@ -1,4 +1,4 @@
-// Package mcp exposes uniTerm as an MCP (Model Context Protocol) server so
+// Package mcp exposes FlexTerm as an MCP (Model Context Protocol) server so
 // external AI agents (Claude Code, Codex CLI, Kimi CLI, ...) can run commands
 // on the user's saved / live SSH connections without ever seeing a password
 // or private key: the app holds the credentials, executes through its own
@@ -197,7 +197,7 @@ type AuditEntry struct {
 	Error    string `json:"error,omitempty"`
 }
 
-// Server is the uniTerm MCP server: HTTP listener + SDK server + token auth.
+// Server is the FlexTerm MCP server: HTTP listener + SDK server + token auth.
 type Server struct {
 	env Env
 
@@ -248,7 +248,7 @@ func (s *Server) Start(port int) error {
 	s.Stop()
 
 	srv := mcp.NewServer(&mcp.Implementation{
-		Name:    "uniterm",
+		Name:    "flexterm",
 		Version: "1.0.0",
 	}, nil)
 	s.registerTools(srv)
@@ -320,7 +320,7 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 			info, ok := s.tokens[key]
 			s.mu.Unlock()
 			if !ok {
-				w.Header().Set("WWW-Authenticate", `Bearer realm="uniterm"`)
+				w.Header().Set("WWW-Authenticate", `Bearer realm="flexterm"`)
 				http.Error(w, "invalid or missing token", http.StatusUnauthorized)
 				return
 			}

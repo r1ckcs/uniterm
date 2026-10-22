@@ -352,7 +352,7 @@ func truncateOutput(b []byte, max int) []byte {
 	if max <= 0 || len(b) <= max {
 		return b
 	}
-	const marker = "\n…[uniterm: output truncated]"
+	const marker = "\n…[flexterm: output truncated]"
 	trunc := b[:max]
 	// Cut at the last newline before the limit so we don't split a line in
 	// the middle when we can help it.

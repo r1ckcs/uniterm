@@ -693,7 +693,7 @@ func (s *SkillsStore) ImportFromZip(zipPath string) (string, error) {
 	}
 
 	// 解压到临时目录，再整体拷入
-	tmpDir, err := os.MkdirTemp("", "uniterm-skill-import-")
+	tmpDir, err := os.MkdirTemp("", "flexterm-skill-import-")
 	if err != nil {
 		return "", fmt.Errorf("create temp dir: %w", err)
 	}

@@ -1,7 +1,7 @@
 version: '3'
 
 vars:
-  APP_NAME: "uniTerm"
+  APP_NAME: "FlexTerm"
   BIN_DIR: "bin"
   PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "npm"}}'
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
@@ -80,11 +80,12 @@ tasks:
     internal: true
     cmds:
       - task: darwin:build
-        vars: { ARCH: '{{.ARCH}}', VERSION: '{{.VERSION}}', OUTPUT: 'bin/release-{{.ARCH}}/uniTerm' }
+        vars: { ARCH: '{{.ARCH}}', VERSION: '{{.VERSION}}', OUTPUT: 'bin/release-{{.ARCH}}/FlexTerm' }
       # Refuse to ship a binary whose updater would not trust the release key.
-      - go run ./scripts/release/sigtool binkey -expect @build/release-pubkey.txt "bin/release-{{.ARCH}}/uniTerm"
-      # Bare executable at the zip root: the updater extracts "uniterm" from it.
-      - zip -q -j "{{.RELEASE_DIR}}/uniterm-darwin-{{.ARCH}}-v{{.VERSION}}.zip" "bin/release-{{.ARCH}}/uniTerm"
+      - go run ./scripts/release/sigtool binkey -expect @build/release-pubkey.txt "bin/release-{{.ARCH}}/FlexTerm"
+      # Bare executable at the zip root: the updater extracts "FlexTerm" (or the
+      # pre-rename "uniterm") from it. Asset names keep the uniterm- prefix.
+      - zip -q -j "{{.RELEASE_DIR}}/uniterm-darwin-{{.ARCH}}-v{{.VERSION}}.zip" "bin/release-{{.ARCH}}/FlexTerm"
 
   release:verify:
     summary: Verifies checksums.txt.sig and every asset hash in dist/release
@@ -100,7 +101,7 @@ tasks:
         msg: "gh is not logged in (gh auth login)"
     cmds:
       - task: release:verify
-      - gh release create "v{{.VERSION}}" "{{.RELEASE_DIR}}"/uniterm-* "{{.RELEASE_DIR}}/checksums.txt" "{{.RELEASE_DIR}}/checksums.txt.sig" --repo r1ckcs/uniterm --draft --title "uniTerm v{{.VERSION}}" {{if .NOTES_FILE}}--notes-file "{{.NOTES_FILE}}"{{else}}--generate-notes{{end}}
+      - gh release create "v{{.VERSION}}" "{{.RELEASE_DIR}}"/uniterm-* "{{.RELEASE_DIR}}/checksums.txt" "{{.RELEASE_DIR}}/checksums.txt.sig" --repo r1ckcs/uniterm --draft --title "FlexTerm v{{.VERSION}}" {{if .NOTES_FILE}}--notes-file "{{.NOTES_FILE}}"{{else}}--generate-notes{{end}}
 
   android:compile:check:
     summary: Cross-compiles all Go packages for android (no SDK needed; CGO off)

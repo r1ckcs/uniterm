@@ -1,3 +1,8 @@
+> **FlexTerm** — this repository is FlexTerm, an internal fork of uniTerm
+> ([ys-ll/uniterm](https://github.com/ys-ll/uniterm)) modified by Netflex. The
+> app is named FlexTerm; the text below is the original uniTerm README. See
+> [NOTICE](NOTICE) and [LICENSE](LICENSE) (Apache 2.0).
+
 <div align="center">
   <img src="build/appicon.png" alt="uniTerm" width="128" height="128" />
   <h1>uniTerm</h1>

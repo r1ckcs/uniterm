@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ys-ll/uniterm/backend/appname"
 	"github.com/ys-ll/uniterm/backend/log"
 )
 
@@ -202,17 +203,18 @@ func cachePath() string {
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(dir, "uniTerm", "update_cache_"+strings.ReplaceAll(updateRepo, "/", "-")+".json")
+	return filepath.Join(dir, appname.DirName, "update_cache_"+strings.ReplaceAll(updateRepo, "/", "-")+".json")
 }
 
-// removeLegacyCaches deletes the upstream-era cache files.
+// removeLegacyCaches deletes the upstream-era cache files (the first FlexTerm
+// start copies them over from the uniTerm folder along with everything else).
 func removeLegacyCaches() {
 	dir, err := configDir()
 	if err != nil {
 		return
 	}
 	for _, name := range legacyCacheFiles {
-		_ = os.Remove(filepath.Join(dir, "uniTerm", name))
+		_ = os.Remove(filepath.Join(dir, appname.DirName, name))
 	}
 }
 
@@ -299,7 +301,7 @@ func fetchRelease() (*release, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
-	req.Header.Set("User-Agent", "uniTerm")
+	req.Header.Set("User-Agent", appname.Name)
 
 	resp, err := sharedHTTPClient().Do(req)
 	if err != nil {
@@ -348,7 +350,7 @@ func fetchAssetBytes(ctx context.Context, rel *release, name string) ([]byte, bo
 		if err != nil {
 			return nil, false
 		}
-		req.Header.Set("User-Agent", "uniTerm")
+		req.Header.Set("User-Agent", appname.Name)
 		resp, err := downloadHTTPClient().Do(req)
 		if err != nil || resp.StatusCode != http.StatusOK {
 			if resp != nil {

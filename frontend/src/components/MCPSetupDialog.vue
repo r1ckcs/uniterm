@@ -79,13 +79,13 @@ const clients = computed(() => [
     id: 'claude',
     label: 'Claude Code',
     hint: t('mcp.claudeHint'),
-    config: `claude mcp add --transport http uniterm ${url.value} \\\n  --header "Authorization: Bearer ${props.token}"`,
+    config: `claude mcp add --transport http flexterm ${url.value} \\\n  --header "Authorization: Bearer ${props.token}"`,
   },
   {
     id: 'codex',
     label: 'Codex',
     hint: t('mcp.codexHint'),
-    config: `[mcp_servers.uniterm]\nurl = "${url.value}"\nhttp_headers = { "Authorization" = "Bearer ${props.token}" }`,
+    config: `[mcp_servers.flexterm]\nurl = "${url.value}"\nhttp_headers = { "Authorization" = "Bearer ${props.token}" }`,
   },
   {
     id: 'zcode',
@@ -94,7 +94,7 @@ const clients = computed(() => [
     config: JSON.stringify({
       mcp: {
         servers: {
-          uniterm: {
+          flexterm: {
             type: 'http',
             url: url.value,
             headers: { Authorization: `Bearer ${props.token}` },
@@ -109,7 +109,7 @@ const clients = computed(() => [
     hint: t('mcp.traeHint'),
     config: JSON.stringify({
       mcpServers: {
-        uniterm: {
+        flexterm: {
           url: url.value,
           headers: { Authorization: `Bearer ${props.token}` },
         },
@@ -122,7 +122,7 @@ const clients = computed(() => [
     hint: t('mcp.workbuddyHint'),
     config: JSON.stringify({
       mcpServers: {
-        uniterm: {
+        flexterm: {
           type: 'streamableHttp',
           url: url.value,
           headers: { Authorization: `Bearer ${props.token}` },
@@ -134,7 +134,7 @@ const clients = computed(() => [
     id: 'kimi',
     label: 'Kimi',
     hint: t('mcp.kimiHint'),
-    config: `kimi mcp add --transport http uniterm ${url.value} \\\n  --header "Authorization: Bearer ${props.token}"`,
+    config: `kimi mcp add --transport http flexterm ${url.value} \\\n  --header "Authorization: Bearer ${props.token}"`,
   },
   {
     id: 'gemini',
@@ -142,7 +142,7 @@ const clients = computed(() => [
     hint: t('mcp.geminiHint'),
     config: JSON.stringify({
       mcpServers: {
-        uniterm: {
+        flexterm: {
           type: 'http',
           url: url.value,
           headers: { Authorization: `Bearer ${props.token}` },

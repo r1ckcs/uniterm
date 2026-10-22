@@ -175,7 +175,7 @@ func startElevatedPty(spec localPtySpawn) (*adminPty, error) {
 	if _, err := rand.Read(suffix); err != nil {
 		return nil, fmt.Errorf("pipe name: %w", err)
 	}
-	pipeName := `\\.\pipe\uniterm-pty-` + hex.EncodeToString(suffix)
+	pipeName := `\\.\pipe\flexterm-pty-` + hex.EncodeToString(suffix)
 
 	handle, err := createPtyPipeServer(pipeName)
 	if err != nil {

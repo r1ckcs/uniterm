@@ -427,14 +427,14 @@ type extEditWatcher struct {
 // session gets a subdirectory keyed by its sanitized ID.
 //
 // It lives under the per-user cache dir rather than the shared system temp
-// dir: on multi-user Linux a predictable /tmp/uniterm-extedit could be
+// dir: on multi-user Linux a predictable /tmp/flexterm-extedit could be
 // pre-created (or symlinked) by another local user to read or swap the files
 // that the watcher later uploads with this user's credentials.
 func extEditRootDir() string {
 	if dir, err := os.UserCacheDir(); err == nil && dir != "" {
-		return filepath.Join(dir, "uniterm", "extedit")
+		return filepath.Join(dir, "flexterm", "extedit")
 	}
-	return filepath.Join(os.TempDir(), fmt.Sprintf("uniterm-extedit-%d", os.Getuid()))
+	return filepath.Join(os.TempDir(), fmt.Sprintf("flexterm-extedit-%d", os.Getuid()))
 }
 
 // extEditSessionDir is a session's scratch dir. The PID prefix attributes the

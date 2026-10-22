@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/ys-ll/uniterm/backend/appname"
 	"github.com/ys-ll/uniterm/backend/log"
 )
 
@@ -17,13 +18,13 @@ type bootstrap struct {
 	DataDir string `json:"dataDir,omitempty"`
 }
 
-// DefaultDataDir returns the OS user-config data dir (<UserConfigDir>/uniTerm).
+// DefaultDataDir returns the OS user-config data dir (<UserConfigDir>/FlexTerm).
 func DefaultDataDir() (string, error) {
 	cfg, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(cfg, "uniTerm"), nil
+	return filepath.Join(cfg, appname.DirName), nil
 }
 
 func exeDir() (string, error) {
@@ -43,7 +44,7 @@ func bootstrapPath() (string, error) {
 }
 
 // userConfigBootstrapPath returns the bootstrap path in the user config dir
-// (<UserConfigDir>/uniTerm/bootstrap.json). Unlike the exe/data location it is
+// (<UserConfigDir>/FlexTerm/bootstrap.json). Unlike the exe/data location it is
 // writable for installs under a read-only Program Files / Applications, which
 // is where default and custom data dirs (and their bootstrap pointer) belong.
 func userConfigBootstrapPath() (string, error) {

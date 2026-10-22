@@ -11,6 +11,7 @@ import (
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
 
+	"github.com/ys-ll/uniterm/backend/appname"
 	"github.com/ys-ll/uniterm/backend/log"
 )
 
@@ -68,7 +69,7 @@ func appKnownHostsPath() string {
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(home, ".uniterm", "known_hosts")
+	return filepath.Join(home, appname.HomeDir, "known_hosts")
 }
 
 func userKnownHostsPath() string {

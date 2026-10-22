@@ -83,7 +83,7 @@ func kerberosCachePath() (string, func(), error) {
 // into the FILE format understood by gokrb5. kcc reads the current default
 // cache, so no principal or secret is passed on the command line.
 func exportDarwinCredentialCache() (string, func(), error) {
-	file, err := os.CreateTemp("", "uniterm-krb5cc-*")
+	file, err := os.CreateTemp("", "flexterm-krb5cc-*")
 	if err != nil {
 		return "", nil, fmt.Errorf("create temporary Kerberos cache: %w", err)
 	}

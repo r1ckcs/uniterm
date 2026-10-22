@@ -40,7 +40,7 @@ type TerminalSettings struct {
 	CtrlWheelZoom *bool `json:"ctrlWheelZoom,omitempty"`
 	// SessionLogDir overrides the default directory used for session
 	// output logs (issue #227). Empty means: use the OS-appropriate
-	// default under ~/Documents/uniTerm/logs.
+	// default under ~/Documents/FlexTerm/logs.
 	SessionLogDir string `json:"sessionLogDir,omitempty"`
 	// ZmodemDownloadDir is the device-local default directory for files
 	// received with sz. Empty preserves the directory picker behavior.

@@ -43,7 +43,7 @@ function onCancel() { emit('update:visible', false) }
 async function onExport() {
   if (!password.value) { msg.error(t('importExport.configPassword')); return }
   if (password.value !== confirmPassword.value) { msg.error(t('importExport.passwordMismatch')); return }
-  const dest = await SaveFileDialogFiltered(t('importExport.exportTitle'), 'uniterm-connections.utm', 'uniTerm (*.utm)', '*.utm')
+  const dest = await SaveFileDialogFiltered(t('importExport.exportTitle'), 'flexterm-connections.utm', 'FlexTerm (*.utm)', '*.utm')
   if (!dest) return
   exporting.value = true
   try {

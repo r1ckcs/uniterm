@@ -1,0 +1,12 @@
+FlexTerm
+Copyright 2026 Netflex
+
+FlexTerm é um fork de uniTerm (ys-ll/uniterm), modificado pela Netflex.
+FlexTerm is a fork of uniTerm (https://github.com/ys-ll/uniterm), modified by Netflex.
+
+uniTerm
+Copyright 2025 uniTerm
+
+Both are licensed under the Apache License, Version 2.0 (see LICENSE).
+Files modified by Netflex are identified by this repository's git history.
+Third-party components are listed in THIRD_PARTY_NOTICES.md.

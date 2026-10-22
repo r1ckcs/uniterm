@@ -57,7 +57,7 @@ func TestAdminPtyBrokerRelay(t *testing.T) {
 	if _, err := rand.Read(suffix); err != nil {
 		t.Fatal(err)
 	}
-	pipeName := `\\.\pipe\uniterm-pty-test-` + hex.EncodeToString(suffix)
+	pipeName := `\\.\pipe\flexterm-pty-test-` + hex.EncodeToString(suffix)
 
 	handle, err := createPtyPipeServer(pipeName)
 	if err != nil {

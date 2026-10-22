@@ -68,18 +68,18 @@ func (s *Server) registerFileTools(srv *mcp.Server) {
 
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "upload_file",
-		Description: "Upload a local file to a remote host over the session's SFTP channel. Streams disk to disk — content never passes through the model. The local path must be inside a directory allowed in uniTerm's SFTP bookmarks. Requires user approval.",
+		Description: "Upload a local file to a remote host over the session's SFTP channel. Streams disk to disk — content never passes through the model. The local path must be inside a directory allowed in FlexTerm's SFTP bookmarks. Requires user approval.",
 	}, s.toolUploadFile)
 
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "download_file",
-		Description: "Download a remote file to a local directory over the session's SFTP channel. Streams disk to disk. The local path must be inside a directory allowed in uniTerm's SFTP bookmarks. Requires user approval.",
+		Description: "Download a remote file to a local directory over the session's SFTP channel. Streams disk to disk. The local path must be inside a directory allowed in FlexTerm's SFTP bookmarks. Requires user approval.",
 	}, s.toolDownloadFile)
 }
 
 func (s *Server) toolListRemoteDir(ctx context.Context, req *mcp.CallToolRequest, in listDirIn) (*mcp.CallToolResult, listDirOut, error) {
 	if !s.env.envFilesEnabled() {
-		return nil, listDirOut{}, fmt.Errorf("file tools are disabled in uniTerm settings")
+		return nil, listDirOut{}, fmt.Errorf("file tools are disabled in FlexTerm settings")
 	}
 	if strings.TrimSpace(in.SessionID) == "" {
 		return nil, listDirOut{}, fmt.Errorf("sessionId is required")
@@ -104,7 +104,7 @@ func (s *Server) toolListRemoteDir(ctx context.Context, req *mcp.CallToolRequest
 
 func (s *Server) toolReadRemoteFile(ctx context.Context, req *mcp.CallToolRequest, in readFileIn) (*mcp.CallToolResult, readFileOut, error) {
 	if !s.env.envFilesEnabled() {
-		return nil, readFileOut{}, fmt.Errorf("file tools are disabled in uniTerm settings")
+		return nil, readFileOut{}, fmt.Errorf("file tools are disabled in FlexTerm settings")
 	}
 	if strings.TrimSpace(in.SessionID) == "" {
 		return nil, readFileOut{}, fmt.Errorf("sessionId is required")
@@ -132,7 +132,7 @@ func (s *Server) toolReadRemoteFile(ctx context.Context, req *mcp.CallToolReques
 
 func (s *Server) toolUploadFile(ctx context.Context, req *mcp.CallToolRequest, in uploadIn) (*mcp.CallToolResult, uploadOut, error) {
 	if !s.env.envFilesEnabled() {
-		return nil, uploadOut{}, fmt.Errorf("file tools are disabled in uniTerm settings")
+		return nil, uploadOut{}, fmt.Errorf("file tools are disabled in FlexTerm settings")
 	}
 	if strings.TrimSpace(in.SessionID) == "" {
 		return nil, uploadOut{}, fmt.Errorf("sessionId is required")
@@ -159,7 +159,7 @@ func (s *Server) toolUploadFile(ctx context.Context, req *mcp.CallToolRequest, i
 
 func (s *Server) toolDownloadFile(ctx context.Context, req *mcp.CallToolRequest, in downloadIn) (*mcp.CallToolResult, downloadOut, error) {
 	if !s.env.envFilesEnabled() {
-		return nil, downloadOut{}, fmt.Errorf("file tools are disabled in uniTerm settings")
+		return nil, downloadOut{}, fmt.Errorf("file tools are disabled in FlexTerm settings")
 	}
 	if strings.TrimSpace(in.SessionID) == "" {
 		return nil, downloadOut{}, fmt.Errorf("sessionId is required")

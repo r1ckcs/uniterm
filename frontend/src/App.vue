@@ -342,7 +342,7 @@ function hasLiveSessions(): boolean {
 function onVisibilityChange() {
   if (document.visibilityState === 'hidden') {
     if (hasLiveSessions()) {
-      startAndroidKeepAlive('uniTerm', t('app.backgroundKeepAlive'))
+      startAndroidKeepAlive('FlexTerm', t('app.backgroundKeepAlive'))
     }
   } else {
     stopAndroidKeepAlive()
@@ -454,7 +454,7 @@ async function checkCredentials() {
   // rejects and the placeholder status would wrongly pop the encryption
   // dialog. Skip the whole credential flow so the UI renders for debugging.
   if (!credStore.backendAvailable) {
-    console.warn('[uniTerm] Backend unreachable — browser debug mode: credential flow skipped')
+    console.warn('[FlexTerm] Backend unreachable — browser debug mode: credential flow skipped')
     return
   }
   if (credStore.firstRun || credStore.dataDirInfo.firstRun) {

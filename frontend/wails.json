@@ -1,7 +1,7 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "uniTerm",
-  "outputfilename": "uniTerm",
+  "name": "FlexTerm",
+  "outputfilename": "FlexTerm",
   "frontend": {
     "dir": "./frontend",
     "install": "npm install",
@@ -9,7 +9,7 @@
     "dev": "npm run dev"
   },
   "author": {
-    "name": "uniTerm",
-    "email": "uniTerm@example.com"
+    "name": "FlexTerm",
+    "email": "flexterm@example.com"
   }
 }

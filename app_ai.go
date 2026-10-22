@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/mattn/go-ieproxy"
+	"github.com/ys-ll/uniterm/backend/appname"
 	"github.com/ys-ll/uniterm/backend/session"
 	"github.com/ys-ll/uniterm/backend/store"
 )
@@ -123,7 +124,7 @@ func (a *App) ChatCompletion(apiKey, baseURL, model string, requestJSON string, 
 	}
 
 	if userAgent == "" {
-		userAgent = "uniTerm"
+		userAgent = appname.Name
 	}
 
 	client, err := a.llmClientFor(proxyID)
@@ -1259,7 +1260,7 @@ func (a *App) FetchModels(apiKey, baseURL, protocol string, proxyID string) ([]M
 	} else {
 		req.Header.Set("Authorization", "Bearer "+apiKey)
 	}
-	req.Header.Set("User-Agent", "uniTerm")
+	req.Header.Set("User-Agent", appname.Name)
 
 	// F-208: share the same transport as the LLM clients so the model
 	// list call also benefits from the keep-alive pool; the request

@@ -86,7 +86,7 @@ func launchInstallerUpdate(pend *PendingUpdate, onProgress func(Progress)) error
 	script := filepath.Join(pend.StageDir, "updater.cmd")
 	content := fmt.Sprintf(`@echo off
 :waitloop
-tasklist /FI "IMAGENAME eq uniTerm.exe" 2>nul | find /I "uniTerm.exe" >nul
+tasklist /FI "IMAGENAME eq FlexTerm.exe" 2>nul | find /I "FlexTerm.exe" >nul
 if not errorlevel 1 (
   timeout /t 1 /nobreak >nul
   goto waitloop
