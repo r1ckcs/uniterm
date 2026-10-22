@@ -137,16 +137,18 @@ tasks:
       Local replacement for common:generate:icons. The repo ships no
       build/appicon.icon (only build/appicon.png), and on macOS the canonical
       task's `-iconcomposerinput appicon.icon` / Assets.car step would fail.
-      This produces the same icns + ico from the png without the icon composer.
+      This produces the same icns from the png without the icon composer.
     internal: true
     dir: build
     sources:
       - appicon.png
     generates:
       - darwin/icons.icns
-      - windows/icon.ico
     cmds:
-      - wails3 generate icons -input appicon.png -macfilename darwin/icons.icns -windowsfilename windows/icon.ico
+      # windows/icon.ico is hand-built (near full-bleed tile, legible at
+      # 16 px) and committed; the tool always writes an .ico, so send this
+      # one to an ignored scratch path instead of overwriting it.
+      - wails3 generate icons -input appicon.png -macfilename darwin/icons.icns -windowsfilename darwin/.icon-unused.ico
 
   package:dmg:
     summary: Packages the application into a styled `.dmg`
