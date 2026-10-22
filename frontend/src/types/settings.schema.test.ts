@@ -57,13 +57,16 @@ function goStructTags(src: string, structName: string): Set<string> {
   return tags
 }
 
-// All structs that mirror a slice of AppSettings, and which top-level key
-// each nested struct serves. Everything else lives directly on AppSettings.
-// When a nested settings struct is added on the Go side, register it here.
+// Go struct that stores each nested settings object, by its key path.
+// Everything else lives directly on AppSettings. When a nested settings
+// struct is added on the Go side, register it here (an unregistered nested
+// object fails the test instead of being checked against the wrong struct).
 const NESTED_STRUCTS: Record<string, string> = {
   terminal: 'TerminalSettings',
   ai: 'AISettings',
-  sftpBookmarks: 'SFTPBookmarks'
+  sftpBookmarks: 'SFTPBookmarks',
+  mcp: 'MCPSettings',
+  'mcp.tools': 'MCPToolToggles',
 }
 
 const tagsByStruct: Record<string, Set<string>> = {}
@@ -71,17 +74,27 @@ for (const s of new Set(['AppSettings', ...Object.values(NESTED_STRUCTS)])) {
   tagsByStruct[s] = goStructTags(goStructsSrc, s)
 }
 
-// A frontend leaf key passes when its last segment has a json tag in the Go
-// struct that stores it (top-level key → AppSettings or the nested struct).
-function hasGoTag(path: string): boolean {
+// Why a frontend leaf key would be dropped by the Go round-trip, or null if
+// it survives: every segment of the path must be a json tag of the struct
+// that holds it, walking AppSettings → nested structs.
+function goTagProblem(path: string): string | null {
   const parts = path.split('.')
-  const structTags = tagsByStruct[NESTED_STRUCTS[parts[0]] ?? 'AppSettings']
-  return structTags.has(parts[parts.length - 1])
+  let struct = 'AppSettings'
+  for (let i = 0; i < parts.length; i++) {
+    if (!tagsByStruct[struct].has(parts[i])) return `${path} (no "${parts[i]}" tag in ${struct})`
+    if (i < parts.length - 1) {
+      const prefix = parts.slice(0, i + 1).join('.')
+      const next = NESTED_STRUCTS[prefix]
+      if (!next) return `${path} (nested "${prefix}" has no struct in NESTED_STRUCTS)`
+      struct = next
+    }
+  }
+  return null
 }
 
 describe('settings schema parity (frontend ↔ backend/store/settings_store.go)', () => {
   it('every leaf key in DEFAULT_SETTINGS has a Go json tag', () => {
-    const missing = [...collectLeafKeys(DEFAULT_SETTINGS)].filter(k => !hasGoTag(k))
+    const missing = [...collectLeafKeys(DEFAULT_SETTINGS)].map(goTagProblem).filter(Boolean)
     expect(
       missing,
       `settings keys dropped by the Go JSON round-trip — add them to backend/store/settings_store.go: ${missing.join(', ')}`
