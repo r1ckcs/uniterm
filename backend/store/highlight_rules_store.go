@@ -51,6 +51,12 @@ type HighlightRulesData struct {
 	Rules   []HighlightRule `json:"rules"`
 	// Sets is the legacy (version 1) layout, kept for migration only.
 	Sets []HighlightRuleSet `json:"sets,omitempty"`
+	// DefaultsVersion is the default-list version the rules were last merged
+	// with; Defaults maps each default rule id to a fingerprint of the rule
+	// as last handed to the user. The frontend uses both to bring in new or
+	// changed defaults without overwriting the user's edits.
+	DefaultsVersion int               `json:"defaultsVersion,omitempty"`
+	Defaults        map[string]string `json:"defaults,omitempty"`
 }
 
 const (
@@ -59,6 +65,7 @@ const (
 	maxHighlightRulesPerSet  = 500
 	maxHighlightPatternBytes = 2000
 	maxHighlightGroupBytes   = 60
+	maxHighlightDefaultBytes = 32
 )
 
 // "#rrggbb", or "theme:<palette key>" to follow the terminal theme.
@@ -91,6 +98,14 @@ func (d HighlightRulesData) Validate() error {
 	for _, r := range d.Rules {
 		if err := r.validate(); err != nil {
 			return err
+		}
+	}
+	if len(d.Defaults) > maxHighlightRules {
+		return fmt.Errorf("too many default rule fingerprints (%d > %d)", len(d.Defaults), maxHighlightRules)
+	}
+	for id, fp := range d.Defaults {
+		if id == "" || len(id) > maxHighlightDefaultBytes || len(fp) > maxHighlightDefaultBytes {
+			return fmt.Errorf("invalid default rule fingerprint for %q", id)
 		}
 	}
 	if len(d.Sets) > maxHighlightSets {

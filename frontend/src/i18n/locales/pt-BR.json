@@ -1771,6 +1771,7 @@
   "hl.saved": "Regras de destaque salvas",
   "hl.restoreDefaults": "Restaurar padrão",
   "hl.restoreConfirm": "Substituir a lista inteira pelas regras padrão? Suas regras serão removidas — exporte antes se quiser guardá-las.",
+  "hl.defaultsAdded": "{count} regra(s) padrão de destaque nova(s) adicionada(s) à sua lista.",
   "hl.group.optical": "Sinal óptico",
   "hl.group.macVlan": "MAC / VLAN",
   "hl.group.zteOlt": "OLT ZTE",

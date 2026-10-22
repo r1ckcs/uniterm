@@ -24,9 +24,10 @@ export const MOBAXTERM_STANDARD: Array<[string, string, string]> = [
   ["Cyan", "(( |\\(|\"|'|\\[|\\])-(-)?[a-zA-Z_][a-zA-Z0-9_-]*( |=|,|\\.|\\)|\"|'|\\[|\\]))|([^A-Za-z_&-](last (failed )?login:|launching|checking|loading|creating|building|important|booting|starting|notice|informational|informationen|informazioni|informação|oplysninger|informations?|info|información|informasi|note|\\(ii\\)|\\(\\!\\!\\))[^A-Za-z_-])|([ ;¨](builtin )?(setenv|export|unset|builtin|shopt|unalias|echo|printf|alias|function|bindkey|setopt|unsetopt|user access verification|switchport|logging event|no ip address|service-policy|vlan-range|spanning-tree|access-list|description|running-config|startup-config|radius-server|class-map|policy-map|media-type|ip address)[ ;¨])", "theme:cyan"],
 ]
 
-export function mobaxtermStandardRules(): UserHighlightRule[] {
+/** The profile as rules; ids[i] is the default-list number of entry i. */
+export function mobaxtermStandardRules(ids: number[]): UserHighlightRule[] {
   return MOBAXTERM_STANDARD.map(([, pattern, color], i) => ({
-    id: `moba${i + 1}`,
+    id: `d${ids[i]}`,
     pattern,
     kind: 'regex',
     color,
