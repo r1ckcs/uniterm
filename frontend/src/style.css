@@ -370,6 +370,7 @@
   --header-text: #eef2ff;
   --header-text-2: #c7d0ee;
   --header-tab-active: #24335c;
+  --header-text-3: #9aa6cc;
   --header-brand-stroke: #2f4174;
 
   --alert-card: #3a1520;
@@ -503,6 +504,7 @@
   --header-text: #ffffff;
   --header-text-2: #c9d2ee;
   --header-tab-active: #2a3a63;
+  --header-text-3: #a9b4d6;
   --header-brand-stroke: #3a4f8a;
 
   --alert-card: #ffffff;
@@ -1598,8 +1600,15 @@ html[data-theme^="flexterm"] .app-header .tab-item.tab-down:hover {
 }
 html[data-theme^="flexterm"] .app-header .tab-item.tab-down .tab-name,
 html[data-theme^="flexterm"] .app-header .tab-item.tab-down .tab-type-icon,
-html[data-theme^="flexterm"] .app-header .tab-item.tab-down .tab-close {
+html[data-theme^="flexterm"] .app-header .tab-item.tab-down .tab-close,
+html[data-theme^="flexterm"] .app-header .tab-item.tab-down .tab-shortcut {
   color: var(--alert-text);
+}
+/* A tab without a live session: a dimmer solid color instead of 50%
+   opacity, which fell to ~3.6:1 on the navy header. */
+html[data-theme^="flexterm"] .app-header .tab-item .tab-name.tab-disconnected {
+  opacity: 1;
+  color: var(--header-text-3);
 }
 html[data-theme^="flexterm"] .app-header .tab-item .tab-type-icon.ai-locked-icon {
   color: var(--warning);

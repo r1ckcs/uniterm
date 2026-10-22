@@ -31,7 +31,8 @@ const TEXT_PAIRS: Array<[string, string[]]> = [
   ['--tag-mk', ['--bg-sunken', '--alert-row']],
   ['--tag-sw', ['--bg-sunken', '--alert-row']],
   ['--header-text', ['--header-bg', '--header-tab-active']],
-  ['--header-text-2', ['--header-bg']],
+  ['--header-text-2', ['--header-bg', '--header-tab-active']],
+  ['--header-text-3', ['--header-bg', '--header-tab-active']],
 ]
 
 describe('FlexTerm (D1c) themes', () => {
@@ -57,6 +58,13 @@ describe('FlexTerm (D1c) themes', () => {
       for (const k of ['--shadow-sm', '--shadow-md', '--shadow-lg', '--el-box-shadow']) expect(tokens[k], k).toBe('none')
     })
   }
+
+  it('header tabs paint text with solid tokens that the contrast test covers', () => {
+    // The dropped (red) tab's shortcut hint uses the alert text color, and a
+    // tab without a session gets a solid dimmer color, not opacity.
+    expect(css).toMatch(/\.tab-item\.tab-down \.tab-shortcut \{\s*color: var\(--alert-text\);/)
+    expect(css).toMatch(/\.tab-name\.tab-disconnected \{\s*opacity: 1;\s*color: var\(--header-text-3\);/)
+  })
 
   it('the terminal follows the app theme with the matching palette', () => {
     expect(resolveTerminalThemeName(FOLLOW_APP_THEME, 'flexterm')).toBe('flexterm-dark')
