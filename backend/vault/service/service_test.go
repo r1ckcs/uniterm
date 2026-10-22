@@ -11,6 +11,7 @@ import (
 
 	"github.com/ys-ll/uniterm/backend/vault"
 	"github.com/ys-ll/uniterm/backend/vault/records"
+	"github.com/ys-ll/uniterm/backend/vault/recovery"
 )
 
 // memBridge stands in for the app's stores.
@@ -461,7 +462,13 @@ func TestRegenerateRecoveryAfterRevokingAdmin(t *testing.T) {
 	if a.v.Trust() != trust {
 		t.Fatal("wrong words wrote something")
 	}
+	if a.Status().RecoveryKeys != 1 {
+		t.Fatalf("recovery keys before = %d", a.Status().RecoveryKeys)
+	}
 	newWords := confirmShown(t, a)
+	if a.Status().RecoveryKeys != 1 {
+		t.Fatalf("recovery keys after = %d", a.Status().RecoveryKeys)
+	}
 	if a.Status().Phase != PhaseReady || a.Status().RecoveryRegen {
 		t.Fatalf("after confirm: %+v", a.Status())
 	}
@@ -515,5 +522,23 @@ func TestRegenerateNeedsReadyAdmin(t *testing.T) {
 	}
 	if err := n.CancelRecovery(); code(err) != CodeWrongPhase {
 		t.Fatalf("cancel during creation = %v", err)
+	}
+}
+
+func TestTwoRecoveryKeysAreReported(t *testing.T) {
+	// The app closed between adding the new key and revoking the old.
+	shared := t.TempDir()
+	a := newDevice(t, shared, "mac-a")
+	create(t, a)
+	_, k, err := recovery.Generate()
+	must(t, err)
+	must(t, a.v.AddMember(vault.MemberOf(k, "", recovery.RecoveryName, vault.RoleAdmin)))
+	if n := a.Status().RecoveryKeys; n != 2 {
+		t.Fatalf("recovery keys = %d, want 2", n)
+	}
+	must(t, a.RegenerateRecovery())
+	confirmShown(t, a)
+	if n := a.Status().RecoveryKeys; n != 1 {
+		t.Fatalf("after regenerating: %d", n)
 	}
 }

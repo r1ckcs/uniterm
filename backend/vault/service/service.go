@@ -279,6 +279,9 @@ func (s *Service) statusLocked() Status {
 			if m.DeviceID == st.Device.ID {
 				st.Device.Role = m.Role
 			}
+			if recovery.IsRecoveryMember(m) {
+				st.RecoveryKeys++
+			}
 		}
 	}
 	if s.phase == PhaseShowRecovery {
