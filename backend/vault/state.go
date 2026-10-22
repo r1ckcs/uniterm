@@ -12,7 +12,8 @@ import (
 // State is what a device keeps locally per vault, outside the vault folder
 // (it must not travel with the storage it guards).
 type State struct {
-	// Trust is the newest roster version accepted (anti-rollback).
+	// Trust is the pinned roster version (anti-rollback): the newest
+	// accepted one that is at least PinDelay old (see Vault.refreshLocked).
 	Trust TrustState `json:"trust"`
 	// NextSeq is this device's next op sequence number. It is reserved here
 	// before the op is written, never derived from the storage listing

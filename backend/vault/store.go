@@ -36,8 +36,11 @@ type Entry struct {
 	// ID is unique per object (the name in FileStore, a file id in Drive).
 	ID   string
 	Name string
-	// Created orders entries by server-side creation time; with the content
-	// hash it breaks ties between valid candidates deterministically.
+	// Created is the server-side creation time (Unix nanoseconds). With the
+	// content hash it breaks ties between valid roster candidates, and it
+	// delays pinning a fresh version (see PinDelay). Drive lets the creator
+	// set createdTime, so it must never carry any other security role: only
+	// admin-signed versions compete, and those authors are trusted anyway.
 	Created int64
 }
 

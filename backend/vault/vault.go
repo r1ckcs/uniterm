@@ -3,8 +3,10 @@ package vault
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
+	"time"
 )
 
 // ErrNotWriter: this device's role can't append ops.
@@ -22,6 +24,7 @@ type Vault struct {
 	dev      DeviceKey
 	self     string
 	roster   *verifiedRoster
+	cur      TrustState // newest accepted version (st.Trust is the pinned one)
 	hashes   map[uint64]string
 	warnings []string
 	keys     map[uint64][]byte
@@ -59,7 +62,7 @@ func Create(s Store, state StateStore, vaultID string, dev DeviceKey, owner, nam
 		return nil, err
 	}
 	return &Vault{
-		store: s, state: state, st: st, dev: dev, self: self.DeviceID, roster: vr,
+		store: s, state: state, st: st, cur: st.Trust, dev: dev, self: self.DeviceID, roster: vr,
 		hashes: map[uint64]string{1: vr.hash}, keys: map[uint64][]byte{1: vk},
 	}, nil
 }
@@ -85,6 +88,15 @@ func Open(s Store, state StateStore, dev DeviceKey) (*Vault, error) {
 	return v, nil
 }
 
+// PinDelay is how old a roster version must be before it becomes the
+// persisted trust anchor. Until then a client uses it in memory but loads
+// from the older pinned version every time, so a version that loses an
+// admin race (seen alone through a lagging listing) is replaced by the
+// winner once the listing catches up, instead of being pinned and making
+// the client refuse the winner forever. The price: a rollback of versions
+// younger than this goes unnoticed across restarts.
+const PinDelay = 5 * time.Minute
+
 // Refresh re-reads the roster (newer versions, new epoch keys).
 func (v *Vault) Refresh() error {
 	v.mu.Lock()
@@ -96,6 +108,9 @@ func (v *Vault) refreshLocked() error {
 	ch, err := loadRoster(v.store, v.st.Trust)
 	if err != nil {
 		return err
+	}
+	if v.cur.Counter > ch.trust.Counter {
+		return fmt.Errorf("%w: storage has %d, accepted %d", ErrRollback, ch.trust.Counter, v.cur.Counter)
 	}
 	r := ch.cur
 	if _, ok := r.member(v.self); !ok {
@@ -117,13 +132,19 @@ func (v *Vault) refreshLocked() error {
 		keys[e] = vk
 	}
 	st := v.st
-	st.Trust = ch.trust
+	horizon := time.Now().Add(-PinDelay).UnixNano()
+	for c := ch.trust.Counter; c > st.Trust.Counter; c-- {
+		if ch.created[c] <= horizon {
+			st.Trust = TrustState{VaultID: ch.trust.VaultID, Counter: c, Hash: ch.hashes[c]}
+			break
+		}
+	}
 	if st != v.st {
 		if err := v.state.Save(st); err != nil {
 			return err
 		}
 	}
-	v.st, v.roster, v.hashes, v.warnings, v.keys = st, r, ch.hashes, ch.warnings, keys
+	v.st, v.cur, v.roster, v.hashes, v.warnings, v.keys = st, ch.trust, r, ch.hashes, ch.warnings, keys
 	return nil
 }
 
@@ -131,7 +152,7 @@ func (v *Vault) refreshLocked() error {
 func (v *Vault) Trust() TrustState {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	return v.st.Trust
+	return v.cur
 }
 
 // Roster returns a copy of the current verified roster.
@@ -252,14 +273,36 @@ func (v *Vault) Revoke(deviceID string) error {
 	if err != nil {
 		return err
 	}
-	seqs := map[string]uint64{}
-	if n := len(v.roster.Closed); n > 0 {
-		for a, s := range v.roster.Closed[n-1].Seqs {
-			seqs[a] = s
+	// The closing epoch's cut per author: every seq it holds an accepted op
+	// under this epoch, the gaps listed as holes.
+	closing := v.roster.Epoch
+	used := map[string][]uint64{}
+	for _, op := range log.Ops {
+		if op.Epoch == closing {
+			used[op.Author] = append(used[op.Author], op.Seq)
 		}
 	}
-	for _, op := range log.Ops {
-		seqs[op.Author] = max(seqs[op.Author], op.Seq)
+	seqs := map[string]Cut{}
+	if n := len(v.roster.Closed); n > 0 {
+		for a, c := range v.roster.Closed[n-1].Seqs {
+			seqs[a] = Cut{Max: c.Max}
+		}
+	}
+	for a, list := range used {
+		slices.Sort(list)
+		from := seqs[a].Max
+		c := Cut{Max: list[len(list)-1]}
+		for s, i := from+1, 0; s <= c.Max; s++ {
+			if i < len(list) && list[i] == s {
+				i++
+				continue
+			}
+			c.Holes = append(c.Holes, s)
+		}
+		if len(c.Holes) > maxHoles {
+			return fmt.Errorf("vault: %s left %d unused seqs in epoch %d", a, len(c.Holes), closing)
+		}
+		seqs[a] = c
 	}
 
 	epoch := v.roster.Epoch + 1
@@ -269,7 +312,7 @@ func (v *Vault) Revoke(deviceID string) error {
 	}
 	next.Epoch = epoch
 	next.KeyChecks = append(next.KeyChecks, keyCheck(v.roster.VaultID, epoch, vk))
-	next.Closed = append(next.Closed, EpochClose{Epoch: epoch - 1, Seqs: seqs})
+	next.Closed = append(next.Closed, EpochClose{Epoch: closing, Seqs: seqs})
 	if err := next.validate(next.VaultID); err != nil {
 		return err
 	}
@@ -309,7 +352,7 @@ func (v *Vault) Append(payload []byte) (Op, error) {
 		}
 	}
 	epoch := v.roster.Epoch
-	seq = max(seq, v.roster.cutoff(epoch-1, v.self)+1)
+	seq = max(seq, v.roster.cut(epoch-1, v.self).Max+1)
 	vk := v.keys[epoch]
 	seen := RosterRef{Counter: v.roster.Counter, Hash: v.roster.hash}
 	for range 1000 {

@@ -135,9 +135,9 @@ func sealOp(dev DeviceKey, vaultID string, seq, epoch, lamport uint64, seen Rost
 
 // openOp verifies and decrypts one stored op candidate against the current
 // roster. Epoch rules:
-//   - an op under a closed epoch e is valid only if its seq is within the
-//     author's cutoff for e (written before the rotation, as attested by the
-//     rotating admin); then the author may also be a former member;
+//   - an op under a closed epoch e is valid only if its seq is one the
+//     rotating admin attested for e (Roster.closedSeq: in the epoch's range,
+//     not a hole); then the author may also be a former member;
 //   - any other op must be under the current epoch, by a current writer,
 //     with a seq past the author's cutoff of the previous epoch.
 func openOp(r *Roster, keys map[uint64][]byte, name string, data []byte) (Op, opHeader, error) {
@@ -168,8 +168,8 @@ func openOp(r *Roster, keys map[uint64][]byte, name string, data []byte) (Op, op
 	case h.Epoch == 0 || h.Epoch > r.Epoch:
 		return Op{}, h, fmt.Errorf("unknown epoch %d", h.Epoch)
 	case h.Epoch < r.Epoch:
-		if seq > r.cutoff(h.Epoch, author) {
-			return Op{}, h, fmt.Errorf("written under epoch %d after it was closed", h.Epoch)
+		if !r.closedSeq(h.Epoch, author, seq) {
+			return Op{}, h, fmt.Errorf("seq %d is not one of epoch %d's when it was closed", seq, h.Epoch)
 		}
 		m, ok := r.member(author)
 		if !ok {
@@ -186,7 +186,7 @@ func openOp(r *Roster, keys map[uint64][]byte, name string, data []byte) (Op, op
 		if !m.Role.canWrite() {
 			return Op{}, h, fmt.Errorf("author %s is a %s, not a writer", author, m.Role)
 		}
-		if seq <= r.cutoff(h.Epoch-1, author) {
+		if seq <= r.cut(h.Epoch-1, author).Max {
 			return Op{}, h, fmt.Errorf("seq %d reuses a number of a closed epoch", seq)
 		}
 		signer = m

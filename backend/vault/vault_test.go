@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 func newKey(t *testing.T) *SoftwareDeviceKey {
@@ -424,7 +426,7 @@ func TestRevokedWriterKeepsOldOpsButCannotAddMore(t *testing.T) {
 	_, err = tm.vw.Append([]byte("w2"))
 	must(t, err)
 	must(t, tm.va.Revoke(IDOf(tm.w)))
-	if c := tm.va.Roster().Closed[0].Seqs[IDOf(tm.w)]; c != 2 {
+	if c := tm.va.Roster().Closed[0].Seqs[IDOf(tm.w)]; c.Max != 2 || len(c.Holes) != 0 {
 		t.Fatalf("cutoff = %d", c)
 	}
 	// Its ops from before the rotation still count…
@@ -438,7 +440,7 @@ func TestRevokedWriterKeepsOldOpsButCannotAddMore(t *testing.T) {
 	_, err = tm.store.Create(opName(IDOf(tm.w), 3), obj)
 	must(t, err)
 	log = logOf(t, tm.va)
-	if payloads(log.Ops) != "w1,w2" || len(log.Rejected) != 1 || !strings.Contains(log.Rejected[0].Reason, "after it was closed") {
+	if payloads(log.Ops) != "w1,w2" || len(log.Rejected) != 1 || !strings.Contains(log.Rejected[0].Reason, "is not one of epoch") {
 		t.Fatalf("%+v", log)
 	}
 }
@@ -452,7 +454,7 @@ func TestOldEpochOpAfterRotationRefused(t *testing.T) {
 	_, err := tm.vw.Append([]byte("stale")) // vw not refreshed: epoch 1
 	must(t, err)
 	log := logOf(t, tm.va)
-	if len(log.Ops) != 0 || len(log.Rejected) != 1 || !strings.Contains(log.Rejected[0].Reason, "after it was closed") {
+	if len(log.Ops) != 0 || len(log.Rejected) != 1 || !strings.Contains(log.Rejected[0].Reason, "is not one of epoch") {
 		t.Fatalf("%+v", log)
 	}
 	must(t, tm.vw.Refresh())
@@ -703,5 +705,136 @@ func TestMemStoreKeepsCandidates(t *testing.T) {
 	must(t, err)
 	if len(c) != 2 || c[0].ID != e1.ID || c[1].ID != e2.ID || c[0].Created >= c[1].Created {
 		t.Fatalf("candidates = %+v", c)
+	}
+}
+
+// --- review 2: holes below a cutoff, premature pinning ---
+
+// forgeOp stores an op signed by dev under (seq, epoch) with key vk.
+func forgeOp(t *testing.T, s Store, dev DeviceKey, seq, epoch, lamport uint64, vk []byte, p string) {
+	t.Helper()
+	obj, err := sealOp(dev, "pessoal", seq, epoch, lamport, RosterRef{}, vk, []byte(p))
+	must(t, err)
+	_, err = s.Create(opName(IDOf(dev), seq), obj)
+	must(t, err)
+}
+
+// dropOp removes every candidate of an op (a write that never landed).
+func dropOp(t *testing.T, s Store, name string) {
+	t.Helper()
+	c, err := candidates(s, name)
+	must(t, err)
+	for _, e := range c {
+		must(t, s.Delete(e.ID))
+	}
+}
+
+func TestRevokedCannotFillHoleBelowCutoff(t *testing.T) {
+	s := NewMemStore()
+	tm := newTeam(t, s)
+	for _, p := range []string{"w1", "w2", "w3"} {
+		_, err := tm.vw.Append([]byte(p))
+		must(t, err)
+	}
+	dropOp(t, s, opName(IDOf(tm.w), 2)) // seq 2 never landed
+	must(t, tm.va.Revoke(IDOf(tm.w)))
+	if c := tm.va.Roster().Closed[0].Seqs[IDOf(tm.w)]; c.Max != 3 || !slices.Equal(c.Holes, []uint64{2}) {
+		t.Fatalf("cut = %+v", c)
+	}
+	forgeOp(t, s, tm.w, 2, 1, 2, tm.vw.keys[1], "honeypot")
+	log := logOf(t, tm.va)
+	if payloads(log.Ops) != "w1,w3" || len(log.Rejected) != 1 || !strings.Contains(log.Rejected[0].Reason, "is not one of epoch") {
+		t.Fatalf("%+v", log)
+	}
+}
+
+func TestCurrentWriterCannotFillHoleUnderOldEpoch(t *testing.T) {
+	// A remaining writer (buggy or compromised) puts new content in its own
+	// hole under the retired key, which the removed reader knows.
+	s := NewMemStore()
+	tm := newTeam(t, s)
+	for _, p := range []string{"w1", "w2", "w3"} {
+		_, err := tm.vw.Append([]byte(p))
+		must(t, err)
+	}
+	dropOp(t, s, opName(IDOf(tm.w), 2))
+	must(t, tm.va.Revoke(IDOf(tm.r)))
+	forgeOp(t, s, tm.w, 2, 1, 2, tm.vw.keys[1], "readable by the revoked reader")
+	log := logOf(t, tm.va)
+	if payloads(log.Ops) != "w1,w3" || len(log.Rejected) != 1 {
+		t.Fatalf("%+v", log)
+	}
+}
+
+func TestOldSeqRelabeledWithLaterClosedEpochRefused(t *testing.T) {
+	// seq 1 belongs to epoch 1; after epoch 2 is closed too, an op 1 under
+	// epoch 2 must not pass as one of epoch 2's.
+	s := NewMemStore()
+	tm := newTeam(t, s)
+	x := newKey(t)
+	must(t, tm.va.AddMember(MemberOf(x, "h", "x", RoleReader)))
+	_, err := tm.vw.Append([]byte("e1"))
+	must(t, err)
+	must(t, tm.va.Revoke(IDOf(tm.r))) // closes epoch 1: w max 1
+	must(t, tm.vw.Refresh())
+	_, err = tm.vw.Append([]byte("e2"))
+	must(t, err)
+	must(t, tm.va.Revoke(IDOf(x))) // closes epoch 2: w (1, 2]
+	dropOp(t, s, opName(IDOf(tm.w), 1))
+	forgeOp(t, s, tm.w, 1, 2, 1, tm.vw.keys[2], "relabeled")
+	log := logOf(t, tm.va)
+	if payloads(log.Ops) != "e2" || len(log.Rejected) != 1 || !strings.Contains(log.Rejected[0].Reason, "is not one of epoch 2") {
+		t.Fatalf("%+v", log)
+	}
+}
+
+func TestLoserSeenAloneIsNotPinned(t *testing.T) {
+	s := NewMemStore()
+	tm := newTeam(t, s)
+	a2 := newKey(t)
+	must(t, tm.va.AddMember(MemberOf(a2, "reserva", "mac-reserva", RoleAdmin)))
+	va2 := tm.join(t, a2)
+	// A client that has pinned counter 4 (old enough).
+	pinned := NewMemState(State{Trust: tm.va.Trust(), NextSeq: 1})
+	// Both admins write roster 5; the client's listing only shows the loser.
+	must(t, tm.va.AddMember(MemberOf(newKey(t), "h", "x", RoleReader)))
+	winner, _ := candidates(s, rosterName(5))
+	s.Hide(winner[0].ID)
+	if err := va2.AddMember(MemberOf(newKey(t), "h", "y", RoleReader)); err != nil {
+		t.Fatal(err) // with the winner hidden, the loser thinks it won
+	}
+	v, err := Open(s, pinned, tm.r)
+	must(t, err)
+	loser := v.Trust()
+	if loser.Counter != 5 {
+		t.Fatalf("view = %+v", loser)
+	}
+	if st, _ := pinned.Load(); st.Trust.Counter != 4 {
+		t.Fatalf("pinned a fresh version: %+v", st.Trust)
+	}
+	// The listing catches up: the client moves to the winner, no ErrFork.
+	s.Show(winner[0].ID)
+	must(t, v.Refresh())
+	if v.Trust() == loser || v.Trust() != tm.va.Trust() {
+		t.Fatalf("view = %+v, want the winner %+v", v.Trust(), tm.va.Trust())
+	}
+}
+
+func TestOldVersionIsPinned(t *testing.T) {
+	s := NewMemStore()
+	s.Now = func() time.Time { return time.Now().Add(-2 * PinDelay) }
+	tm := newTeam(t, s)
+	st := NewMemState(State{})
+	must(t, Join(st, "pessoal", tm.genesis))
+	_, err := Open(s, st, tm.r)
+	must(t, err)
+	if got, _ := st.Load(); got.Trust.Counter != 3 {
+		t.Fatalf("pinned = %+v", got.Trust)
+	}
+	// A rollback below the pinned version is caught across restarts.
+	c, _ := candidates(s, rosterName(3))
+	must(t, s.Delete(c[0].ID))
+	if _, err := Open(s, st, tm.r); !errors.Is(err, ErrRollback) {
+		t.Fatalf("Open = %v, want ErrRollback", err)
 	}
 }

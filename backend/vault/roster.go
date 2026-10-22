@@ -59,14 +59,29 @@ func (m Member) equal(o Member) bool {
 }
 
 // EpochClose is written when an epoch's key is retired: for each author,
-// the highest op seq the rotating admin had accepted. An op under that
-// epoch is valid only up to it, so nobody who still knows the old key (the
-// removed device included) can add content under it afterwards, while the
-// ops written before the rotation stay readable.
+// exactly which op seqs the rotating admin had accepted under it. An op
+// under a closed epoch is valid only if it is one of those, so nobody who
+// still knows the old key (the removed device included) can add content
+// under it afterwards, not even in a seq left unused below the cutoff,
+// while the ops written before the rotation stay readable.
 type EpochClose struct {
-	Epoch uint64            `json:"epoch"`
-	Seqs  map[string]uint64 `json:"seqs"`
+	Epoch uint64         `json:"epoch"`
+	Seqs  map[string]Cut `json:"seqs"`
 }
+
+// Cut is one author's share of a closed epoch: the seqs in
+// (previous epoch's Max, Max], except Holes (numbers that never held an
+// accepted op: a failed write, a refused op). Holes is normally empty.
+type Cut struct {
+	Max   uint64   `json:"max"`
+	Holes []uint64 `json:"holes,omitempty"`
+}
+
+func (c Cut) equal(o Cut) bool { return c.Max == o.Max && slices.Equal(c.Holes, o.Holes) }
+
+// maxHoles bounds a cut's hole list (an author with that many failed
+// writes in one epoch is broken, not legitimate).
+const maxHoles = 10000
 
 // Roster is one version of the vault's device list. Versions form a hash
 // chain: each is signed by an admin of the previous one and names its hash,
@@ -172,12 +187,21 @@ func (r *Roster) former(id string) (Member, bool) {
 	return Member{}, false
 }
 
-// cutoff is the last seq of author valid under epoch e (a closed epoch).
-func (r *Roster) cutoff(e uint64, author string) uint64 {
+// cut is author's cut of closed epoch e (zero for the open epoch or none).
+func (r *Roster) cut(e uint64, author string) Cut {
 	if e == 0 || e > uint64(len(r.Closed)) {
-		return 0
+		return Cut{}
 	}
 	return r.Closed[e-1].Seqs[author]
+}
+
+// closedSeq reports whether seq of author is one the admin attested for
+// closed epoch e: above the previous epoch's cutoff, at most this one's,
+// and not a hole.
+func (r *Roster) closedSeq(e uint64, author string, seq uint64) bool {
+	c := r.cut(e, author)
+	_, hole := slices.BinarySearch(c.Holes, seq)
+	return seq > r.cut(e-1, author).Max && seq <= c.Max && !hole
 }
 
 func validMember(m Member) error {
@@ -211,6 +235,11 @@ func (r *Roster) validate(vaultID string) error {
 	for i, c := range r.Closed {
 		if c.Epoch != uint64(i+1) {
 			return errors.New("vault: roster epoch closes out of order")
+		}
+		for a, cut := range c.Seqs {
+			if len(cut.Holes) > maxHoles || !slices.IsSorted(cut.Holes) || len(slices.Compact(slices.Clone(cut.Holes))) != len(cut.Holes) {
+				return fmt.Errorf("vault: epoch %d cut of %s has malformed holes", c.Epoch, a)
+			}
 		}
 	}
 	seen := map[string]bool{}
@@ -299,16 +328,27 @@ func checkSuccessor(prev, next *verifiedRoster) error {
 		}
 	}
 	for i, c := range prev.Closed {
-		if !maps.Equal(next.Closed[i].Seqs, c.Seqs) {
+		if !maps.EqualFunc(next.Closed[i].Seqs, c.Seqs, Cut.equal) {
 			return fmt.Errorf("vault: roster %d rewrites the close of epoch %d", next.Counter, i+1)
 		}
 	}
-	if rotated && len(prev.Closed) > 0 {
-		// Cutoffs only move forward.
-		last, closing := prev.Closed[len(prev.Closed)-1], next.Closed[len(next.Closed)-1]
-		for a, s := range last.Seqs {
-			if closing.Seqs[a] < s {
+	if rotated {
+		// Cutoffs only move forward, and holes lie in the epoch's own range.
+		closing := next.Closed[len(next.Closed)-1]
+		for a, c := range closing.Seqs {
+			prevMax := next.cut(closing.Epoch-1, a).Max
+			if c.Max < prevMax {
 				return fmt.Errorf("vault: roster %d moves %s's cutoff back", next.Counter, a)
+			}
+			if len(c.Holes) > 0 && (c.Holes[0] <= prevMax || c.Holes[len(c.Holes)-1] > c.Max) {
+				return fmt.Errorf("vault: roster %d lists holes of %s outside its epoch", next.Counter, a)
+			}
+		}
+		if len(prev.Closed) > 0 {
+			for a, c := range prev.Closed[len(prev.Closed)-1].Seqs {
+				if closing.Seqs[a].Max < c.Max {
+					return fmt.Errorf("vault: roster %d moves %s's cutoff back", next.Counter, a)
+				}
 			}
 		}
 	}
@@ -349,6 +389,8 @@ type rosterChain struct {
 	trust TrustState
 	// hashes of the accepted versions from the trust anchor on.
 	hashes map[uint64]string
+	// created is each accepted version's Created.
+	created map[uint64]int64
 	// warnings about ignored candidates or admin races.
 	warnings []string
 }
@@ -383,6 +425,7 @@ func loadRoster(s Store, trust TrustState) (*rosterChain, error) {
 	// when it was accepted, or (genesis anchor of a joining device) the hash
 	// came from an admin out of band. A genesis must still be self-signed.
 	var cur *verifiedRoster
+	var curCreated int64
 	for _, e := range byCounter[trust.Counter] {
 		data, _, err := s.Get(e.ID)
 		if err != nil {
@@ -394,7 +437,7 @@ func loadRoster(s Store, trust TrustState) (*rosterChain, error) {
 					return nil, errors.New("vault: genesis roster malformed")
 				}
 			}
-			cur = vr
+			cur, curCreated = vr, e.Created
 			break
 		}
 	}
@@ -405,7 +448,7 @@ func loadRoster(s Store, trust TrustState) (*rosterChain, error) {
 		return nil, fmt.Errorf("vault: roster %d claims counter %d", trust.Counter, cur.Counter)
 	}
 
-	ch := &rosterChain{hashes: map[uint64]string{cur.Counter: cur.hash}}
+	ch := &rosterChain{hashes: map[uint64]string{cur.Counter: cur.hash}, created: map[uint64]int64{cur.Counter: curCreated}}
 	for c := trust.Counter + 1; c <= newest; c++ {
 		type cand struct {
 			vr      *verifiedRoster
@@ -442,6 +485,7 @@ func loadRoster(s Store, trust TrustState) (*rosterChain, error) {
 		}
 		cur = valid[0].vr
 		ch.hashes[cur.Counter] = cur.hash
+		ch.created[cur.Counter] = valid[0].created
 	}
 	ch.cur = cur
 	ch.trust = TrustState{VaultID: trust.VaultID, Counter: cur.Counter, Hash: cur.hash}
@@ -474,7 +518,11 @@ func cloneRoster(r Roster) Roster {
 	r.KeyChecks = slices.Clone(r.KeyChecks)
 	closed := make([]EpochClose, len(r.Closed))
 	for i, c := range r.Closed {
-		closed[i] = EpochClose{Epoch: c.Epoch, Seqs: maps.Clone(c.Seqs)}
+		seqs := make(map[string]Cut, len(c.Seqs))
+		for a, cut := range c.Seqs {
+			seqs[a] = Cut{Max: cut.Max, Holes: slices.Clone(cut.Holes)}
+		}
+		closed[i] = EpochClose{Epoch: c.Epoch, Seqs: seqs}
 	}
 	r.Closed = closed
 	r.Members = cloneMembers(r.Members)
