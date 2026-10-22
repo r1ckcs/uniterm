@@ -73,6 +73,7 @@
           @input="(v: string) => (code4 = v.replace(/\D/g, '').slice(0, 4))"
           @keyup.enter="onComplete"
         />
+        <p class="vault-muted">{{ t('vault.approval.onlyOther') }}</p>
         <p class="vault-muted">{{ t('vault.join.attemptsLeft', { n: pending.attemptsLeft }) }}</p>
         <p v-if="vault.lastError" class="vault-error">{{ errorText(vault.lastError) }}</p>
       </template>

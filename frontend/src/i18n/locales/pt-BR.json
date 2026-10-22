@@ -1945,9 +1945,10 @@
   "vault.err.integrity": "O cofre no Drive foi alterado de forma suspeita. A sincronização está parada.",
   "vault.err.revoked": "Este aparelho foi removido do cofre.",
   "vault.err.internal": "Algo deu errado com o cofre. Os detalhes estão no log.",
-  "vault.join.confirmTitle": "Confirme no aparelho novo",
-  "vault.join.confirmLead": "Digite este número em \"{name}\" para concluir:",
+  "vault.join.confirmTitle": "Aprovado",
+  "vault.join.confirmLead": "Aprovado. Agora digite este número em \"{name}\" para concluir:",
   "vault.join.confirmHint": "Sem ele o aparelho novo não entra, mesmo com o código aceito.",
   "vault.approval.leadConfirm": "Aprovado no outro aparelho. Digite o número de 4 dígitos que aparece nele:",
-  "vault.approval.finish": "Concluir"
+  "vault.approval.finish": "Concluir",
+  "vault.approval.onlyOther": "Só digite aqui o número que o seu outro aparelho mostrou."
 }

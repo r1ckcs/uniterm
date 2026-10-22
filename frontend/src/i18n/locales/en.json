@@ -1945,9 +1945,10 @@
   "vault.err.integrity": "The vault on Drive was changed in a suspicious way. Sync is stopped.",
   "vault.err.revoked": "This device was removed from the vault.",
   "vault.err.internal": "Something went wrong with the vault. Details are in the log.",
-  "vault.join.confirmTitle": "Confirm on the new device",
-  "vault.join.confirmLead": "Type this number on \"{name}\" to finish:",
+  "vault.join.confirmTitle": "Approved",
+  "vault.join.confirmLead": "Approved. Now type this number on \"{name}\" to finish:",
   "vault.join.confirmHint": "Without it the new device does not join, even with the code accepted.",
   "vault.approval.leadConfirm": "Approved on the other device. Type the 4-digit number it is showing:",
-  "vault.approval.finish": "Finish"
+  "vault.approval.finish": "Finish",
+  "vault.approval.onlyOther": "Only type here the number your other device showed."
 }

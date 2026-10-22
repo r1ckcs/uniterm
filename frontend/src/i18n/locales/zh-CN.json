@@ -1945,9 +1945,10 @@
   "vault.err.integrity": "云端硬盘上的保险库被可疑地修改，同步已停止。",
   "vault.err.revoked": "本设备已从保险库中移除。",
   "vault.err.internal": "保险库出错，详情见日志。",
-  "vault.join.confirmTitle": "在新设备上确认",
-  "vault.join.confirmLead": "在“{name}”上输入此数字以完成：",
+  "vault.join.confirmTitle": "已批准",
+  "vault.join.confirmLead": "已批准。请在“{name}”上输入此数字以完成：",
   "vault.join.confirmHint": "即使代码已通过，不输入它新设备也无法加入。",
   "vault.approval.leadConfirm": "已在另一台设备上批准。请输入它显示的 4 位数字：",
-  "vault.approval.finish": "完成"
+  "vault.approval.finish": "完成",
+  "vault.approval.onlyOther": "只在这里输入你另一台设备显示的数字。"
 }
