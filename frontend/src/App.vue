@@ -155,6 +155,9 @@
     <CredentialUnlockDialog v-model:visible="unlockVisible" @done="onUnlockDone" @reset="onReset" />
     <PasswordSaveOffer />
     <KeychainLostDialog v-model:visible="keychainLostVisible" @done="onKeychainLostDone" />
+    <!-- Startup credential dialogs first; the vault welcome waits its turn. -->
+    <VaultOnboardingDialog v-if="!dataDirVisible && !encryptVisible && !unlockVisible && !keychainLostVisible" />
+    <VaultJoinApprovalDialog />
     <MobileKeyBar v-if="keyBarSessionId" :session-id="keyBarSessionId" />
   </div>
   </el-config-provider>
@@ -202,6 +205,9 @@ import DataDirDialog from './components/DataDirDialog.vue'
 import EncryptionModeDialog from './components/EncryptionModeDialog.vue'
 import CredentialUnlockDialog from './components/CredentialUnlockDialog.vue'
 import KeychainLostDialog from './components/KeychainLostDialog.vue'
+import VaultOnboardingDialog from './components/VaultOnboardingDialog.vue'
+import VaultJoinApprovalDialog from './components/VaultJoinApprovalDialog.vue'
+import { useVaultStore } from './stores/vaultStore'
 import CredentialPrompt from './components/CredentialPrompt.vue'
 import type { CredentialResult } from './components/CredentialPrompt.vue'
 import MCPApprovalDialog from './components/MCPApprovalDialog.vue'
@@ -956,6 +962,8 @@ onMounted(async () => {
   useHighlightRuleStore().load()
   // Pre-load tunnels so auto-start state and the panel are ready
   useTunnelStore().load()
+  // Credential vault: status, join requests and "changed by" badges
+  useVaultStore().start()
   // Auto-open start tab if no tabs are open
   if (tabStore.tabs.length === 0) {
     tabStore.createStartTab()

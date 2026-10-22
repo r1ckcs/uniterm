@@ -83,6 +83,7 @@
               <span class="name">{{ conn.name }}</span>
               <span class="conn-meta">
                 <span class="host">{{ getSubtitle(conn) }}</span>
+                <VaultChangedBadge :connection-id="conn.id" />
               </span>
             </div>
             <!-- Inside the favorites group the star is hover-only (everything
@@ -145,6 +146,7 @@
               <span class="name">{{ conn.name }}</span>
               <span class="conn-meta">
                 <span class="host">{{ getSubtitle(conn) }}</span>
+                <VaultChangedBadge :connection-id="conn.id" />
               </span>
             </div>
             <button v-if="showHostRowButtons" class="conn-fav-btn" :class="{ on: favoriteStore.isFavorite(conn.id) }" :title="favoriteStore.isFavorite(conn.id) ? t('sidebar.removeFromFavorites') : t('sidebar.addToFavorites')" @click.stop="favoriteStore.toggle(conn.id)"><Star :size="'0.75rem'" /></button>
@@ -180,6 +182,7 @@
             <span class="name">{{ conn.name }}</span>
             <span class="conn-meta">
               <span class="host">{{ getSubtitle(conn) }}</span>
+              <VaultChangedBadge :connection-id="conn.id" />
             </span>
           </div>
           <button v-if="showHostRowButtons" class="conn-more-btn" @click.stop="onConnMoreClick($event, conn)" :title="t('terminal.more')"><MoreHorizontal :size="'0.875rem'" /></button>
@@ -404,6 +407,7 @@
 </template>
 
 <script setup lang="ts">
+import VaultChangedBadge from './VaultChangedBadge.vue'
 import { ref, onMounted, onUnmounted, computed, watch, nextTick, provide } from 'vue'
 import { X, ChevronRight, ChevronDown, Filter, Check, Network, Zap, Clock, Plus, Palette, SquareTerminal, Activity, Pencil, MoreHorizontal, FolderTree, ArrowRightLeft, Star } from '@lucide/vue'
 import { getShellLabel as getShellLabelBase } from '../utils/shellLabel'
