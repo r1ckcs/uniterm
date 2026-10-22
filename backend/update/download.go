@@ -50,10 +50,13 @@ func downloadHTTPClient() *http.Client {
 	return downloadClient
 }
 
+// userCacheDir is os.UserCacheDir, swappable in tests.
+var userCacheDir = os.UserCacheDir
+
 // updateCacheDir returns (and creates) the per-user staging directory for
 // update downloads.
 func updateCacheDir() (string, error) {
-	dir, err := os.UserCacheDir()
+	dir, err := userCacheDir()
 	if err != nil {
 		return "", err
 	}
@@ -117,18 +120,23 @@ func (m *Manager) downloadOne(cand UpdateAsset, onProgress func(Progress)) (*Pen
 	}
 	cleanup := func() { _ = os.RemoveAll(stage) }
 
+	// Fail closed before touching the network: only assets with a signed
+	// checksum, served from the fork's own releases, are ever downloaded.
+	if cand.SHA256 == "" {
+		cleanup()
+		return nil, fmt.Errorf("no signed sha256 checksum for %s; refusing to install", cand.Name)
+	}
+	if !assetURLAllowed(cand.URL) {
+		cleanup()
+		return nil, fmt.Errorf("asset %s is not served from %s releases; refusing to install", cand.Name, updateRepo)
+	}
+
 	filePath := filepath.Join(stage, filepath.Base(cand.Name))
 	if err := downloadToFile(cand.URL, filePath, cand.Name, onProgress); err != nil {
 		cleanup()
 		return nil, fmt.Errorf("download %s: %w", cand.Name, err)
 	}
 
-	// Fail closed: an asset with no published checksum (missing
-	// checksums.txt, fetch failure, or unlisted asset) is never installed.
-	if cand.SHA256 == "" {
-		cleanup()
-		return nil, fmt.Errorf("no sha256 checksum published for %s; refusing to install", cand.Name)
-	}
 	{
 		if onProgress != nil {
 			onProgress(Progress{Phase: "verifying", Total: -1, Message: cand.Name})
@@ -309,8 +317,9 @@ func extractPortableZip(stage, zipPath string) (string, error) {
 		}
 		base := filepath.Base(f.Name)
 		dest := filepath.Join(stage, f.Name)
-		// archive/zip names use forward slashes; guard against traversal.
-		if strings.Contains(f.Name, "..") {
+		// archive/zip names use forward slashes; guard against traversal and
+		// skip anything that is not a plain file (symlinks included).
+		if !filepath.IsLocal(f.Name) || strings.Contains(f.Name, "..") || !f.Mode().IsRegular() {
 			continue
 		}
 		// "uniterm.exe" is the Windows payload; a bare "uniterm" covers the

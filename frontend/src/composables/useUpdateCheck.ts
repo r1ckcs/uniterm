@@ -2,7 +2,7 @@ import { reactive, ref, watch, h } from 'vue'
 import { ElMessage } from 'element-plus'
 import { msg } from '../services/message'
 import { CheckForUpdate, GetAppInfo, DownloadUpdate, ApplyUpdate } from '../../bindings/github.com/ys-ll/uniterm/app'
-import { useI18n, locale } from '../i18n'
+import { useI18n } from '../i18n'
 import { useSettingsStore } from '../stores/settingsStore'
 import { isMobilePlatform } from '../utils/platform'
 import { Events } from '@wailsio/runtime'
@@ -12,9 +12,11 @@ const CHECK_TIMEOUT = 15000
 
 const updateInfo = ref<UpdateInfo | null>(null)
 const checking = ref(false)
-const autoCheck = ref(true)
-// Update source preference: "auto" resolves from the UI language, or is
-// pinned to "github" / "gitee" by the user (settings.updateSource).
+// Off by default in this fork: there are no signed fork releases yet, so a
+// background check could only cost a request.
+const autoCheck = ref(false)
+// Legacy update-source preference (settings.updateSource). The fork has a
+// single source, github.com/r1ckcs/uniterm; the backend ignores this value.
 const source = ref<'auto' | 'github' | 'gitee'>('auto')
 
 // --- update install flow state ---------------------------------------------
@@ -122,11 +124,8 @@ let timer: ReturnType<typeof setInterval> | null = null
 let initialCheckTimer: ReturnType<typeof setTimeout> | null = null
 let settingsWatchStop: (() => void) | null = null
 
-function resolveSource(): 'github' | 'gitee' {
-  if (source.value === 'github' || source.value === 'gitee') {
-    return source.value
-  }
-  return locale.value === 'zh-CN' ? 'gitee' : 'github'
+function resolveSource(): 'github' {
+  return 'github'
 }
 
 // setSource persists the preference and immediately re-checks with the new
@@ -222,7 +221,7 @@ function initAutoCheck() {
     [() => settings.loaded, () => settings.settings.autoCheckUpdate],
     ([loaded, persisted]) => {
       if (!loaded) return
-      const enabled = persisted ?? true
+      const enabled = persisted ?? false
       autoCheck.value = enabled
       const s = settings.settings.updateSource
       source.value = (s === 'github' || s === 'gitee' || s === 'auto') ? s : 'auto'

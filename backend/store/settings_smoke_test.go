@@ -86,8 +86,8 @@ func TestSettingsStore_LoadMissingFile(t *testing.T) {
 	if got.Theme == "" {
 		t.Errorf("expected defaults to populate, got zero-value settings")
 	}
-	if got.AutoCheckUpdate == nil || !*got.AutoCheckUpdate {
-		t.Errorf("AutoCheckUpdate: got %v, want true by default", got.AutoCheckUpdate)
+	if got.AutoCheckUpdate == nil || *got.AutoCheckUpdate {
+		t.Errorf("AutoCheckUpdate: got %v, want false by default", got.AutoCheckUpdate)
 	}
 }
 
@@ -114,7 +114,7 @@ func TestSettingsStore_PreservesExplicitAutoCheckUpdate(t *testing.T) {
 	}
 }
 
-func TestSettingsStore_DefaultsMissingAutoCheckUpdateToTrue(t *testing.T) {
+func TestSettingsStore_DefaultsMissingAutoCheckUpdateToFalse(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(`{"theme":"dark"}`), 0600); err != nil {
 		t.Fatalf("seed settings: %v", err)
@@ -125,8 +125,8 @@ func TestSettingsStore_DefaultsMissingAutoCheckUpdateToTrue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if got.AutoCheckUpdate == nil || !*got.AutoCheckUpdate {
-		t.Errorf("AutoCheckUpdate: got %v, want true for a missing field", got.AutoCheckUpdate)
+	if got.AutoCheckUpdate == nil || *got.AutoCheckUpdate {
+		t.Errorf("AutoCheckUpdate: got %v, want false for a missing field", got.AutoCheckUpdate)
 	}
 }
 

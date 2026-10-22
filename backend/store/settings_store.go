@@ -186,10 +186,9 @@ type AppSettings struct {
 	AI              AISettings            `json:"ai"`
 	Keyboard        map[string]KeyBinding `json:"keyboard"`
 	AutoCheckUpdate *bool                 `json:"autoCheckUpdate"`
-	// UpdateSource selects where update checks and downloads come from:
-	// "auto" (default, picks by UI language with fallback), "github" or
-	// "gitee" (domestic mirror). Pointer + omitempty so settings.json written
-	// by older builds still load; nil means "auto".
+	// UpdateSource is a legacy field kept so settings.json written by older
+	// builds still loads. It is ignored: this fork checks only
+	// github.com/r1ckcs/uniterm (see backend/update), never ys-ll or Gitee.
 	UpdateSource   *string       `json:"updateSource,omitempty"`
 	CloseTabPrompt *bool         `json:"closeTabPrompt"`
 	CloseAppPrompt *bool         `json:"closeAppPrompt"`
@@ -329,9 +328,10 @@ func (s *SettingsStore) Load() (AppSettings, error) {
 			needsSave = true // legacy plaintext — re-save will encrypt
 		}
 	}
-	// Default autoCheckUpdate to true if not present
+	// Default autoCheckUpdate to false if not present: the fork has no
+	// signed releases yet, so a background check could only cost a request.
 	if settings.AutoCheckUpdate == nil {
-		settings.AutoCheckUpdate = boolPtr(true)
+		settings.AutoCheckUpdate = boolPtr(false)
 		needsSave = true
 	}
 	// Default updateSource to "auto" if not present
@@ -383,7 +383,7 @@ func defaultSettings() AppSettings {
 		},
 		AI:              defaultAISettings(),
 		Keyboard:        defaultKeyboard(),
-		AutoCheckUpdate: boolPtr(true),
+		AutoCheckUpdate: boolPtr(false),
 		UpdateSource:    strPtr("auto"),
 		CloseTabPrompt:  boolPtr(true),
 		CloseAppPrompt:  boolPtr(true),
