@@ -33,12 +33,18 @@ type Status struct {
 	RecoveryCheck []int        `json:"recoveryCheck,omitempty"`
 	// RecoveryRegen: showRecovery is replacing the key of an open vault
 	// (VaultRegenerateRecovery), not creating one; it can be cancelled.
-	RecoveryRegen bool       `json:"recoveryRegen"`
-	LastSyncAt    string     `json:"lastSyncAt,omitempty"`
-	Syncing       bool       `json:"syncing"`
-	Offline       bool       `json:"offline"`
-	PendingOps    int        `json:"pendingOps"`
-	Error         *ErrorInfo `json:"error,omitempty"`
+	RecoveryRegen bool `json:"recoveryRegen"`
+	// RecoveryKeys counts the recovery keys in the roster (ready only).
+	// More than one means a replacement stopped between adding the new key
+	// and revoking the old (app closed): the old phrase still works, maybe
+	// from before an admin's revocation. The UI suggests a new one, which
+	// revokes every other.
+	RecoveryKeys int        `json:"recoveryKeys"`
+	LastSyncAt   string     `json:"lastSyncAt,omitempty"`
+	Syncing      bool       `json:"syncing"`
+	Offline      bool       `json:"offline"`
+	PendingOps   int        `json:"pendingOps"`
+	Error        *ErrorInfo `json:"error,omitempty"`
 }
 
 type Account struct {
