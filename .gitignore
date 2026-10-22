@@ -9,6 +9,8 @@ build/windows/installer/*
 !build/appicon.png
 !build/appicon_tray.png
 !build/appicon_tray_template.png
+# Icon source + generator (see build/icon-src/build_icons.py)
+!build/icon-src/
 # Release signing public key (RELEASES.md); the private key never lives here
 !build/release-pubkey.txt
 !build/linux/
