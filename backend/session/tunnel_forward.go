@@ -252,12 +252,13 @@ func (ts *TunnelService) dialChain(chain []ConnectionConfig, upstream *SocksProx
 			return nil, nil, err
 		}
 		clientConfig := &ssh.ClientConfig{
-			User:              cfg.User,
-			Auth:              authMethods,
-			Timeout:           30 * time.Second,
-			HostKeyCallback:   hostKeyCallback(nil),
-			Config:            algoSet.config(),
-			HostKeyAlgorithms: algoSet.HostKeys,
+			User:                     cfg.User,
+			Auth:                     authMethods,
+			Timeout:                  30 * time.Second,
+			HostKeyCallback:          hostKeyCallback(nil),
+			Config:                   algoSet.config(),
+			HostKeyAlgorithms:        algoSet.HostKeys,
+			HostKeySignatureVerifier: algoSet.hostKeyVerifier(),
 		}
 		sshConn, chans, reqs, err := ssh.NewClientConn(raw, addr, clientConfig)
 		cleanup()

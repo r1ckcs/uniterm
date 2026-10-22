@@ -178,12 +178,13 @@ func (s *MonitorSession) Connect(config ConnectionConfig) error {
 		return err
 	}
 	clientConfig := &ssh.ClientConfig{
-		User:              config.User,
-		Auth:              authMethods,
-		Timeout:           30 * time.Second,
-		HostKeyCallback:   hostKeyCallback(nil),
-		Config:            algoSet.config(),
-		HostKeyAlgorithms: algoSet.HostKeys,
+		User:                     config.User,
+		Auth:                     authMethods,
+		Timeout:                  30 * time.Second,
+		HostKeyCallback:          hostKeyCallback(nil),
+		Config:                   algoSet.config(),
+		HostKeyAlgorithms:        algoSet.HostKeys,
+		HostKeySignatureVerifier: algoSet.hostKeyVerifier(),
 	}
 
 	addr := net.JoinHostPort(config.Host, strconv.Itoa(config.Port))

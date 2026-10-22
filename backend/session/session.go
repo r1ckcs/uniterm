@@ -42,6 +42,10 @@ type SSHAlgoConfig struct {
 	Ciphers      []string `json:"ciphers,omitempty"`
 	MACs         []string `json:"macs,omitempty"`
 	HostKeys     []string `json:"hostKeys,omitempty"`
+	// LegacyDevice accepts what old network gear still needs: RSA host keys
+	// below 1024 bits (verified per connection, see ssh_legacy.go) and the
+	// compatible algorithm set even when Mode is secure. Off by default.
+	LegacyDevice bool `json:"legacyDevice,omitempty"`
 }
 
 // CwdHook injection timing for SSH connections (ConnectionConfig.CwdHookMode).

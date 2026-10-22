@@ -245,6 +245,9 @@ func (s *SSHSession) terminalHostKeyPrompt(p HostKeyPrompt) (bool, error) {
 	if p.OtherKeyTypesKnown {
 		msg.WriteString("\x1b[33mA key of a different type is already trusted for this host.\x1b[0m\r\n")
 	}
+	if p.Weak {
+		msg.WriteString(fmt.Sprintf("\x1b[1;31mWARNING: weak %d-bit RSA key. Accept only for an old device you know.\x1b[0m\r\n", p.KeyBits))
+	}
 	msg.WriteString(fmt.Sprintf("%s key fingerprint is %s.\r\n", p.KeyType, p.Fingerprint))
 	msg.WriteString("Are you sure you want to continue connecting (yes/no)? ")
 	s.emitData([]byte(msg.String()))
@@ -360,42 +363,29 @@ func (s *SSHSession) Connect(config ConnectionConfig) error {
 	}()
 
 	// For password auth without a stored password, prompt in the terminal
-	// before the SSH handshake. This covers servers that do not advertise
-	// keyboard-interactive support (the kbCallback fallback below).
+	// only once the server asks for it (ssh.PasswordCallback), i.e. after the
+	// handshake and the host key check passed. Prompting before the dial made
+	// a handshake failure (old algorithms, a weak host key) look like a
+	// password problem and ask again on every retry. The answer is kept, so a
+	// second dial (keyboard-interactive fallback) does not ask twice.
+	var lazyPassword func() (string, error)
 	if shouldPromptForSSHPassword(config) {
-		s.emitData([]byte("\r\nPassword: "))
-		var answer string
-	promptLoop:
-		for {
-			select {
-			case data := <-s.authAnswerCh:
-				for _, b := range data {
-					switch b {
-					case '\r', '\n':
-						break promptLoop
-					case '\x03': // Ctrl+C
-						s.emitData([]byte("^C\r\n"))
-						return fmt.Errorf("auth cancelled")
-					case 127, '\b': // Backspace
-						if len(answer) > 0 {
-							answer = answer[:len(answer)-1]
-						}
-					case '\x15': // Ctrl+U
-						answer = ""
-					default:
-						answer += string(b)
-					}
+		var (
+			once   sync.Once
+			answer string
+			perr   error
+		)
+		lazyPassword = func() (string, error) {
+			once.Do(func() {
+				answer, perr = s.promptTerminalPassword()
+				if perr == nil {
+					s.mu.Lock()
+					s.authPassword = answer
+					s.mu.Unlock()
 				}
-			case <-time.After(120 * time.Second):
-				s.emitData([]byte("\r\nAuth timeout\r\n"))
-				return fmt.Errorf("auth timeout")
-			}
+			})
+			return answer, perr
 		}
-		s.emitData([]byte("\r\n"))
-		config.Password = answer
-		s.mu.Lock()
-		s.authPassword = answer
-		s.mu.Unlock()
 	}
 
 	// Auto-answer keyboard-interactive challenges with the saved password on
@@ -415,6 +405,11 @@ func (s *SSHSession) Connect(config ConnectionConfig) error {
 			authMethods, cleanup, err := makeSSHAuthMethodsForAttempt(config, challenge)
 			if err != nil {
 				return nil, nil, err
+			}
+			if lazyPassword != nil {
+				// No stored password: ask for it when the server offers
+				// "password" (keyboard-interactive keeps its own prompt).
+				authMethods = append([]ssh.AuthMethod{ssh.PasswordCallback(lazyPassword)}, withoutEmptyPassword(config, authMethods)...)
 			}
 			return &ssh.ClientConfig{
 				User:            config.User,
@@ -449,9 +444,9 @@ func (s *SSHSession) Connect(config ConnectionConfig) error {
 	// injection, exactly like the old unsupported-shell skip.
 	s.cwdHookFollow = config.CwdHookMode == CwdHookModeFollow
 	probeCh := make(chan string, 1)
-	if !s.cwdHookFollow {
+	if !s.cwdHookFollow && lazyPassword == nil {
 		go func() { probeCh <- probeCwdShellSeparately(config) }()
-	} else {
+	} else if s.cwdHookFollow {
 		log.Writef("ssh: cwd hook deferred to directory-follow toggle")
 	}
 
@@ -461,6 +456,16 @@ func (s *SSHSession) Connect(config ConnectionConfig) error {
 	if err != nil {
 		s.setStatus(StatusError)
 		return wrapSSHAlgorithmError(sshAlgoModeOf(config.SSHAlgorithms), err)
+	}
+
+	// A password typed at the prompt is only known now: the probe (which
+	// re-authenticates with the same credentials) starts after the dial.
+	if !s.cwdHookFollow && lazyPassword != nil {
+		probeConfig := config
+		s.mu.RLock()
+		probeConfig.Password = s.authPassword
+		s.mu.RUnlock()
+		go func() { probeCh <- probeCwdShellSeparately(probeConfig) }()
 	}
 
 	// Detect Windows OpenSSH from the server identification string exchanged
@@ -980,9 +985,9 @@ func probeCwdShellSeparately(config ConnectionConfig) string {
 			return nil, nil, err
 		}
 		return &ssh.ClientConfig{
-			User:            config.User,
-			Auth:            authMethods,
-			Timeout:         cwdProbeDialTimeout,
+			User:    config.User,
+			Auth:    authMethods,
+			Timeout: cwdProbeDialTimeout,
 			// Never prompt here (the main dial asks), and never skip the
 			// check: this connection sends the same credentials. On a first
 			// visit the key is not trusted yet, so the probe fails and the
@@ -1229,4 +1234,51 @@ func (s *SSHSession) AuthPassword() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.authPassword
+}
+
+// promptTerminalPassword reads a password typed in the terminal (no echo).
+func (s *SSHSession) promptTerminalPassword() (string, error) {
+	s.mu.RLock()
+	ch := s.authAnswerCh
+	s.mu.RUnlock()
+	if ch == nil {
+		return "", fmt.Errorf("no terminal to ask for the password")
+	}
+	s.emitData([]byte("\r\nPassword: "))
+	var answer string
+	for {
+		select {
+		case data := <-ch:
+			for _, b := range data {
+				switch b {
+				case '\r', '\n':
+					s.emitData([]byte("\r\n"))
+					return answer, nil
+				case '\x03': // Ctrl+C
+					s.emitData([]byte("^C\r\n"))
+					return "", fmt.Errorf("auth cancelled")
+				case 127, '\b': // Backspace
+					if len(answer) > 0 {
+						answer = answer[:len(answer)-1]
+					}
+				case '\x15': // Ctrl+U
+					answer = ""
+				default:
+					answer += string(b)
+				}
+			}
+		case <-time.After(120 * time.Second):
+			s.emitData([]byte("\r\nAuth timeout\r\n"))
+			return "", fmt.Errorf("auth timeout")
+		}
+	}
+}
+
+// withoutEmptyPassword drops the ssh.Password("") method the "password"
+// auth type builds when no password is stored: the lazy prompt replaces it.
+func withoutEmptyPassword(config ConnectionConfig, methods []ssh.AuthMethod) []ssh.AuthMethod {
+	if config.AuthType != "password" || config.Password != "" || len(methods) == 0 {
+		return methods
+	}
+	return methods[1:]
 }

@@ -39,6 +39,7 @@ func dialSSHWithCipherFallback(addr string, sets []sshAlgoSet, newConfig sshClie
 		attempt := *config
 		attempt.Config = set.config()
 		attempt.HostKeyAlgorithms = set.HostKeys
+		attempt.HostKeySignatureVerifier = set.hostKeyVerifier()
 		sshConn, chans, reqs, err := ssh.NewClientConn(conn, addr, &attempt)
 		cleanup()
 		if err == nil {
