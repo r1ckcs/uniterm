@@ -1,6 +1,15 @@
 <template>
   <div ref="startTabRef" class="start-tab">
     <div class="start-content" :style="contentStyle">
+      <!-- Sync is off: the welcome dialog shows once, this strip keeps the
+           way in visible until the user signs in or says not now. -->
+      <div v-if="tab.viewMode === 'home' && vault.syncOffNotice" class="sync-off-strip" role="status">
+        <el-icon class="sync-off-icon"><CloudOff /></el-icon>
+        <span class="sync-off-text">{{ t('startTab.syncOff') }}</span>
+        <button class="sync-off-btn primary" :disabled="vault.busy" @click="onSyncSignIn">{{ t('startTab.syncOffSignIn') }}</button>
+        <button class="sync-off-btn" @click="vault.dismissSyncOff()">{{ t('vault.welcome.notNow') }}</button>
+      </div>
+
       <!-- Head: title, site filter and the actions -->
       <div class="sites-head">
         <h1 class="sites-title">
@@ -65,7 +74,7 @@
         ref="searchInputRef"
         v-model="searchQuery"
         class="start-search-input"
-        :placeholder="t('sidebar.searchPlaceholder')"
+        :placeholder="`${t('sidebar.searchPlaceholder')} (${quickSearchLabel(isMacUi)})`"
         clearable
         @keydown="onSearchKeydown"
       />
@@ -412,9 +421,12 @@ import { GetRecentConnections } from '../../bindings/github.com/ys-ll/uniterm/ap
 import { formatConnSubtitle, formatTypeFilterLabel, matchTypeFilter } from '../utils/quickConnect'
 import { connectionTypeIcon as connTypeIcon, connectionTypeLabel as connTypeLabel, connectionTypeInfo } from '../utils/connectionTypes'
 import { useConnStatusStore } from '../stores/connStatusStore'
+import { useVaultStore } from '../stores/vaultStore'
+import { quickSearchLabel, type QuickSearchRequest } from '../utils/quickSearch'
+import { detectPlatformSync } from '../utils/platform'
 import { getShellLabel as getShellLabelBase } from '../utils/shellLabel'
 import MenuItem from './MenuItem.vue'
-import { Filter, Plus, Laptop, Server, Folder, FolderOpen, Zap, MoreHorizontal, ChevronDown, Star, LayoutDashboard } from '@lucide/vue'
+import { CloudOff, Filter, Plus, Laptop, Server, Folder, FolderOpen, Zap, MoreHorizontal, ChevronDown, Star, LayoutDashboard } from '@lucide/vue'
 
 const props = defineProps<{
   tab: StartTab
@@ -439,6 +451,13 @@ const favoriteStore = useFavoriteStore()
 const tabStore = useTabStore()
 const settingsStore = useSettingsStore()
 const connStatus = useConnStatusStore()
+const vault = useVaultStore()
+
+// Opens the onboarding dialog and starts the Google sign-in it walks through.
+function onSyncSignIn() {
+  vault.openOnboarding()
+  void vault.signIn()
+}
 
 // ── Default local shell ──
 const effectiveDefaultShell = computed(() => {
@@ -950,7 +969,43 @@ function getGridColumns(): number {
   return contentCols.value
 }
 
+// ── Quick search (⌘K / Ctrl+Shift+P from anywhere, see App.vue) ──
+const isMacUi = detectPlatformSync() === 'darwin'
+// Where Esc goes back to, while the search was opened by the shortcut.
+const quickReturn = ref<{ returnTo: string | null; created: boolean } | null>(null)
+
+function onQuickSearch(e: Event) {
+  const req = (e as CustomEvent<QuickSearchRequest>).detail
+  if (!req || req.tabId !== props.tab.id) return
+  quickReturn.value = { returnTo: req.returnTo, created: req.created }
+  focusInGrid.value = false
+  focusedCardIndex.value = -1
+  nextTick(() => {
+    searchInputRef.value?.focus()
+    ;(searchInputRef.value as unknown as { select?: () => void })?.select?.()
+  })
+}
+
+function closeQuickSearch() {
+  const q = quickReturn.value
+  quickReturn.value = null
+  searchQuery.value = ''
+  searchInputRef.value?.blur()
+  if (!q) return
+  if (q.created) emit('close-self', props.tab.id)
+  if (q.returnTo && tabStore.tabs.some(t => t.id === q.returnTo)) tabStore.setActiveTab(q.returnTo)
+}
+
+// Leaving the tab ends the shortcut session: Esc then just clears.
+watch(() => tabStore.activeTabId, (id) => { if (id !== props.tab.id) quickReturn.value = null })
+
 function onSearchKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && (quickReturn.value || searchQuery.value)) {
+    e.preventDefault()
+    e.stopPropagation()
+    closeQuickSearch()
+    return
+  }
   if (e.key === 'Tab' || e.key === 'ArrowDown') {
     e.preventDefault()
     e.stopPropagation()
@@ -1203,6 +1258,7 @@ watch(probing, (on) => {
 
 onMounted(() => {
   connStatus.start(() => connectionStore.connections.map(c => c.id))
+  window.addEventListener('app:quick-search', onQuickSearch)
   window.addEventListener('focus', syncWindowFocus)
   window.addEventListener('blur', syncWindowFocus)
   document.addEventListener('visibilitychange', syncWindowFocus)
@@ -1218,6 +1274,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (holdsProbe) connStatus.release()
   holdsProbe = false
+  window.removeEventListener('app:quick-search', onQuickSearch)
   window.removeEventListener('focus', syncWindowFocus)
   window.removeEventListener('blur', syncWindowFocus)
   document.removeEventListener('visibilitychange', syncWindowFocus)
@@ -1296,6 +1353,55 @@ function doEditConnection(config: ConnectionConfig | null) {
   margin: 0 auto;
 }
 
+.sync-off-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem 0.625rem 0.5rem 0.875rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-btn);
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+}
+.sync-off-icon {
+  color: var(--text-secondary);
+}
+.sync-off-text {
+  flex: 1;
+  min-width: 12rem;
+}
+.sync-off-btn {
+  height: 1.75rem;
+  padding: 0 0.875rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-row);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sync-off-btn:hover {
+  background: var(--bg-hover);
+}
+.sync-off-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+}
+.sync-off-btn.primary:hover {
+  background: var(--el-color-primary-dark-2);
+}
+.sync-off-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .sites-head {
   display: flex;
   flex-wrap: wrap;
@@ -1342,6 +1448,7 @@ function doEditConnection(config: ConnectionConfig | null) {
   font: inherit;
   font-size: 0.75rem;
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
 }
 .sites-seg-btn:hover {
@@ -1982,4 +2089,81 @@ function doEditConnection(config: ConnectionConfig | null) {
   background-color: var(--bg-input) !important;
   border-radius: var(--radius-row) !important;
 }
+
+/* Search results and the inside of a group keep their grid; under the
+   FlexTerm themes the tiles take the D1c row look. */
+html[data-theme^="flexterm"] .start-cards-grid {
+  gap: 0.625rem;
+}
+html[data-theme^="flexterm"] .start-card,
+html[data-theme^="flexterm"] .start-quick-card {
+  padding: 0.625rem 0.75rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-btn);
+}
+html[data-theme^="flexterm"] .start-card:hover {
+  border-color: var(--border-hover);
+}
+html[data-theme^="flexterm"] .start-card.focused,
+html[data-theme^="flexterm"] .start-quick-card.focused {
+  border-color: var(--accent);
+  box-shadow: none;
+}
+html[data-theme^="flexterm"] .start-card.selected {
+  border-color: var(--accent);
+  background: var(--bg-active);
+}
+html[data-theme^="flexterm"] .start-quick-card {
+  border-style: dashed;
+  border-color: var(--border-hover);
+}
+html[data-theme^="flexterm"] .start-quick-card:hover {
+  background: var(--bg-hover);
+}
+html[data-theme^="flexterm"] .start-card-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-row);
+  background: var(--bg-sunken);
+}
+html[data-theme^="flexterm"] .start-card-name {
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+html[data-theme^="flexterm"] .start-card-meta {
+  font-size: 0.6875rem;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+html[data-theme^="flexterm"] .start-quick-card .start-card-meta {
+  font-family: inherit;
+}
+html[data-theme^="flexterm"] .card-more-btn,
+html[data-theme^="flexterm"] .card-fav-btn {
+  background: var(--bg-surface);
+  border-radius: var(--radius-badge);
+}
+html[data-theme^="flexterm"] .start-section-label {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+html[data-theme^="flexterm"] .start-breadcrumb {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+html[data-theme^="flexterm"] .start-breadcrumb .current {
+  font-weight: 800;
+}
+html[data-theme^="flexterm"] .start-filter-btn {
+  border-radius: var(--radius-row);
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+html[data-theme^="flexterm"] .start-empty-hint,
+html[data-theme^="flexterm"] .start-empty-state {
+  color: var(--text-muted);
+}
 </style>
+

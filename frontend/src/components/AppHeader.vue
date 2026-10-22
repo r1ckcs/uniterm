@@ -14,6 +14,17 @@
       @close="onClose"
     />
 
+    <!-- Brand (FlexTerm themes only). Not a control: it stays part of the
+         drag region, and a double click maximises like the rest of the bar. -->
+    <div v-if="showBrand" class="header-brand" aria-label="FlexTerm">
+      <svg class="header-brand-icon" viewBox="0 0 100 100" aria-hidden="true">
+        <rect x="1.5" y="1.5" width="97" height="97" rx="22" fill="#0F2351" class="header-brand-tile" stroke-width="3" />
+        <path d="M26 36 L42 50 L26 64" fill="none" stroke="#F46414" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M48 62 C54 54 60 54 66 62 S78 70 82 62" fill="none" stroke="#F46414" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <span class="header-brand-name">FlexTerm</span>
+    </div>
+
     <!-- Connections button (icon only, leftmost) -->
     <button class="header-btn" @click="emit('toggle-sidebar')" :title="t('header.connections') + shortcutSuffix('toggleSidebar')">
       <el-icon><PanelLeft :size="'0.875rem'" /></el-icon>
@@ -167,6 +178,8 @@ const tabStore = useTabStore()
 const panelStore = usePanelStore()
 const sessionStore = useSessionStore()
 const settingsStore = useSettingsStore()
+// The D1c header carries the logo; the classic themes keep their bar as is.
+const showBrand = computed(() => settingsStore.concreteAppTheme.startsWith('flexterm'))
 const localStateStore = useLocalStateStore()
 // Window frame is fixed at startup (Wails limitation): the OS title bar only
 // appears after a relaunch. Snapshot the choice once the persisted local
@@ -452,6 +465,36 @@ onUnmounted(() => {
   position: relative;
   z-index: 10;
   --wails-draggable: drag;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  margin: 0 0.625rem 0 0.25rem;
+  color: var(--header-text);
+  user-select: none;
+}
+.header-brand-icon {
+  width: 1.375rem;
+  height: 1.375rem;
+  flex-shrink: 0;
+}
+/* Tile outline so the navy tile stays visible on the navy light header. */
+.header-brand-tile {
+  stroke: var(--header-brand-stroke, #2f4174);
+}
+.header-brand-name {
+  font-size: 0.875rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+/* Narrow window: the tabs keep the room, the logo keeps only its icon. */
+@media (max-width: 48rem) {
+  .header-brand-name {
+    display: none;
+  }
 }
 
 .header-tabs {

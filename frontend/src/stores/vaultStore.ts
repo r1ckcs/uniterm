@@ -33,6 +33,12 @@ export const useVaultStore = defineStore('vault', () => {
   const onboardingRequested = ref(false)
   // The revoked / integrity notice can be dismissed until the next phase change.
   const noticeDismissed = ref(false)
+  // True once the backend (or the mock) reported a status: before that
+  // phase 'off' is only the placeholder.
+  const statusLoaded = ref(false)
+  // "Not now" on the start screen's sync-off strip: memory only, so it comes
+  // back on the next app start (the welcome dialog shows just once).
+  const syncOffDismissed = ref(false)
   let started = false
 
   const phase = computed(() => status.value.phase)
@@ -45,6 +51,11 @@ export const useVaultStore = defineStore('vault', () => {
     if (p === 'off') return onboardingRequested.value || status.value.promptWelcome
     return true
   })
+  const syncOffNotice = computed(() =>
+    statusLoaded.value && status.value.phase === 'off' && !status.value.testMode && !syncOffDismissed.value)
+  function dismissSyncOff() {
+    syncOffDismissed.value = true
+  }
   // Requests closed with × stay pending but stop popping up until reopened.
   const snoozed = ref<Set<string>>(new Set())
   // Only admins see join requests (contract §3); oldest first.
@@ -54,6 +65,7 @@ export const useVaultStore = defineStore('vault', () => {
   function applyStatus(s: VaultStatus) {
     const was = status.value.phase
     status.value = { ...EMPTY, ...s }
+    statusLoaded.value = true
     if (s.phase !== was) noticeDismissed.value = false
     if (s.phase === 'ready') {
       onboardingRequested.value = false
@@ -216,7 +228,7 @@ export const useVaultStore = defineStore('vault', () => {
 
   return {
     status, devices, changes, joinRequests, busy, lastError, lastRevoke, confirmation,
-    phase, isAdmin, integrityAlert, onboardingVisible, joinRequest, visibleJoinRequests, snoozeJoin, unsnoozeJoins,
+    phase, isAdmin, integrityAlert, onboardingVisible, syncOffNotice, dismissSyncOff, joinRequest, visibleJoinRequests, snoozeJoin, unsnoozeJoins,
     start, refresh, clearError, signIn, cancelSignIn, skip, recoveryWords, confirmRecovery,
     recoverWithWords, revokeDevice, renameThisDevice, beginApproval, approveJoin, rejectJoin,
     completeJoin, cancelJoin, closeConfirmation, canRegenerateRecovery, regenerateRecovery, cancelRecovery, syncNow, signOut, openOnboarding, closeOnboarding, changeFor,

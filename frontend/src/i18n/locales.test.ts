@@ -36,3 +36,21 @@ describe('i18n bundles', () => {
     expect(Object.keys(ptBR).filter((k) => cjk.test((ptBR as Record<string, string>)[k]))).toEqual([])
   })
 })
+
+describe('plural forms', () => {
+  it('pick the singular and plural by count, per locale', async () => {
+    const { t, setLocale } = await import('./index')
+    setLocale('pt-BR')
+    expect(t('startTab.connectionsCount', { count: 1 })).toBe('1 conexão')
+    expect(t('startTab.connectionsCount', { count: 3 })).toBe('3 conexões')
+    expect(t('startTab.connectionsCount', { count: 0 })).toBe('0 conexões')
+    setLocale('en')
+    expect(t('startTab.connectionsCount', { count: 1 })).toBe('1 connection')
+    expect(t('startTab.connectionsCount', { count: 2 })).toBe('2 connections')
+    setLocale('zh-CN')
+    expect(t('startTab.connectionsCount', { count: 5 })).toBe('5 个连接')
+    // A locale without the plural entries falls back to its plain key.
+    setLocale('de')
+    expect(t('startTab.connectionsCount', { count: 1 })).not.toContain('startTab')
+  })
+})

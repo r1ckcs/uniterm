@@ -63,8 +63,25 @@ export function setLocale(lang: Language) {
   currentLocale.value = resolveLocale(lang)
 }
 
+// Plural forms live in "<key>.<category>" entries (Intl.PluralRules
+// categories: one, other, ...), picked when params.count is a number. An
+// optional "<key>.zero" wins for 0: CLDR files 0 under "one" in Portuguese,
+// but "0 conexões" is what pt-BR reads. A
+// bundle without them falls back to the plain key, so the locales that only
+// carry "<key>" keep working.
+function lookup(loc: Locale, key: string, count: unknown): string | undefined {
+  const bundle = messages[loc]
+  if (!bundle) return undefined
+  if (typeof count === 'number') {
+    const form = (count === 0 ? bundle[`${key}.zero`] : undefined)
+      ?? bundle[`${key}.${new Intl.PluralRules(loc).select(count)}`] ?? bundle[`${key}.other`]
+    if (form !== undefined) return form
+  }
+  return bundle[key]
+}
+
 function translate(loc: Locale, key: string, params?: Record<string, string | number>): string {
-  const msg = messages[loc]?.[key] ?? messages['en']?.[key] ?? key
+  const msg = lookup(loc, key, params?.count) ?? lookup('en', key, params?.count) ?? key
   if (!params) return msg
   return msg.replace(/\{(\w+)\}/g, (_, k) => String(params[k] ?? `{${k}}`))
 }
