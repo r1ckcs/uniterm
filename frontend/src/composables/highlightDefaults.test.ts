@@ -3,18 +3,20 @@ import { matchTextSpans } from './highlightRules'
 import { compileRules, validateRule } from './userHighlightRules'
 import { buildDefaultRules, DEFAULTS_VERSION, NEXT_DEFAULT_ID } from './highlightDefaults'
 import { defaultsSignature, isDefaultId } from './highlightMerge'
+import { getXtermTheme } from './useTerminal'
+import { resolveHighlightColors, resolveSpanColor } from './overlayHighlight'
 import en from '../i18n/locales/en.json'
 import ptBR from '../i18n/locales/pt-BR.json'
 import zhCN from '../i18n/locales/zh-CN.json'
 
-const RED = '#ff4d4f'
-const ORANGE = '#fa8c16'
-const YELLOW = '#fadb14'
-const GREEN = '#52c41a'
-const BLUE = '#4096ff'
-const GRAY = '#8c8c8c'
-const PURPLE = '#b37feb'
-const TEAL = '#36cfc9'
+const RED = 'theme:red'
+const ORANGE = '#d9480f'
+const YELLOW = 'theme:yellow'
+const GREEN = 'theme:green'
+const BLUE = 'theme:blue'
+const GRAY = '#7a7a7a'
+const PURPLE = 'theme:magenta'
+const TEAL = 'theme:cyan'
 const MAGENTA = 'theme:magenta'
 
 const SLUG: Record<string, string> = {
@@ -65,8 +67,33 @@ describe('default list', () => {
   it('the list matches the signature pinned to DEFAULTS_VERSION', () => {
     const SIGNATURES: Record<number, string> = {
       1: '19e174513f8654',
+      2: '19474307e7f582', // colors moved to the theme palette (light themes)
     }
     expect(defaultsSignature(DEFAULTS), `DEFAULTS_VERSION ${DEFAULTS_VERSION}`).toBe(SIGNATURES[DEFAULTS_VERSION])
+  })
+
+  // Every default color, resolved the way the terminal paints it, must read
+  // on both built-in uniTerm themes (WCAG ratio >= 3:1, the bar for large or
+  // bold text — terminal highlights are short tokens).
+  it('every default color reads at >= 3:1 on uniterm-dark and uniterm-light', () => {
+    const channel = (v: number) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+    const lum = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map(i => channel(parseInt(hex.slice(i, i + 2), 16) / 255))
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    }
+    const ratio = (a: string, b: string) => {
+      const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x)
+      return (hi + 0.05) / (lo + 0.05)
+    }
+    const colors = new Set(DEFAULTS.map(r => r.color))
+    for (const name of ['uniterm-dark', 'uniterm-light']) {
+      const theme = getXtermTheme(name)
+      const categories = resolveHighlightColors(theme)
+      for (const c of colors) {
+        const hex = resolveSpanColor(c, 'error', theme, categories)
+        expect(ratio(hex, theme.background), `${name} ${c} = ${hex}`).toBeGreaterThanOrEqual(3)
+      }
+    }
   })
 
   it('every default group has a label in en, pt-BR and zh-CN', () => {
