@@ -20,6 +20,7 @@
       <el-icon v-if="expanded.has(node.group.id)"><ChevronDown :size="'0.875rem'" /></el-icon>
       <el-icon v-else><ChevronRight :size="'0.875rem'" /></el-icon>
     </span>
+    <ConnStyleIcon v-if="hasGroupStyle" class="group-style" :group="node.group" :fallback="Folder" />
     <span class="group-name">{{ node.group.name }}</span>
     <span v-if="totalCount > 0" class="group-count">{{ totalCount }}</span>
   </div>
@@ -56,7 +57,7 @@
       @dblclick="onItemDblClick(conn)"
       @contextmenu.prevent="onConnCtxMenu($event, conn)"
     >
-      <span class="conn-icon"><component :is="connIcon(conn)" :size="'0.875rem'" /></span>
+      <span class="conn-icon"><ConnStyleIcon :conn="conn" :fallback="connIcon(conn)" /></span>
       <div class="conn-details">
         <span class="name">{{ conn.name }}</span>
         <span class="conn-meta">
@@ -81,11 +82,14 @@
 </template>
 
 <script setup lang="ts">
+import ConnStyleIcon from './ConnStyleIcon.vue'
 import VaultChangedBadge from './VaultChangedBadge.vue'
 import { inject, computed } from 'vue'
-import { ChevronDown, ChevronRight, MoreHorizontal, Star } from '@lucide/vue'
+import { ChevronDown, ChevronRight, Folder, MoreHorizontal, Star } from '@lucide/vue'
+import { groupStyle } from '../utils/connectionStyle'
 import type { ConnectionConfig, ConnectionGroup } from '../types/session'
 import type { GroupTreeNode } from '../stores/connectionStore'
+import { useConnectionStore } from '../stores/connectionStore'
 import { useFavoriteStore } from '../stores/favoriteStore'
 import { useSettingsStore } from '../stores/settingsStore'
 
@@ -114,6 +118,13 @@ const handlers = inject<any>('groupHandlers')!
 const utils = inject<any>('utils')!
 
 const { connIcon, getSubtitle, t } = utils
+const connectionStore = useConnectionStore()
+
+// A styled group (own color/icon, or inherited) shows it before its name.
+const hasGroupStyle = computed(() => {
+  const st = groupStyle(props.node.group, connectionStore.groups)
+  return !!(st.color || st.icon)
+})
 
 const favoriteStore = useFavoriteStore()
 const settingsStore = useSettingsStore()
@@ -278,7 +289,12 @@ function onMoreClick(e: MouseEvent, conn: ConnectionConfig) {
 }
 
 /* Connection has an open session → highlight its icon with the AI-lock amber */
-.connection-item.has-session .conn-icon {
+.connection-item.has-session .group-style {
+  margin-right: 0.375rem;
+  color: var(--text-secondary);
+}
+
+.conn-icon {
   color: var(--warning);
 }
 

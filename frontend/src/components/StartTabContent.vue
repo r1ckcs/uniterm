@@ -103,6 +103,7 @@
           :class="{ alert: site.down > 0 }"
         >
           <header class="site-card-head" @contextmenu.prevent="site.id !== UNGROUPED && onGroupContextMenu($event, site.id, site.name)">
+            <ConnStyleIcon v-if="site.group && site.styled" class="site-style" :group="site.group" :fallback="Folder" size="md" />
             <button
               class="site-name"
               :class="{ focused: isCardFocused('group:' + site.id) }"
@@ -120,6 +121,7 @@
             @dblclick="onCardDblClick(config, $event)"
             @contextmenu.prevent="onContextMenu($event, config, 'site:')"
           >
+            <ConnStyleIcon v-if="styledConn(config)" class="site-row-style" :conn="config" :fallback="connTypeIcon(config) || Server" />
             <span class="site-tag" :class="'tag-' + tagKind(config)">{{ tagLabel(config) }}</span>
             <span class="site-row-name">{{ config.name }}</span>
             <span v-if="connStatus.stateOf(config.id) === 'down'" class="site-row-down">{{ t('startTab.noResponse') }}</span>
@@ -171,7 +173,7 @@
           >
             <div class="start-card-top">
               <div class="start-card-icon" :class="config.type">
-                <el-icon><component :is="connTypeIcon(config) || Server" :size="'1.75rem'" /></el-icon>
+                <ConnStyleIcon :conn="config" :fallback="connTypeIcon(config) || Server" size="md" />
               </div>
               <div>
                 <div class="start-card-name">{{ config.name }}</div>
@@ -201,7 +203,7 @@
           >
             <div class="start-card-top">
               <div class="start-card-icon" :class="config.type">
-                <el-icon><component :is="connTypeIcon(config) || Server" :size="'1.75rem'" /></el-icon>
+                <ConnStyleIcon :conn="config" :fallback="connTypeIcon(config) || Server" size="md" />
               </div>
               <div>
                 <div class="start-card-name">{{ config.name }}</div>
@@ -230,7 +232,7 @@
           @contextmenu.prevent="onGroupContextMenu($event, group.id, group.name)"
         >
           <div class="start-card-top">
-            <div class="start-card-icon group"><el-icon><Folder :size="'1.375rem'" /></el-icon></div>
+            <div class="start-card-icon group"><ConnStyleIcon :group="group" :fallback="Folder" size="md" /></div>
             <div>
               <div class="start-card-name">{{ group.name }}</div>
               <div class="start-card-meta">{{ t('startTab.connectionsCount', { count: group.count }) }}</div>
@@ -269,7 +271,7 @@
           >
             <div class="start-card-top">
               <div class="start-card-icon" :class="config.type">
-                <el-icon><component :is="connTypeIcon(config) || Server" :size="'1.75rem'" /></el-icon>
+                <ConnStyleIcon :conn="config" :fallback="connTypeIcon(config) || Server" size="md" />
               </div>
               <div>
                 <div class="start-card-name">{{ config.name }}</div>
@@ -301,7 +303,7 @@
           @contextmenu.prevent="onGroupContextMenu($event, group.id, group.name)"
         >
           <div class="start-card-top">
-            <div class="start-card-icon group"><el-icon><Folder :size="'1.375rem'" /></el-icon></div>
+            <div class="start-card-icon group"><ConnStyleIcon :group="group" :fallback="Folder" size="md" /></div>
             <div>
               <div class="start-card-name">{{ group.name }}</div>
               <div class="start-card-meta">{{ t('startTab.connectionsCount', { count: group.count }) }}</div>
@@ -324,7 +326,7 @@
         >
           <div class="start-card-top">
             <div class="start-card-icon" :class="config.type">
-              <el-icon><component :is="connTypeIcon(config) || Server" :size="'1.75rem'" /></el-icon>
+              <ConnStyleIcon :conn="config" :fallback="connTypeIcon(config) || Server" size="md" />
             </div>
             <div>
               <div class="start-card-name">{{ config.name }}</div>
@@ -422,6 +424,8 @@ import { formatConnSubtitle, formatTypeFilterLabel, matchTypeFilter } from '../u
 import { connectionTypeIcon as connTypeIcon, connectionTypeLabel as connTypeLabel, connectionTypeInfo } from '../utils/connectionTypes'
 import { useConnStatusStore } from '../stores/connStatusStore'
 import { useVaultStore } from '../stores/vaultStore'
+import { connectionStyle, groupStyle } from '../utils/connectionStyle'
+import ConnStyleIcon from './ConnStyleIcon.vue'
 import { quickSearchLabel, type QuickSearchRequest } from '../utils/quickSearch'
 import { detectPlatformSync } from '../utils/platform'
 import { getShellLabel as getShellLabelBase } from '../utils/shellLabel'
@@ -703,10 +707,11 @@ const siteCards = computed(() => {
     .sort((a, b) => a.name.localeCompare(b.name))
     .map(g => {
       const ids = subtreeIds(g.id)
-      return { id: g.id, name: g.name, conns: connectionStore.connections.filter(c => !!c.groupId && ids.has(c.groupId)) }
+      const st = groupStyle(g, connectionStore.groups)
+      return { id: g.id, name: g.name, group: g as ConnectionGroup | undefined, styled: !!(st.color || st.icon), conns: connectionStore.connections.filter(c => !!c.groupId && ids.has(c.groupId)) }
     })
   const ungrouped = connectionStore.connections.filter(c => !c.groupId)
-  if (ungrouped.length > 0) sites.push({ id: UNGROUPED, name: t('conn.noGroup'), conns: ungrouped })
+  if (ungrouped.length > 0) sites.push({ id: UNGROUPED, name: t('conn.noGroup'), group: undefined, styled: false, conns: ungrouped })
 
   return sites
     .map(site => {
@@ -720,7 +725,7 @@ const siteCards = computed(() => {
       if (connStatus.available && down > 0) { badge = t('startTab.siteDown', { count: down }); badgeKind = 'alert' }
       else if (connStatus.available && ok > 0) { badge = t('startTab.siteOk', { count: ok }); badgeKind = 'ok' }
       else badge = t('startTab.connectionsCount', { count: typed.length })
-      return { id: site.id, name: site.name, rows: shown.slice(0, SITE_ROWS), total: shown.length, down, badge, badgeKind }
+      return { id: site.id, name: site.name, group: site.group, styled: site.styled, rows: shown.slice(0, SITE_ROWS), total: shown.length, down, badge, badgeKind }
     })
     .filter(site => siteFilter.value === 'all' ? true : site.total > 0)
 })
@@ -733,6 +738,12 @@ const siteFilterOptions = computed(() => {
     { value: 'favorites' as const, label: t('startTab.favorites'), count: 0 },
   ]
 })
+
+// Rows show the color/icon mark only when one applies (own or inherited).
+function styledConn(config: ConnectionConfig): boolean {
+  const st = connectionStyle(config, connectionStore.groups)
+  return !!(st.color || st.icon)
+}
 
 // Type tag of a row: the protocol, colored by family.
 function typeShort(config: ConnectionConfig): string {
@@ -1557,6 +1568,18 @@ function doEditConnection(config: ConnectionConfig | null) {
 }
 .site-row.selected {
   background: var(--accent-subtle);
+}
+.site-style {
+  color: var(--text-primary);
+}
+.site-row-style {
+  color: var(--text-secondary);
+}
+.site-card-head .site-name {
+  flex: 1;
+}
+.site-card-head .site-style {
+  margin-right: 0.125rem;
 }
 .site-tag {
   flex-shrink: 0;

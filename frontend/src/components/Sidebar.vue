@@ -78,7 +78,7 @@
             @dblclick="onItemDblClick(conn)"
             @contextmenu.prevent="onContextMenu($event, conn)"
           >
-            <span class="conn-icon"><component :is="connIcon(conn)" :size="'0.875rem'" /></span>
+            <span class="conn-icon"><ConnStyleIcon :conn="conn" :fallback="connIcon(conn)" /></span>
             <div class="conn-details">
               <span class="name">{{ conn.name }}</span>
               <span class="conn-meta">
@@ -141,7 +141,7 @@
             @dblclick="onItemDblClick(conn)"
             @contextmenu.prevent="onContextMenu($event, conn)"
           >
-            <span class="conn-icon"><component :is="connIcon(conn)" :size="'0.875rem'" /></span>
+            <span class="conn-icon"><ConnStyleIcon :conn="conn" :fallback="connIcon(conn)" /></span>
             <div class="conn-details">
               <span class="name">{{ conn.name }}</span>
               <span class="conn-meta">
@@ -177,7 +177,7 @@
           @dblclick="onItemDblClick(conn)"
           @contextmenu.prevent="onContextMenu($event, conn)"
         >
-          <span class="conn-icon"><component :is="connIcon(conn)" :size="'0.875rem'" /></span>
+          <span class="conn-icon"><ConnStyleIcon :conn="conn" :fallback="connIcon(conn)" /></span>
           <div class="conn-details">
             <span class="name">{{ conn.name }}</span>
             <span class="conn-meta">
@@ -409,6 +409,7 @@
 </template>
 
 <script setup lang="ts">
+import ConnStyleIcon from './ConnStyleIcon.vue'
 import VaultChangedBadge from './VaultChangedBadge.vue'
 import { ref, onMounted, onUnmounted, computed, watch, nextTick, provide } from 'vue'
 import { X, ChevronRight, ChevronDown, Filter, Check, Network, Zap, Clock, Plus, Palette, SquareTerminal, Activity, Pencil, MoreHorizontal, FolderTree, ArrowRightLeft, Star } from '@lucide/vue'

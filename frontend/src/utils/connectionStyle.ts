@@ -87,9 +87,10 @@ export function groupStyle(g: ConnectionGroup, groups: ConnectionGroup[]): Effec
 
 // CSS color for a resolved color: a theme token for a palette key, the
 // validated hex, else undefined. Re-checked here so a caller cannot pass
-// an unvalidated string through.
-export function colorCss(color: string): string | undefined {
-  if (isPaletteKey(color)) return `var(--conn-${color})`
+// an unvalidated string through. 'header' picks the tone for marks drawn on
+// the app header (navy in the light theme).
+export function colorCss(color: string, on: 'surface' | 'header' = 'surface'): string | undefined {
+  if (isPaletteKey(color)) return on === 'header' ? `var(--conn-${color}-header)` : `var(--conn-${color})`
   return HEX.test(color) ? color.toLowerCase() : undefined
 }
 

@@ -11,6 +11,7 @@
     @dragend="onDragEnd"
     @contextmenu="onContextMenu"
   >
+    <span v-if="stripeColor" class="tab-color-stripe" :style="{ background: stripeColor }" aria-hidden="true"></span>
     <button
       v-if="!tabCloseRight && hovered && !tab.locked"
       class="tab-close"
@@ -134,6 +135,8 @@
 </template>
 
 <script setup lang="ts">
+import { colorCss, connectionStyle } from '../utils/connectionStyle'
+import { useConnectionStore } from '../stores/connectionStore'
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useTabStore } from '../stores/tabStore'
 import { usePanelStore } from '../stores/panelStore'
@@ -184,6 +187,7 @@ const emit = defineEmits<{
 
 const tabStore = useTabStore()
 const panelStore = usePanelStore()
+const connectionStore = useConnectionStore()
 const sessionStore = useSessionStore()
 const k8sStore = useK8sStore()
 
@@ -421,6 +425,17 @@ const fileMenuKey = computed(() => {
 // Visibility of each menu group, used to place dividers strictly between
 // Group-enable flags moved into MenuDivider's own sibling detection, so no
 // longer needed here.
+
+// Color stripe (CONTRATO-cor-icone): the saved connection's effective color,
+// so an edit shows at once; the panel's own config when it is not saved.
+const stripeColor = computed(() => {
+  if (!('panelId' in props.tab)) return undefined
+  const cfg = panelStore.getPanel(props.tab.panelId)?.config
+  if (!cfg) return undefined
+  const live = cfg.id ? connectionStore.connections.find(c => c.id === cfg.id) : undefined
+  const { color } = connectionStyle(live ?? cfg, connectionStore.groups)
+  return colorCss(color, 'header')
+})
 
 // True when the tab's panel is backed by a saved connection (has a config id),
 // so the "定位到连接" item can locate it in the sidebar's connection list.
@@ -755,6 +770,15 @@ onMounted(async () => {
   transition: background 0.15s ease, color 0.15s ease;
   flex-shrink: 0;
   --wails-draggable: no-drag;
+}
+.tab-color-stripe {
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: 0;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  pointer-events: none;
 }
 .tab-item:hover {
   background: var(--bg-hover);
