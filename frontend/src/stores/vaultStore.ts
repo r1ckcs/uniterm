@@ -125,7 +125,11 @@ export const useVaultStore = defineStore('vault', () => {
     return (await run(() => api().recoveryWords())).value ?? []
   }
   async function confirmRecovery(words: string[]) {
-    return (await run(() => api().confirmRecovery(status.value.recoveryCheck ?? [], words))).ok
+    const regen = !!status.value.recoveryRegen
+    const ok = (await run(() => api().confirmRecovery(status.value.recoveryCheck ?? [], words))).ok
+    // The new phrase is in only once confirmed: that is what clears the warning.
+    if (ok && regen && lastRevoke.value) lastRevoke.value = { ...lastRevoke.value, recoveryStale: false }
+    return ok
   }
   async function recoverWithWords(words: string[]) {
     return (await run(() => api().recoverWithWords(words))).ok
@@ -188,10 +192,9 @@ export const useVaultStore = defineStore('vault', () => {
   async function regenerateRecovery() {
     const fn = getVaultApi().regenerateRecovery
     if (!fn) return false
-    const r = await run(() => fn())
-    if (r.ok && lastRevoke.value) lastRevoke.value = { ...lastRevoke.value, recoveryStale: false }
-    return r.ok
+    return (await run(() => fn())).ok
   }
+  const cancelRecovery = () => run(() => api().cancelRecovery())
   const syncNow = () => run(() => api().syncNow())
   async function signOut() {
     await run(() => api().signOut())
@@ -216,6 +219,6 @@ export const useVaultStore = defineStore('vault', () => {
     phase, isAdmin, integrityAlert, onboardingVisible, joinRequest, visibleJoinRequests, snoozeJoin, unsnoozeJoins,
     start, refresh, clearError, signIn, cancelSignIn, skip, recoveryWords, confirmRecovery,
     recoverWithWords, revokeDevice, renameThisDevice, beginApproval, approveJoin, rejectJoin,
-    completeJoin, cancelJoin, closeConfirmation, canRegenerateRecovery, regenerateRecovery, syncNow, signOut, openOnboarding, closeOnboarding, changeFor,
+    completeJoin, cancelJoin, closeConfirmation, canRegenerateRecovery, regenerateRecovery, cancelRecovery, syncNow, signOut, openOnboarding, closeOnboarding, changeFor,
   }
 })
