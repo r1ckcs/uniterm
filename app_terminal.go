@@ -444,6 +444,16 @@ func (a *App) setupJumpHostTunnel(sessionID string, sessionType string, config *
 	}
 	log.Writef("[tunnel] established for session=%s via ssh=%s, localPort=%d",
 		sessionID, config.TunnelSSHConnID, localPort)
+	// The session will dial 127.0.0.1; its latency is the jump host leg.
+	if a.sessionManager != nil {
+		if s, ok := a.sessionManager.Get(sessionID); ok {
+			if ssh, ok := s.(*session.SSHSession); ok {
+				if hop, ok := a.tunnelService.FirstHop(sessionID); ok {
+					ssh.SetFirstHop(hop)
+				}
+			}
+		}
+	}
 	config.Host = "127.0.0.1"
 	config.Port = localPort
 	config.Proxy = nil // proxy was consumed by the jump-host dial; local dial is direct

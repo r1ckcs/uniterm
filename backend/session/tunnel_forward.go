@@ -296,11 +296,16 @@ func dialFirstHop(addr string, upstream *SocksProxy) (net.Conn, error) {
 		if upstream.User != "" {
 			auth = &proxy.Auth{User: upstream.User, Password: upstream.Pass}
 		}
-		d, err := proxy.SOCKS5("tcp", proxyAddr, auth, &net.Dialer{Timeout: 30 * time.Second})
+		fwd := &socketDialer{d: &net.Dialer{Timeout: 30 * time.Second}}
+		d, err := proxy.SOCKS5("tcp", proxyAddr, auth, fwd)
 		if err != nil {
 			return nil, err
 		}
-		return d.Dial("tcp", addr)
+		c, err := d.Dial("tcp", addr)
+		if err != nil {
+			return nil, err
+		}
+		return &socketConn{Conn: c, socket: fwd.conn}, nil
 	case "http":
 		return dialHTTPConnect(proxyAddr, upstream, addr)
 	default:
@@ -356,6 +361,28 @@ func dialHTTPConnect(proxyAddr string, up *SocksProxy, addr string) (net.Conn, e
 	}
 	return conn, nil
 }
+
+// socketDialer remembers the socket it dialed (to the SOCKS proxy), which
+// the proxy package hides behind its own conn type.
+type socketDialer struct {
+	d    *net.Dialer
+	conn net.Conn
+}
+
+func (s *socketDialer) Dial(network, addr string) (net.Conn, error) {
+	c, err := s.d.Dial(network, addr)
+	s.conn = c
+	return c, err
+}
+
+// socketConn exposes the TCP socket under a proxied conn through NetConn,
+// so tcprtt can read the first leg's RTT. Reads and writes go to Conn.
+type socketConn struct {
+	net.Conn
+	socket net.Conn
+}
+
+func (c *socketConn) NetConn() net.Conn { return c.socket }
 
 // --- accept / copy helpers ---
 
