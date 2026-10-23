@@ -10,6 +10,10 @@ import './style.css'
 import { Window } from '@wailsio/runtime'
 import { useSettingsStore } from './stores/settingsStore'
 import { setLocale } from './i18n'
+import { installCspReporter } from './utils/cspReport'
+import { FrontendLog } from '../bindings/github.com/ys-ll/uniterm/app'
+
+installCspReporter(FrontendLog)
 
 Window.SetTitle('FlexTerm')
 
