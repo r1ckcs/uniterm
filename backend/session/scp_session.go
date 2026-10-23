@@ -99,7 +99,9 @@ func (s *SCPSession) Connect(config ConnectionConfig) error {
 	s.mu.Lock()
 	s.sshClient = client
 	s.mu.Unlock()
-	go startFileSessionKeepAlive(client, s.Status)
+	if appKeepAlive(config) {
+		go startFileSessionKeepAlive(client, s.Status)
+	}
 
 	// Resolve the login home directory as the initial remote cwd. Login
 	// banners may print before it, so take the last non-empty line.

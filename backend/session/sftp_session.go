@@ -127,7 +127,9 @@ func (s *SFTPSession) Connect(config ConnectionConfig) error {
 	}()
 
 	s.sshClient = client
-	go startFileSessionKeepAlive(client, s.Status)
+	if appKeepAlive(config) {
+		go startFileSessionKeepAlive(client, s.Status)
+	}
 	s.sftpClient = sc
 	// Preload remote user/group name maps so list owners show names, not numbers.
 	s.loadUserGroupMaps()

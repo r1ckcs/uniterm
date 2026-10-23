@@ -2026,7 +2026,7 @@
   "vault.confirm.submitRegen": "替换恢复密钥",
   "vault.settings.multipleRecoveryKeys": "存在多个有效的恢复密钥；请生成新的密钥以使旧密钥失效。",
   "conn.sshLegacyDevice": "旧设备（接受弱算法和弱密钥）",
-  "conn.sshLegacyDeviceDesc": "仅对此连接接受低于 1024 位的 RSA 密钥和旧算法。仅用于无法升级的设备，并在管理网络中使用。",
+  "conn.sshLegacyDeviceDesc": "仅对此连接接受低于 1024 位的 RSA 密钥和旧算法。同时关闭 SSH 保活（只保留 TCP 保活）。仅用于无法升级的设备，并在管理网络中使用。",
   "conn.sshLegacySecureNote": "开启“旧设备”后，安全模式将按兼容模式处理。",
   "hostKey.weakKey": "{bits} 位 RSA 密钥——强度较弱。仅当这是你了解的旧设备时才接受。",
   "ssh.legacyKeyError": "该设备使用旧的密钥/算法（RSA {bits} 位）。请为此连接开启“旧设备”。",

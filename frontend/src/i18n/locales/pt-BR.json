@@ -2026,7 +2026,7 @@
   "vault.confirm.submitRegen": "Trocar a chave de recuperação",
   "vault.settings.multipleRecoveryKeys": "Há mais de uma chave de recuperação válida; gere uma nova para invalidar as antigas.",
   "conn.sshLegacyDevice": "Equipamento legado (aceitar algoritmos e chaves fracas)",
-  "conn.sshLegacyDeviceDesc": "Aceita chaves RSA abaixo de 1024 bits e algoritmos antigos só nesta conexão. Use apenas para equipamento que não pode ser atualizado, em rede de gerência.",
+  "conn.sshLegacyDeviceDesc": "Aceita chaves RSA abaixo de 1024 bits e algoritmos antigos só nesta conexão. Também desliga o keepalive do SSH (fica só o do TCP). Use apenas para equipamento que não pode ser atualizado, em rede de gerência.",
   "conn.sshLegacySecureNote": "Com \"Equipamento legado\" ligado, o modo Seguro é tratado como Compatível.",
   "hostKey.weakKey": "Chave RSA de {bits} bits — fraca. Só aceite se for um equipamento antigo que você conhece.",
   "ssh.legacyKeyError": "O equipamento usa chave/algoritmo antigo (RSA {bits} bits). Ative \"Equipamento legado\" nesta conexão.",

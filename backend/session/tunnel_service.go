@@ -147,7 +147,9 @@ func (ts *TunnelService) Start(sessionID string, sshConfig ConnectionConfig, tar
 		quit:      quit,
 		hop:       hop,
 	}
-	go tunnelKeepAlive(client, quit, "session="+sessionID)
+	if appKeepAlive(sshConfig) {
+		go tunnelKeepAlive(client, quit, "session="+sessionID)
+	}
 
 	return localPort, nil
 }

@@ -690,7 +690,9 @@ func (s *SSHSession) attach(client *ssh.Client, config ConnectionConfig) error {
 
 	go s.readLoop()
 	go s.readStderr()
-	go s.startKeepAlive()
+	if appKeepAlive(config) {
+		go s.startKeepAlive()
+	}
 	go s.runPostLoginAutomation(config)
 
 	return nil

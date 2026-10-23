@@ -346,3 +346,21 @@ func TestLegacyDeviceSurvivesJSON(t *testing.T) {
 		t.Fatalf("legacyDevice written when off: %s", off)
 	}
 }
+
+func TestAppKeepAliveOffForLegacyDevice(t *testing.T) {
+	cases := []struct {
+		name string
+		algo *SSHAlgoConfig
+		want bool
+	}{
+		{"no preferences", nil, true},
+		{"compatible", &SSHAlgoConfig{Mode: SSHAlgoModeCompatible}, true},
+		{"legacy device", &SSHAlgoConfig{LegacyDevice: true}, false},
+		{"legacy device in secure mode", &SSHAlgoConfig{Mode: SSHAlgoModeSecure, LegacyDevice: true}, false},
+	}
+	for _, c := range cases {
+		if got := appKeepAlive(ConnectionConfig{SSHAlgorithms: c.algo}); got != c.want {
+			t.Errorf("%s: appKeepAlive = %v, want %v", c.name, got, c.want)
+		}
+	}
+}

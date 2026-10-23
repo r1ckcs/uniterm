@@ -61,6 +61,14 @@ func strictHostKeyVerifier(hostKey ssh.PublicKey, data []byte, sig *ssh.Signatur
 	return err
 }
 
+// appKeepAlive reports whether a connection gets the SSH-level keepalive
+// (keepalive@openssh.com global requests). Legacy devices only get the OS TCP
+// keepalive: old network gear may answer an unknown global request badly or
+// drop the session on it.
+func appKeepAlive(c ConnectionConfig) bool {
+	return c.SSHAlgorithms == nil || !c.SSHAlgorithms.LegacyDevice
+}
+
 // hostKeyVerifier picks the verifier for a connection.
 func hostKeyVerifier(legacy bool) func(ssh.PublicKey, []byte, *ssh.Signature) error {
 	if legacy {
