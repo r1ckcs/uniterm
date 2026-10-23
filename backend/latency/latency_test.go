@@ -117,11 +117,18 @@ func TestWatchReusesFreshSample(t *testing.T) {
 	if n := f.count("a"); n != 2 {
 		t.Fatalf("after the interval: sampled %d times, want 2", n)
 	}
-	// A session that left the watch set is sampled anew when it comes back.
-	m.Watch(nil)
+	// Leaving and coming back within the interval reuses the sample too.
+	f.add("b", session.ViaDirect)
+	m.Watch([]string{"b"})
+	m.Watch([]string{"a"})
+	if n := f.count("a"); n != 2 {
+		t.Fatalf("after [b], [a]: sampled %d times, want 2", n)
+	}
+	now = now.Add(Interval)
+	m.Watch([]string{"b"}) // a is stale and unwatched: dropped
 	m.Watch([]string{"a"})
 	if n := f.count("a"); n != 3 {
-		t.Fatalf("after leaving: sampled %d times, want 3", n)
+		t.Fatalf("after the interval: sampled %d times, want 3", n)
 	}
 }
 
@@ -273,6 +280,7 @@ func TestRealSocketSendsNothing(t *testing.T) {
 		t.Fatalf("server received %d bytes", n)
 	}
 	m.Watch(nil)
+	time.Sleep(20 * time.Millisecond) // let the cached sample go stale
 	if s := m.Watch([]string{"a"})["a"]; s.State != StateUnavailable || s.Reason != ReasonClosed {
 		t.Fatalf("closed socket: %+v", s)
 	}

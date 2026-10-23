@@ -103,7 +103,7 @@ func (m *Monitor) Close() { m.once.Do(func() { close(m.quit) }) }
 
 // Watch replaces the watched set (the visible terminal tabs; empty stops
 // sampling) and returns their current samples. A session sampled less than
-// Interval ago returns its cached sample.
+// Interval ago, watched or not since, returns its cached sample.
 func (m *Monitor) Watch(ids []string) map[string]Sample {
 	seen := map[string]bool{}
 	var w []string
@@ -116,8 +116,11 @@ func (m *Monitor) Watch(ids []string) map[string]Sample {
 	}
 	m.mu.Lock()
 	m.watched = w
-	for id := range m.cache {
-		if !seen[id] {
+	// An unwatched sample stays until it is stale, so flipping tabs
+	// ([A], [B], [A]) still samples A at most once per interval.
+	now := m.o.Now()
+	for id, e := range m.cache {
+		if !seen[id] && now.Sub(e.taken) >= m.interval {
 			delete(m.cache, id)
 		}
 	}
