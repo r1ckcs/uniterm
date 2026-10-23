@@ -16,6 +16,7 @@ type tunnelEntry struct {
 	sshClient *ssh.Client
 	listener  net.Listener
 	quit      chan struct{}
+	hop       FirstHop // socket to the jump host (or its proxy)
 }
 
 // TunnelService manages SSH tunnel lifecycles.
@@ -136,10 +137,15 @@ func (ts *TunnelService) Start(sessionID string, sshConfig ConnectionConfig, tar
 	}()
 
 	quit := make(chan struct{})
+	hop := FirstHop{Conn: conn, Via: ViaJump}
+	if upstream != nil {
+		hop.Via = ViaProxy
+	}
 	ts.tunnels[sessionID] = &tunnelEntry{
 		sshClient: client,
 		listener:  listener,
 		quit:      quit,
+		hop:       hop,
 	}
 	go tunnelKeepAlive(client, quit, "session="+sessionID)
 
@@ -167,6 +173,17 @@ func tunnelKeepAlive(client *ssh.Client, quit chan struct{}, label string) {
 			return
 		}
 	}
+}
+
+// FirstHop returns the socket of the session's jump host tunnel.
+func (ts *TunnelService) FirstHop(sessionID string) (FirstHop, bool) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+	entry, ok := ts.tunnels[sessionID]
+	if !ok {
+		return FirstHop{}, false
+	}
+	return entry.hop, true
 }
 
 // Stop closes the tunnel and SSH connection for the given session.

@@ -5,6 +5,7 @@
     <span v-if="encoding" class="tsb-item">{{ encoding }}</span>
     <span v-if="size" class="tsb-item tsb-mono">{{ size }}</span>
     <span class="tsb-item" :class="{ 'tsb-down': !connected }">{{ connected ? uptime : t('tab.disconnected') }}</span>
+    <span v-if="latency" class="tsb-item tsb-latency" :class="`tsb-latency-${latencyClass}`" :title="t(latencyHint)">↔ {{ latencyText }}<span v-if="latency.via === 'jump' || latency.via === 'proxy'" class="tsb-latency-via">*</span></span>
     <span class="tsb-spacer"></span>
     <span v-if="panel.outputLog?.enabled" class="tsb-flag tsb-log" :title="panel.outputLog.path">● LOG</span>
     <span v-if="broadcasting" class="tsb-flag tsb-broadcast" :title="t('terminal.broadcastInput')">{{ t('terminal.statusBroadcast') }}</span>
@@ -13,14 +14,16 @@
 
 <script setup lang="ts">
 // Thin footer under a terminal tab: protocol · host:port · encoding ·
-// cols×rows · time connected, plus LOG / broadcast flags. Keepalive latency
-// is not shown: the backend does not expose it.
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+// cols×rows · time connected · latency (CONTRATO-latencia), plus LOG /
+// broadcast flags.
+import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Panel } from '../types/workspace'
 import { useSessionStore } from '../stores/sessionStore'
 import { useTabStore } from '../stores/tabStore'
 import { getTerminalSize } from '../services/terminalManager'
 import { formatUptime, statusBarTarget } from '../utils/terminalStatus'
+import { useLatencyStore } from '../stores/latencyStore'
+import { formatLatency, latencyHintKey, latencyLevel } from '../utils/latency'
 import { getShellLabel } from '../utils/shellLabel'
 import { useI18n } from '../i18n'
 
@@ -56,6 +59,29 @@ const uptime = computed(() => {
   return at ? formatUptime(now.value - at) : ''
 })
 const broadcasting = computed(() => tabStore.isPanelBroadcasting(props.panel.id))
+
+// The footer holds its session in the latency watch only while on screen:
+// KeepAlive deactivates the footers of hidden tabs.
+const latencyStore = useLatencyStore()
+const onScreen = ref(false)
+let held = ''
+function syncHold() {
+  const want = onScreen.value ? props.panel.sessionId || '' : ''
+  if (want === held) return
+  if (held) latencyStore.release(held)
+  held = want
+  if (held) latencyStore.hold(held)
+}
+watch(() => props.panel.sessionId, syncHold)
+onMounted(() => { onScreen.value = true; syncHold() })
+onActivated(() => { onScreen.value = true; syncHold() })
+onDeactivated(() => { onScreen.value = false; syncHold() })
+onUnmounted(() => { onScreen.value = false; syncHold() })
+
+const latency = computed(() => latencyStore.sampleOf(props.panel.sessionId))
+const latencyText = computed(() => formatLatency(latency.value))
+const latencyClass = computed(() => latencyLevel(latency.value))
+const latencyHint = computed(() => latencyHintKey(latency.value))
 </script>
 
 <style scoped>
@@ -92,6 +118,25 @@ const broadcasting = computed(() => tabStore.isPanelBroadcasting(props.panel.id)
 }
 .tsb-spacer {
   flex: 1;
+}
+.tsb-latency {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.tsb-latency-off {
+  color: var(--text-muted);
+}
+.tsb-latency-warn {
+  color: var(--warning);
+  font-weight: 700;
+}
+.tsb-latency-alert {
+  color: var(--error);
+  font-weight: 700;
+}
+.tsb-latency-via {
+  margin-left: 0.0625rem;
 }
 .tsb-flag {
   flex-shrink: 0;

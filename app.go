@@ -15,6 +15,7 @@ import (
 	"github.com/ys-ll/uniterm/backend/credentials"
 	"github.com/ys-ll/uniterm/backend/importer"
 	"github.com/ys-ll/uniterm/backend/k8s"
+	"github.com/ys-ll/uniterm/backend/latency"
 	"github.com/ys-ll/uniterm/backend/log"
 	"github.com/ys-ll/uniterm/backend/mcp"
 	"github.com/ys-ll/uniterm/backend/platform"
@@ -55,6 +56,7 @@ type App struct {
 	vaultService         *service.Service
 	connStatus           *connstatus.Monitor
 	connStatusOn         atomic.Bool
+	latency              *latency.Monitor
 	proxyStore           *store.ProxyStore
 	localStateStore      *store.LocalStateStore
 	quickCommandsStore   *store.QuickCommandsStore
@@ -347,6 +349,9 @@ func (a *App) initStores(dataDir string, upgrade bool) {
 
 	// Start-screen reachability (CONTRATO-status.md).
 	a.initConnStatus()
+
+	// Terminal footer latency (CONTRATO-latencia.md).
+	a.initLatency()
 
 	// Sync service: sync metadata (sync-config.json + local repo clone) lives
 	// in the system user-config dir; the config files it encrypts/decrypts are
@@ -756,6 +761,9 @@ func (a *App) shutdown() {
 	}
 	if a.connStatus != nil {
 		a.connStatus.Close()
+	}
+	if a.latency != nil {
+		a.latency.Close()
 	}
 	if a.recentStore != nil {
 		_ = a.recentStore.Close() // writes a Record still in its debounce

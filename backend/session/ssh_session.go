@@ -120,6 +120,10 @@ type SSHSession struct {
 	// client instead of dialing — Connect skips handshake/auth and only
 	// opens a new session channel.
 	channelClone bool
+
+	// presetHop is the first TCP leg the app set before Connect (the jump
+	// host tunnel's socket); nil means the session's own socket.
+	presetHop *FirstHop
 }
 
 // sshClientRef owns one authenticated SSH transport. The last release closes
@@ -127,6 +131,7 @@ type SSHSession struct {
 type sshClientRef struct {
 	client *ssh.Client
 	refs   atomic.Int32
+	hop    FirstHop // first TCP leg, for the latency footer; set once
 }
 
 func (r *sshClientRef) acquire() {
@@ -450,8 +455,12 @@ func (s *SSHSession) Connect(config ConnectionConfig) error {
 		log.Writef("ssh: cwd hook deferred to directory-follow toggle")
 	}
 
+	// The dials run one after another; the last one carries the client.
+	var socket net.Conn
 	client, err := dialSSHWithAuthRetry(addr, sets, authConfig, fallbackConfig, func() (net.Conn, error) {
-		return dialFirstHop(addr, config.Proxy)
+		c, err := dialFirstHop(addr, config.Proxy)
+		socket = c
+		return c, err
 	})
 	if err != nil {
 		s.setStatus(StatusError)
@@ -493,8 +502,16 @@ func (s *SSHSession) Connect(config ConnectionConfig) error {
 	s.detectedShell = detectedShell
 	s.mu.Unlock()
 
+	ref := newSSHClientRef(client)
+	ref.hop = FirstHop{Conn: socket, Via: ViaDirect}
+	if config.Proxy != nil {
+		ref.hop.Via = ViaProxy
+	}
 	s.mu.Lock()
-	s.clientRef = newSSHClientRef(client)
+	if s.presetHop != nil {
+		ref.hop = *s.presetHop
+	}
+	s.clientRef = ref
 	s.mu.Unlock()
 	if err := s.attach(client, config); err != nil {
 		// The dial path owns the whole client: a failed attach tears it down
