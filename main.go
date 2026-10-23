@@ -183,7 +183,7 @@ func main() {
 
 	w3app := application.New(application.Options{
 		Name:       appname.Name,
-		Assets:     application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
+		Assets:     application.AssetOptions{Handler: application.AssetFileServerFS(assets), Middleware: cspMiddleware},
 		OnShutdown: app.shutdown,
 		// Single-instance: a second GUI launch acquires the OS lock, notifies
 		// this instance (which shows/focuses the existing window) and exits.
