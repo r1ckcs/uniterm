@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/ys-ll/uniterm/backend/appname"
 	"github.com/ys-ll/uniterm/backend/container"
 	"github.com/ys-ll/uniterm/backend/connstatus"
 	"github.com/ys-ll/uniterm/backend/credentials"
@@ -1942,7 +1943,7 @@ type AppInfo struct {
 
 func (a *App) GetAppInfo() AppInfo {
 	return AppInfo{
-		Name:    "Carrear's Terminal",
+		Name:    appname.Name,
 		Version: Version,
 	}
 }
