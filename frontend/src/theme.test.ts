@@ -82,6 +82,14 @@ describe('FlexTerm (D1c) themes', () => {
     expect(css).toMatch(/\.tab-name\.tab-disconnected \{\s*opacity: 1;\s*color: var\(--header-text-3\);/)
   })
 
+  it('the footer latency uses the colors the contrast test covers on the status bar', () => {
+    const bar = Object.values(import.meta.glob('./components/TerminalStatusBar.vue', { query: '?raw', import: 'default', eager: true }))[0] as string
+    expect(bar).toMatch(/\.terminal-status-bar \{[^}]*background: var\(--bg-elevated\);/)
+    expect(bar).toMatch(/\.tsb-latency-off \{\s*color: var\(--text-muted\);/)
+    expect(bar).toMatch(/\.tsb-latency-warn \{\s*color: var\(--warning\);/)
+    expect(bar).toMatch(/\.tsb-latency-alert \{\s*color: var\(--error\);/)
+  })
+
   it('the terminal follows the app theme with the matching palette', () => {
     expect(resolveTerminalThemeName(FOLLOW_APP_THEME, 'flexterm')).toBe('flexterm-dark')
     expect(resolveTerminalThemeName(FOLLOW_APP_THEME, 'flexterm-light')).toBe('flexterm-light')
