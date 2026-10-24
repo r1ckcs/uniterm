@@ -221,7 +221,7 @@ import MCPApprovalDialog from './components/MCPApprovalDialog.vue'
 import type { MCPApprovalRequest } from './types/mcp'
 import Menu from './components/Menu.vue'
 import MenuItem from './components/MenuItem.vue'
-import { ElMessageBox, ElCheckbox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElCheckbox } from 'element-plus'
 import { useConnectionStore } from './stores/connectionStore'
 import { useTabStore } from './stores/tabStore'
 import { usePanelStore } from './stores/panelStore'
@@ -724,7 +724,11 @@ function onHostKeyChangedResolve(replace: boolean) {
   const [req, ...rest] = hostKeyChangedQueue.value
   hostKeyChangedQueue.value = rest
   if (!rest.length) RDPShowForOverlay()
-  if (req && canAnswerHostKeyChanged(req)) ResolveHostKeyChanged(req.id, replace).catch(() => {})
+  if (!req || !canAnswerHostKeyChanged(req)) return
+  // The backend gives up after 120 s; a late "Replace" must not look accepted.
+  ResolveHostKeyChanged(req.id, replace).catch(() => {
+    if (replace) ElMessage.warning(t('hostKeyChanged.expired'))
+  })
 }
 
 // backend mcp:session-created: an agent opened a new SSH session; mount a
