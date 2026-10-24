@@ -183,7 +183,7 @@ func TestWeakHostKeyRefusedWithoutLegacyOption(t *testing.T) {
 	addr := startWeakSSHServer(t, newWeakSigner(t), []string{ssh.KeyAlgoRSA})
 	prompted := false
 	for _, p := range []*SSHAlgoConfig{nil, {Mode: SSHAlgoModeCompatible}, {Mode: SSHAlgoModeSecure}} {
-		err := dialLegacyTest(addr, p, func(HostKeyPrompt) (bool, error) { prompted = true; return true, nil })
+		err := dialLegacyTest(addr, p, func(HostKeyPrompt) (HostKeyAnswer, error) { prompted = true; return HostKeyTrust, nil })
 		w, ok := isWeakHostKeyError(err)
 		if !ok || w.Bits != 512 {
 			if p != nil && p.Mode == SSHAlgoModeSecure && err != nil {
@@ -209,7 +209,7 @@ func TestLegacyOptionConnectsAndKeepsKnownHosts(t *testing.T) {
 			legacy := &SSHAlgoConfig{LegacyDevice: true}
 
 			var got HostKeyPrompt
-			accept := func(p HostKeyPrompt) (bool, error) { got = p; return true, nil }
+			accept := func(p HostKeyPrompt) (HostKeyAnswer, error) { got = p; return HostKeyTrust, nil }
 			if err := dialLegacyTest(addr, legacy, accept); err != nil {
 				t.Fatalf("legacy connection failed: %v", err)
 			}
@@ -217,8 +217,8 @@ func TestLegacyOptionConnectsAndKeepsKnownHosts(t *testing.T) {
 				t.Fatalf("first-visit prompt = %+v, want weak 512-bit", got)
 			}
 			// Known now: no prompt the second time.
-			if err := dialLegacyTest(addr, legacy, func(HostKeyPrompt) (bool, error) {
-				return false, errors.New("must not prompt for a known key")
+			if err := dialLegacyTest(addr, legacy, func(HostKeyPrompt) (HostKeyAnswer, error) {
+				return HostKeyReject, errors.New("must not prompt for a known key")
 			}); err != nil {
 				t.Fatalf("second connection: %v", err)
 			}
@@ -240,7 +240,7 @@ func TestLegacyOptionStillRefusesChangedKey(t *testing.T) {
 	if err := os.WriteFile(appKnownHostsPath(), []byte(line+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	err := dialLegacyTest(addr, &SSHAlgoConfig{LegacyDevice: true}, func(HostKeyPrompt) (bool, error) { return true, nil })
+	err := dialLegacyTest(addr, &SSHAlgoConfig{LegacyDevice: true}, func(HostKeyPrompt) (HostKeyAnswer, error) { return HostKeyTrust, nil })
 	if err == nil {
 		t.Fatal("a changed host key was accepted on a legacy connection")
 	}

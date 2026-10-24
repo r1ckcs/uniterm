@@ -53,9 +53,9 @@ func TestVerifyHostKeyKnown(t *testing.T) {
 	key := newEd25519Key(t)
 	writeKnown(t, app, "example.com:22", key)
 	prompted := false
-	err := verifyHostKey(app, "", "example.com:22", key, func(HostKeyPrompt) (bool, error) {
+	err := verifyHostKey(app, "", "example.com:22", key, func(HostKeyPrompt) (HostKeyAnswer, error) {
 		prompted = true
-		return false, nil
+		return HostKeyReject, nil
 	}, true)
 	if err != nil || prompted {
 		t.Fatalf("known key: err=%v prompted=%v", err, prompted)
@@ -81,9 +81,9 @@ func TestVerifyHostKeyUnknownRejected(t *testing.T) {
 	app := filepath.Join(dir, "known_hosts")
 	key := newEd25519Key(t)
 	var got HostKeyPrompt
-	err := verifyHostKey(app, "", "new.example:22", key, func(p HostKeyPrompt) (bool, error) {
+	err := verifyHostKey(app, "", "new.example:22", key, func(p HostKeyPrompt) (HostKeyAnswer, error) {
 		got = p
-		return false, nil
+		return HostKeyReject, nil
 	}, true)
 	if err == nil {
 		t.Fatal("rejected unknown key must fail")
@@ -109,7 +109,7 @@ func TestVerifyHostKeyUnknownAcceptedPersists(t *testing.T) {
 	dir := t.TempDir()
 	app := filepath.Join(dir, "sub", "known_hosts")
 	key := newEd25519Key(t)
-	accept := func(HostKeyPrompt) (bool, error) { return true, nil }
+	accept := func(HostKeyPrompt) (HostKeyAnswer, error) { return HostKeyTrust, nil }
 	if err := verifyHostKey(app, "", "h.example:2200", key, accept, true); err != nil {
 		t.Fatal(err)
 	}
@@ -126,25 +126,30 @@ func TestVerifyHostKeyUnknownAcceptedPersists(t *testing.T) {
 	}
 }
 
-func TestVerifyHostKeyChangedHardFails(t *testing.T) {
+// A changed key asks, but the unknown-key answer (Trust) never replaces it:
+// a prompter that does not know about changed keys cannot let one through.
+func TestVerifyHostKeyChangedTrustDoesNotReplace(t *testing.T) {
 	dir := t.TempDir()
 	app := filepath.Join(dir, "known_hosts")
 	old := newEd25519Key(t)
 	writeKnown(t, app, "srv:22", old)
+	before, _ := os.ReadFile(app)
 	attacker := newEd25519Key(t)
-	prompted := false
-	err := verifyHostKey(app, "", "srv:22", attacker, func(HostKeyPrompt) (bool, error) {
-		prompted = true
-		return true, nil
+	var got HostKeyPrompt
+	err := verifyHostKey(app, "", "srv:22", attacker, func(p HostKeyPrompt) (HostKeyAnswer, error) {
+		got = p
+		return HostKeyTrust, nil
 	}, true)
 	if err == nil {
-		t.Fatal("changed key must fail even when the prompt would accept")
+		t.Fatal("Trust must not accept a changed key")
 	}
-	if prompted {
-		t.Fatal("changed key must never prompt")
+	if !got.Changed || !got.CanReplace || len(got.OldKeys) != 1 ||
+		got.OldKeys[0].Fingerprint != ssh.FingerprintSHA256(old) || got.OldKeys[0].File != "app" ||
+		got.Fingerprint != ssh.FingerprintSHA256(attacker) {
+		t.Fatalf("changed prompt payload: %+v", got)
 	}
-	if !strings.Contains(err.Error(), ssh.FingerprintSHA256(attacker)) {
-		t.Fatalf("error should carry the new fingerprint: %v", err)
+	if after, _ := os.ReadFile(app); string(after) != string(before) {
+		t.Fatal("rejected change modified known_hosts")
 	}
 }
 
@@ -154,9 +159,9 @@ func TestVerifyHostKeyOtherTypePrompts(t *testing.T) {
 	writeKnown(t, app, "srv:22", newRSAKey(t))
 	ed := newEd25519Key(t)
 	var got HostKeyPrompt
-	err := verifyHostKey(app, "", "srv:22", ed, func(p HostKeyPrompt) (bool, error) {
+	err := verifyHostKey(app, "", "srv:22", ed, func(p HostKeyPrompt) (HostKeyAnswer, error) {
 		got = p
-		return false, nil
+		return HostKeyReject, nil
 	}, true)
 	if err == nil || !got.OtherKeyTypesKnown {
 		t.Fatalf("different key type should prompt with warning; err=%v prompt=%+v", err, got)
