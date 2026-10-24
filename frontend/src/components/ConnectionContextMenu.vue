@@ -19,6 +19,7 @@
       <MenuItem v-if="config?.type === 'wsl'" @click="onConnectClick($event, 'wsl-file')">{{ t('sidebar.connectWslFile') }}</MenuItem>
       <MenuItem v-if="config?.type === 'ssh'" @click="onConnectClick($event, 'monitor')">{{ t('sidebar.connectMonitor') }}</MenuItem>
       <MenuItem v-if="config && isConnected" @click="locateSession">{{ t('sidebar.locateSession') }}</MenuItem>
+      <MenuItem v-if="canForgetHostKey" @click="onForgetHostKey">{{ t('hostKeyForget.menu') }}</MenuItem>
       <MenuDivider />
       <MenuItem :class="{ disabled: targets.length > 1 }" @click="targets.length === 1 && emit('edit', targets[0])">{{ t('sidebar.edit') }}</MenuItem>
       <MenuItem @click="duplicate()">{{ t('sidebar.duplicate') }}</MenuItem>
@@ -38,7 +39,8 @@
 // submenu), favorite state and duplicate/delete flows; parents only wire the
 // connect routing and the edit/group dialogs.
 import { computed, ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ForgetHostKey } from '../../bindings/github.com/ys-ll/uniterm/app'
 import { Plus } from '@lucide/vue'
 import Menu from './Menu.vue'
 import MenuItem from './MenuItem.vue'
@@ -213,6 +215,43 @@ async function duplicate() {
       name: generateDuplicateName(c.name)
     }
     connectionStore.add(dup)
+  }
+}
+
+// "Forget host key" (CONTRATO-chave-trocada): drops the app's trusted keys of
+// host:port, so the next connection asks as for a new host. The user's
+// ~/.ssh/known_hosts is never edited; if it still has the host, show the
+// optional command to clean it there.
+const canForgetHostKey = computed(() =>
+  props.targets.length === 1 && !!props.config?.host && (props.config.type === 'ssh' || props.config.type === 'mosh'))
+
+async function onForgetHostKey() {
+  close()
+  const c = props.config
+  if (!c?.host) return
+  const host = `${c.host}${c.port && c.port !== 22 ? `:${c.port}` : ''}`
+  try {
+    await ElMessageBox.confirm(t('hostKeyForget.confirm', { host }), t('hostKeyForget.menu'), {
+      confirmButtonText: t('hostKeyForget.confirmButton'),
+      cancelButtonText: t('sftp.dialog.cancel'),
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  try {
+    const r = await ForgetHostKey(c.host, c.port || 22)
+    if (r?.inUserFile) {
+      await ElMessageBox.alert(
+        r.removeCommand ? t('hostKeyForget.userFileCmd', { command: r.removeCommand }) : t('hostKeyForget.userFile'),
+        t('hostKeyForget.menu'),
+        { confirmButtonText: t('hostKeyChanged.close') },
+      ).catch(() => {})
+    } else {
+      ElMessage.success(r?.removed ? t('hostKeyForget.done') : t('hostKeyForget.none'))
+    }
+  } catch (e) {
+    ElMessage.error(String(e))
   }
 }
 
