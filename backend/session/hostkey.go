@@ -164,8 +164,9 @@ const (
 // checkKnownHosts checks key for hostname against the given known_hosts
 // files (missing files are skipped; an unparsable user file is ignored with
 // a log line rather than breaking every connection). For hostKeyChanged it
-// also returns the trusted keys of the same type that no longer match.
-func checkKnownHosts(files []string, hostname string, key ssh.PublicKey) (hostKeyStatus, []knownhosts.KnownKey, error) {
+// also returns the trusted keys of the same type that no longer match; all
+// lists every trusted key of the host, any type.
+func checkKnownHosts(files []string, hostname string, key ssh.PublicKey) (status hostKeyStatus, same, all []knownhosts.KnownKey, err error) {
 	var existing []string
 	for _, f := range files {
 		if f == "" {
@@ -186,55 +187,63 @@ func checkKnownHosts(files []string, hostname string, key ssh.PublicKey) (hostKe
 		existing = existing[:len(existing)-1]
 	}
 	if cb == nil {
-		return hostKeyUnknown, nil, nil
+		return hostKeyUnknown, nil, nil, nil
 	}
 	// knownhosts only needs a parsable remote address; the dialed hostname
 	// takes precedence, so the (possibly proxied) peer address is irrelevant.
-	err := cb(hostname, &net.TCPAddr{IP: net.IPv4zero}, key)
+	err = cb(hostname, &net.TCPAddr{IP: net.IPv4zero}, key)
 	if err == nil {
-		return hostKeyKnown, nil, nil
+		return hostKeyKnown, nil, nil, nil
 	}
 	var ke *knownhosts.KeyError
 	if !errors.As(err, &ke) {
 		// RevokedError or a malformed address: never trust.
-		return hostKeyRevoked, nil, err
+		return hostKeyRevoked, nil, nil, err
 	}
 	if len(ke.Want) == 0 {
-		return hostKeyUnknown, nil, nil
+		return hostKeyUnknown, nil, nil, nil
 	}
-	var same []knownhosts.KnownKey
 	for _, w := range ke.Want {
 		if w.Key.Type() == key.Type() {
 			same = append(same, w)
 		}
 	}
 	if len(same) > 0 {
-		return hostKeyChanged, same, nil
+		return hostKeyChanged, same, ke.Want, nil
 	}
-	return hostKeyUnknownOtherType, nil, nil
+	return hostKeyUnknownOtherType, nil, ke.Want, nil
 }
 
-// lookupHostKey decides with both files, the app's taking precedence: a
-// key of this type that the app file trusts or contradicts for the host
-// settles it, whatever ~/.ssh/known_hosts says. That is what lets a replace
-// work without editing the user's file, and it keeps a replaced key out:
-// the old key left in ~/.ssh/known_hosts no longer passes. @revoked in
-// either file always wins. Otherwise both files count together, as before.
-func lookupHostKey(appFile, userFile, hostname string, key ssh.PublicKey) (hostKeyStatus, []knownhosts.KnownKey, error) {
-	merged, mergedOld, err := checkKnownHosts([]string{appFile, userFile}, hostname, key)
+// lookupHostKey decides with both files, the app's taking precedence per
+// host: when the app file has any entry for the host, it alone decides,
+// whatever ~/.ssh/known_hosts says. That lets a replace work without
+// editing the user's file and keeps every old key out, of any type (the
+// OpenSSH client records all of a host's key types, and a fake server picks
+// the type). A key the app file overrides that the user's file still
+// trusts is the replaced device's: it reads as changed. @revoked in either
+// file always wins. Without an app entry both files count together.
+// appAll lists the app file's keys for the host (for planReplace).
+func lookupHostKey(appFile, userFile, hostname string, key ssh.PublicKey) (status hostKeyStatus, old, appAll []knownhosts.KnownKey, err error) {
+	merged, mergedOld, _, err := checkKnownHosts([]string{appFile, userFile}, hostname, key)
 	if merged == hostKeyRevoked {
-		return merged, nil, err
+		return merged, nil, nil, err
 	}
-	if app, appOld, _ := checkKnownHosts([]string{appFile}, hostname, key); app == hostKeyKnown || app == hostKeyChanged {
-		return app, appOld, nil
+	app, appOld, all, _ := checkKnownHosts([]string{appFile}, hostname, key)
+	switch {
+	case app == hostKeyUnknown:
+		return merged, mergedOld, nil, err
+	case app == hostKeyUnknownOtherType && merged == hostKeyKnown:
+		return hostKeyChanged, all, all, nil
+	case app == hostKeyUnknownOtherType && merged == hostKeyChanged:
+		return hostKeyChanged, mergedOld, all, nil
 	}
-	return merged, mergedOld, err
+	return app, appOld, all, nil
 }
 
 func verifyHostKey(appFile, userFile, hostname string, key ssh.PublicKey, prompt HostKeyPrompter, allowPrompt bool) error {
 	fp := ssh.FingerprintSHA256(key)
 
-	status, _, err := lookupHostKey(appFile, userFile, hostname, key)
+	status, _, _, err := lookupHostKey(appFile, userFile, hostname, key)
 	switch status {
 	case hostKeyKnown:
 		return nil
@@ -259,7 +268,7 @@ func verifyHostKey(appFile, userFile, hostname string, key ssh.PublicKey, prompt
 	defer hostKeyPromptMu.Unlock()
 	// Another dial may have accepted (or the user edited the file) while we
 	// waited for the prompt lock.
-	status, old, err := lookupHostKey(appFile, userFile, hostname, key)
+	status, old, appAll, err := lookupHostKey(appFile, userFile, hostname, key)
 	switch status {
 	case hostKeyKnown:
 		return nil
@@ -283,7 +292,7 @@ func verifyHostKey(appFile, userFile, hostname string, key ssh.PublicKey, prompt
 	if status == hostKeyChanged {
 		want = HostKeyReplace
 		p.Changed = true
-		plan = planReplace(appFile, userFile, hostname, old, &p)
+		plan = planReplace(appFile, userFile, hostname, old, appAll, &p)
 	}
 
 	answer, perr := prompt(p)
@@ -313,7 +322,7 @@ func verifyHostKey(appFile, userFile, hostname string, key ssh.PublicKey, prompt
 		}
 		// The file must now trust exactly this key; anything else would
 		// mean the plan missed an entry, so refuse rather than connect.
-		if st, _, _ := lookupHostKey(appFile, userFile, hostname, key); st != hostKeyKnown {
+		if st, _, _, _ := lookupHostKey(appFile, userFile, hostname, key); st != hostKeyKnown {
 			return fmt.Errorf("host key for %s still does not match after replacing it", hostname)
 		}
 		log.Writef("[hostkey] replaced key for %s: old %s, new %s %s (%d entries removed from %s; user file kept: %v)",

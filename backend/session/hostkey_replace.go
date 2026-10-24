@@ -37,35 +37,40 @@ type replacePlan struct {
 }
 
 // planReplace fills p's old keys and whether the app can replace them.
-func planReplace(appFile, userFile, hostname string, old []knownhosts.KnownKey, p *HostKeyPrompt) *replacePlan {
-	var inApp []knownhosts.KnownKey
+// Every app-file entry of the host (appAll, any key type) must be an exact
+// line apply can remove: an entry that matches through a wildcard would
+// keep an old key trusted after the replace.
+func planReplace(appFile, userFile, hostname string, old, appAll []knownhosts.KnownKey, p *HostKeyPrompt) *replacePlan {
+	check := append([]knownhosts.KnownKey(nil), appAll...)
 	for _, o := range old {
 		file := "app"
 		if userFile != "" && o.Filename == userFile {
 			file = "user"
 			p.UserFileKept = true
 		} else {
-			inApp = append(inApp, o)
+			check = append(check, o)
 		}
 		p.OldKeys = append(p.OldKeys, HostKeyOld{KeyType: o.Key.Type(), Fingerprint: ssh.FingerprintSHA256(o.Key), File: file})
 	}
 	if p.UserFileKept {
 		p.RemoveCommand = removeCommand(hostname)
 	}
-	if len(inApp) > 0 {
-		data, err := os.ReadFile(appFile)
-		if err != nil {
-			p.Blocker = "pattern"
-			return nil
+	var matched map[int]bool
+	for _, o := range check {
+		if o.Filename != appFile {
+			continue
 		}
-		_, matched := filterHostLines(data, knownhosts.Normalize(hostname))
-		for _, o := range inApp {
-			if !matched[o.Line] {
-				// A wildcard/negation pattern: removing the exact entries
-				// would leave the old key trusted.
+		if matched == nil {
+			data, err := os.ReadFile(appFile)
+			if err != nil {
 				p.Blocker = "pattern"
 				return nil
 			}
+			_, matched = filterHostLines(data, knownhosts.Normalize(hostname))
+		}
+		if !matched[o.Line] {
+			p.Blocker = "pattern"
+			return nil
 		}
 	}
 	p.CanReplace = true
@@ -198,6 +203,12 @@ func hostField(line []byte) (hosts []string, rest string, ok bool) {
 func hostEntryMatches(entry, norm string) bool {
 	if entry == norm {
 		return true
+	}
+	// "[host]:22" written by hand is the same as "host".
+	if strings.HasPrefix(entry, "[") {
+		if i := strings.Index(entry, "]:"); i > 0 && !strings.ContainsAny(entry, "*?!") {
+			return knownhosts.Normalize(net.JoinHostPort(entry[1:i], entry[i+2:])) == norm
+		}
 	}
 	if !strings.HasPrefix(entry, "|1|") {
 		return false

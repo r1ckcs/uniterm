@@ -1,6 +1,9 @@
 package session
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"errors"
 	"os"
 	"path/filepath"
@@ -396,5 +399,96 @@ func TestTerminalChangedKeyPrompt(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "ssh-keygen -R srv") || !strings.Contains(out.String(), "takes precedence") {
 		t.Fatalf("user-file notice:\n%s", out.String())
+	}
+}
+
+func newECDSAKey(t *testing.T) ssh.PublicKey {
+	t.Helper()
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	k, err := ssh.NewPublicKey(&priv.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return k
+}
+
+// Ferrolho's review 1 (24/10/2026): OpenSSH records every key type of a host
+// (UpdateHostKeys), and a fake server picks the type. After replacing the
+// ed25519 key, the old ecdsa key left in ~/.ssh/known_hosts must not pass:
+// the app file decides per host, and that key reads as changed.
+func TestReplacedHostOldKeyOfOtherTypeInUserFileDoesNotPass(t *testing.T) {
+	dir := t.TempDir()
+	app := filepath.Join(dir, "known_hosts")
+	user := filepath.Join(dir, "user_known_hosts")
+	oldEd, oldEc, next := newEd25519Key(t), newECDSAKey(t), newEd25519Key(t)
+	writeLines(t, user, knownLine("srv:22", oldEd), knownLine("srv:22", oldEc))
+	if err := verifyHostKey(app, user, "srv:22", next, answer(HostKeyReplace, nil), true); err != nil {
+		t.Fatalf("replace: %v", err)
+	}
+	if err := verifyHostKey(app, user, "srv:22", oldEc, nil, false); err == nil {
+		t.Fatal("old ecdsa key from the user file passed after the replace")
+	}
+	var got HostKeyPrompt
+	err := verifyHostKey(app, user, "srv:22", oldEc, func(p HostKeyPrompt) (HostKeyAnswer, error) {
+		got = p
+		return HostKeyTrust, nil
+	}, true)
+	if err == nil || !got.Changed || len(got.OldKeys) != 1 || got.OldKeys[0].Fingerprint != ssh.FingerprintSHA256(next) {
+		t.Fatalf("old ecdsa key: err=%v prompt=%+v, want the red changed prompt", err, got)
+	}
+	// Another ecdsa key while the user file still has the old one: changed,
+	// with the user file's key as the old one.
+	err = verifyHostKey(app, user, "srv:22", newECDSAKey(t), func(p HostKeyPrompt) (HostKeyAnswer, error) {
+		got = p
+		return HostKeyReject, nil
+	}, true)
+	if err == nil || !got.Changed || got.OldKeys[0].Fingerprint != ssh.FingerprintSHA256(oldEc) || got.OldKeys[0].File != "user" {
+		t.Fatalf("new ecdsa: err=%v prompt=%+v", err, got)
+	}
+	// A key of a type neither file knows is a normal first-visit question
+	// (OtherKeyTypesKnown), never a silent pass.
+	err = verifyHostKey(app, user, "srv:22", newRSAKey(t), func(p HostKeyPrompt) (HostKeyAnswer, error) {
+		got = p
+		return HostKeyReject, nil
+	}, true)
+	if err == nil || got.Changed || !got.OtherKeyTypesKnown {
+		t.Fatalf("unknown rsa: err=%v prompt=%+v", err, got)
+	}
+}
+
+// Ferrolho's review 2: a wildcard line of another key type in the app file
+// would survive the replace and keep its old key trusted: no replace.
+func TestChangedKeyOtherTypePatternBlocks(t *testing.T) {
+	dir := t.TempDir()
+	app := filepath.Join(dir, "known_hosts")
+	writeLines(t, app,
+		knownLine("a.example.com:22", newEd25519Key(t)),
+		"*.example.com "+strings.TrimSpace(string(ssh.MarshalAuthorizedKey(newECDSAKey(t)))),
+	)
+	before := readFile(t, app)
+	var got HostKeyPrompt
+	err := verifyHostKey(app, "", "a.example.com:22", newEd25519Key(t), func(p HostKeyPrompt) (HostKeyAnswer, error) {
+		got = p
+		return HostKeyReplace, nil
+	}, true)
+	if err == nil || got.CanReplace || got.Blocker != "pattern" || readFile(t, app) != before {
+		t.Fatalf("err=%v prompt=%+v", err, got)
+	}
+}
+
+// Ferrolho's review 3: "[srv]:22" written by hand is srv's own entry.
+func TestChangedKeyBracketedDefaultPortIsReplaced(t *testing.T) {
+	dir := t.TempDir()
+	app := filepath.Join(dir, "known_hosts")
+	writeLines(t, app, "[srv]:22 "+strings.TrimSpace(string(ssh.MarshalAuthorizedKey(newEd25519Key(t)))))
+	next := newEd25519Key(t)
+	if err := verifyHostKey(app, "", "srv:22", next, answer(HostKeyReplace, nil), true); err != nil {
+		t.Fatalf("replace: %v", err)
+	}
+	if out := readFile(t, app); strings.Contains(out, "[srv]:22") || !strings.Contains(out, knownLine("srv:22", next)) {
+		t.Fatalf("file:\n%s", out)
 	}
 }
