@@ -21,6 +21,7 @@ const TEXT_PAIRS: Array<[string, string[]]> = [
   ['--text-muted', ['--bg-base', '--bg-elevated', '--bg-surface', '--bg-sunken', '--bg-input']],
   ['--accent-text', ['--bg-base', '--bg-surface', '--bg-sunken', '--accent-subtle']],
   ['--on-accent', ['--accent']],
+  ['--on-danger', ['--danger-solid', '--danger-solid-hover']],
   ['--success', ['--bg-base', '--bg-surface', '--success-subtle']],
   // --bg-elevated: the terminal status bar paints LOG / broadcast on it.
   ['--warning', ['--bg-base', '--bg-surface', '--bg-elevated', '--warning-subtle']],
@@ -88,6 +89,13 @@ describe('FlexTerm (D1c) themes', () => {
     expect(bar).toMatch(/\.tsb-latency-off \{\s*color: var\(--text-muted\);/)
     expect(bar).toMatch(/\.tsb-latency-warn \{\s*color: var\(--warning\);/)
     expect(bar).toMatch(/\.tsb-latency-alert \{\s*color: var\(--error\);/)
+  })
+
+  it('the changed host key dialog paints its warning with a pair the contrast test covers', () => {
+    const dlg = Object.values(import.meta.glob('./components/HostKeyChangedDialog.vue', { query: '?raw', import: 'default', eager: true }))[0] as string
+    expect(dlg).toMatch(/\.hkc-alert \{[^}]*background: var\(--alert-card\);\s*color: var\(--alert-text\);/)
+    expect(dlg).toMatch(/\.hkc-title \{[^}]*color: var\(--error\);/)
+    expect(dlg).toMatch(/\.hkc-replace \{[^}]*--el-button-bg-color: var\(--danger-solid\);[^}]*--el-button-text-color: var\(--on-danger\);/)
   })
 
   it('the terminal follows the app theme with the matching palette', () => {

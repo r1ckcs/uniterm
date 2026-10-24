@@ -237,13 +237,18 @@ func (s *SSHSession) keyboardInteractiveChallenge(config ConnectionConfig, autoA
 
 // terminalHostKeyPrompt asks, inline in the terminal like the OpenSSH
 // client, whether to trust an unknown server key. Only a typed "yes"
-// accepts; anything else, Ctrl+C or the timeout rejects.
-func (s *SSHSession) terminalHostKeyPrompt(p HostKeyPrompt) (bool, error) {
+// accepts; anything else, Ctrl+C or the timeout rejects. A changed key gets
+// the red warning with both fingerprints and needs the word "replace":
+// Enter alone or "yes" cancels.
+func (s *SSHSession) terminalHostKeyPrompt(p HostKeyPrompt) (HostKeyAnswer, error) {
 	s.mu.RLock()
 	ch := s.authAnswerCh
 	s.mu.RUnlock()
 	if ch == nil {
-		return false, fmt.Errorf("no terminal to confirm the host key")
+		return HostKeyReject, fmt.Errorf("no terminal to confirm the host key")
+	}
+	if p.Changed {
+		return s.terminalChangedKeyPrompt(ch, p)
 	}
 	var msg strings.Builder
 	msg.WriteString("\r\nThe authenticity of host '" + p.Host + "' can't be established.\r\n")
@@ -256,7 +261,63 @@ func (s *SSHSession) terminalHostKeyPrompt(p HostKeyPrompt) (bool, error) {
 	msg.WriteString(fmt.Sprintf("%s key fingerprint is %s.\r\n", p.KeyType, p.Fingerprint))
 	msg.WriteString("Are you sure you want to continue connecting (yes/no)? ")
 	s.emitData([]byte(msg.String()))
+	answer, err := s.readHostKeyAnswer(ch)
+	if err != nil {
+		return HostKeyReject, err
+	}
+	if strings.EqualFold(answer, "yes") {
+		return HostKeyTrust, nil
+	}
+	return HostKeyReject, nil
+}
+
+func (s *SSHSession) terminalChangedKeyPrompt(ch chan []byte, p HostKeyPrompt) (HostKeyAnswer, error) {
+	var msg strings.Builder
+	msg.WriteString("\r\n\x1b[1;31m@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\r\n")
+	msg.WriteString("@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @\r\n")
+	msg.WriteString("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\x1b[0m\r\n")
+	msg.WriteString("The key of '" + p.Host + "' is not the trusted one. Someone may be\r\n")
+	msg.WriteString("intercepting this connection (man-in-the-middle attack), or the\r\n")
+	msg.WriteString("device was replaced. Check with whoever manages it before replacing.\r\n")
+	for _, o := range p.OldKeys {
+		where := "FlexTerm known_hosts"
+		if o.File == "user" {
+			where = "~/.ssh/known_hosts"
+		}
+		msg.WriteString(fmt.Sprintf("Trusted %s key: %s (%s)\r\n", o.KeyType, o.Fingerprint, where))
+	}
+	msg.WriteString(fmt.Sprintf("\x1b[1mNew %s key:     %s\x1b[0m\r\n", p.KeyType, p.Fingerprint))
+	if !p.CanReplace {
+		msg.WriteString("The trusted key matches a pattern line in FlexTerm's known_hosts;\r\n")
+		msg.WriteString("edit that file if the change is legitimate. Connection refused.\r\n")
+		s.emitData([]byte(msg.String()))
+		return HostKeyReject, nil
+	}
+	if p.UserFileKept {
+		msg.WriteString("~/.ssh/known_hosts is not edited: the new key is saved in FlexTerm's\r\n")
+		msg.WriteString("known_hosts, which takes precedence for this host.\r\n")
+		if p.RemoveCommand != "" {
+			msg.WriteString("To tidy ~/.ssh/known_hosts too (optional):  " + p.RemoveCommand + "\r\n")
+		}
+	}
+	msg.WriteString("Type \x1b[1mreplace\x1b[0m to replace the key and connect; anything else cancels: ")
+	s.emitData([]byte(msg.String()))
+	answer, err := s.readHostKeyAnswer(ch)
+	if err != nil {
+		return HostKeyReject, err
+	}
+	if answer == "replace" {
+		return HostKeyReplace, nil
+	}
+	s.emitData([]byte("Cancelled.\r\n"))
+	return HostKeyReject, nil
+}
+
+// readHostKeyAnswer reads one line typed in the terminal (echoed, with
+// backspace and Ctrl+U). Ctrl+C and the timeout return an error.
+func (s *SSHSession) readHostKeyAnswer(ch chan []byte) (string, error) {
 	var answer string
+	timeout := time.After(120 * time.Second)
 	for {
 		select {
 		case data := <-ch:
@@ -264,13 +325,10 @@ func (s *SSHSession) terminalHostKeyPrompt(p HostKeyPrompt) (bool, error) {
 				switch b {
 				case '\r', '\n':
 					s.emitData([]byte("\r\n"))
-					if strings.EqualFold(strings.TrimSpace(answer), "yes") {
-						return true, nil
-					}
-					return false, nil
+					return strings.TrimSpace(answer), nil
 				case '\x03':
 					s.emitData([]byte("^C\r\n"))
-					return false, fmt.Errorf("cancelled")
+					return "", fmt.Errorf("cancelled")
 				case 127, '\b':
 					if len(answer) > 0 {
 						answer = answer[:len(answer)-1]
@@ -283,9 +341,9 @@ func (s *SSHSession) terminalHostKeyPrompt(p HostKeyPrompt) (bool, error) {
 					s.emitData([]byte{b})
 				}
 			}
-		case <-time.After(120 * time.Second):
+		case <-timeout:
 			s.emitData([]byte("\r\nHost key confirmation timeout\r\n"))
-			return false, fmt.Errorf("timeout")
+			return "", fmt.Errorf("timeout")
 		}
 	}
 }

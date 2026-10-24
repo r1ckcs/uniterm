@@ -158,6 +158,7 @@
     <CredentialUnlockDialog v-model:visible="unlockVisible" @done="onUnlockDone" @reset="onReset" />
     <PasswordSaveOffer />
     <KeychainLostDialog v-model:visible="keychainLostVisible" @done="onKeychainLostDone" />
+    <HostKeyChangedDialog :request="hostKeyChangedQueue[0] ?? null" @resolve="onHostKeyChangedResolve" />
     <!-- Startup credential dialogs first; the vault welcome waits its turn. -->
     <VaultOnboardingDialog v-if="!dataDirVisible && !encryptVisible && !unlockVisible && !keychainLostVisible" />
     <VaultJoinApprovalDialog />
@@ -209,6 +210,8 @@ import DataDirDialog from './components/DataDirDialog.vue'
 import EncryptionModeDialog from './components/EncryptionModeDialog.vue'
 import CredentialUnlockDialog from './components/CredentialUnlockDialog.vue'
 import KeychainLostDialog from './components/KeychainLostDialog.vue'
+import HostKeyChangedDialog from './components/HostKeyChangedDialog.vue'
+import { canAnswerHostKeyChanged, enqueueHostKeyChanged, type HostKeyChangedRequest } from './utils/hostKeyChanged'
 import VaultOnboardingDialog from './components/VaultOnboardingDialog.vue'
 import VaultJoinApprovalDialog from './components/VaultJoinApprovalDialog.vue'
 import { useVaultStore } from './stores/vaultStore'
@@ -218,7 +221,7 @@ import MCPApprovalDialog from './components/MCPApprovalDialog.vue'
 import type { MCPApprovalRequest } from './types/mcp'
 import Menu from './components/Menu.vue'
 import MenuItem from './components/MenuItem.vue'
-import { ElMessageBox, ElCheckbox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElCheckbox } from 'element-plus'
 import { useConnectionStore } from './stores/connectionStore'
 import { useTabStore } from './stores/tabStore'
 import { usePanelStore } from './stores/panelStore'
@@ -244,7 +247,7 @@ import { useDuplicateSession } from './composables/useDuplicateSession'
 import { useTunnelCredentials } from './composables/useTunnelCredentials'
 import type { ShortcutAction } from './types/settings'
 import { useI18n } from './i18n'
-import { CreateSession, CloseSession, RDPHide, RDPShow, RDPInvalidate, RDPSnapshot, RDPSetPosition, RecordRecentConnection, GetPlatform, GetBackgroundImage, SessionStart, RelaunchApp, ResolveMCPApproval, ResolveHostKeyPrompt } from '../bindings/github.com/ys-ll/uniterm/app'
+import { CreateSession, CloseSession, RDPHide, RDPShow, RDPInvalidate, RDPSnapshot, RDPSetPosition, RecordRecentConnection, GetPlatform, GetBackgroundImage, SessionStart, RelaunchApp, ResolveMCPApproval, ResolveHostKeyPrompt, ResolveHostKeyChanged } from '../bindings/github.com/ys-ll/uniterm/app'
 import { waitForTerminalSize } from './services/terminalManager'
 import { msg } from './services/message'
 import { unregisterTransferRoute } from './services/transferTaskCenter'
@@ -706,6 +709,28 @@ async function onHostKeyPrompt(req: HostKeyPromptRequest) {
   ResolveHostKeyPrompt(req.id, accept).catch(() => {})
 }
 
+// ── SSH host key CHANGED (CONTRATO-chave-trocada v1.1) ──
+// ssh:hostkey-changed → red dialog → ResolveHostKeyChanged. One dialog at a
+// time; an informative one (no id / canReplace false) is only closed.
+const hostKeyChangedQueue = ref<HostKeyChangedRequest[]>([])
+let unsubHostKeyChanged: (() => void) | null = null
+
+function onHostKeyChanged(req: HostKeyChangedRequest) {
+  if (!hostKeyChangedQueue.value.length) RDPHideForOverlay()
+  hostKeyChangedQueue.value = enqueueHostKeyChanged(hostKeyChangedQueue.value, req)
+}
+
+function onHostKeyChangedResolve(replace: boolean) {
+  const [req, ...rest] = hostKeyChangedQueue.value
+  hostKeyChangedQueue.value = rest
+  if (!rest.length) RDPShowForOverlay()
+  if (!req || !canAnswerHostKeyChanged(req)) return
+  // The backend gives up after 120 s; a late "Replace" must not look accepted.
+  ResolveHostKeyChanged(req.id, replace).catch(() => {
+    if (replace) ElMessage.warning(t('hostKeyChanged.expired'))
+  })
+}
+
 // backend mcp:session-created: an agent opened a new SSH session; mount a
 // visible terminal tab for it so the user can watch and control it.
 function onMcpSessionCreated(payload: { sessionId: string; name?: string; host?: string }) {
@@ -1048,6 +1073,9 @@ onMounted(async () => {
   unsubHostKeyPrompt = Events.On('ssh:hostkey-prompt', (ev) => {
     onHostKeyPrompt(ev.data as HostKeyPromptRequest)
   })
+  unsubHostKeyChanged = Events.On('ssh:hostkey-changed', (ev) => {
+    onHostKeyChanged(ev.data as HostKeyChangedRequest)
+  })
   unsubMcpSessionCreated = Events.On('mcp:session-created', (ev) => {
     onMcpSessionCreated(ev.data)
   })
@@ -1302,6 +1330,7 @@ onUnmounted(() => {
   unsubTrayOpenAbout?.()
   unsubMcpApproval?.()
   unsubHostKeyPrompt?.()
+  unsubHostKeyChanged?.()
   unsubMcpSessionCreated?.()
   rdpAreaObserver?.disconnect()
   settingsStore.dispose?.()
