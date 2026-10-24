@@ -1,4 +1,8 @@
 :root {
+  /* Solid fill of a destructive confirm button and its text. */
+  --danger-solid: var(--el-color-danger, #f56c6c);
+  --danger-solid-hover: var(--el-color-danger-light-3, #f89898);
+  --on-danger: #ffffff;
   /* Core palette - professional dark, slight blue undertone (kept from before) */
   --bg-base: #14171d;
   --bg-elevated: #191c24;
@@ -435,6 +439,9 @@
   --el-color-success: #2fbf7a;
   --el-color-warning: #e0a030;
   --el-color-danger: #e5535f;
+  --danger-solid: #b4232a;
+  --danger-solid-hover: #9c1d24;
+  --on-danger: #ffffff;
   --el-color-info: #8a96bf;
   --el-bg-color: #0a1120;
   --el-bg-color-page: #0a1120;
@@ -587,6 +594,9 @@
   --el-color-success: #17703f;
   --el-color-warning: #b86a00;
   --el-color-danger: #b4232a;
+  --danger-solid: #b4232a;
+  --danger-solid-hover: #9c1d24;
+  --on-danger: #ffffff;
   --el-color-info: #56607d;
   --el-bg-color: #ffffff;
   --el-bg-color-page: #f4f6fb;
