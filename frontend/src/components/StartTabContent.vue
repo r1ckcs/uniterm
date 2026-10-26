@@ -74,7 +74,7 @@
         ref="searchInputRef"
         v-model="searchQuery"
         class="start-search-input"
-        :placeholder="`${t('sidebar.searchPlaceholder')} (${quickSearchLabel(isMacUi)})`"
+        :placeholder="t('sidebar.searchPlaceholder')"
         clearable
         @keydown="onSearchKeydown"
       />
@@ -426,8 +426,6 @@ import { useConnStatusStore } from '../stores/connStatusStore'
 import { useVaultStore } from '../stores/vaultStore'
 import { connectionStyle, groupStyle } from '../utils/connectionStyle'
 import ConnStyleIcon from './ConnStyleIcon.vue'
-import { quickSearchLabel, type QuickSearchRequest } from '../utils/quickSearch'
-import { detectPlatformSync } from '../utils/platform'
 import { getShellLabel as getShellLabelBase } from '../utils/shellLabel'
 import MenuItem from './MenuItem.vue'
 import { CloudOff, Filter, Plus, Laptop, Server, Folder, FolderOpen, Zap, MoreHorizontal, ChevronDown, Star, LayoutDashboard } from '@lucide/vue'
@@ -980,41 +978,18 @@ function getGridColumns(): number {
   return contentCols.value
 }
 
-// ── Quick search (⌘K / Ctrl+Shift+P from anywhere, see App.vue) ──
-const isMacUi = detectPlatformSync() === 'darwin'
-// Where Esc goes back to, while the search was opened by the shortcut.
-const quickReturn = ref<{ returnTo: string | null; created: boolean } | null>(null)
-
-function onQuickSearch(e: Event) {
-  const req = (e as CustomEvent<QuickSearchRequest>).detail
-  if (!req || req.tabId !== props.tab.id) return
-  quickReturn.value = { returnTo: req.returnTo, created: req.created }
-  focusInGrid.value = false
-  focusedCardIndex.value = -1
-  nextTick(() => {
-    searchInputRef.value?.focus()
-    ;(searchInputRef.value as unknown as { select?: () => void })?.select?.()
-  })
-}
-
-function closeQuickSearch() {
-  const q = quickReturn.value
-  quickReturn.value = null
+// Esc in the search clears it. ⌘K / Ctrl+Shift+P opens the session picker
+// instead (App.vue), so this box no longer advertises it.
+function clearSearch() {
   searchQuery.value = ''
   searchInputRef.value?.blur()
-  if (!q) return
-  if (q.created) emit('close-self', props.tab.id)
-  if (q.returnTo && tabStore.tabs.some(t => t.id === q.returnTo)) tabStore.setActiveTab(q.returnTo)
 }
 
-// Leaving the tab ends the shortcut session: Esc then just clears.
-watch(() => tabStore.activeTabId, (id) => { if (id !== props.tab.id) quickReturn.value = null })
-
 function onSearchKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && (quickReturn.value || searchQuery.value)) {
+  if (e.key === 'Escape' && searchQuery.value) {
     e.preventDefault()
     e.stopPropagation()
-    closeQuickSearch()
+    clearSearch()
     return
   }
   if (e.key === 'Tab' || e.key === 'ArrowDown') {
@@ -1272,7 +1247,6 @@ watch(probing, (on) => {
 
 onMounted(() => {
   connStatus.start(() => connectionStore.connections.map(c => c.id))
-  window.addEventListener('app:quick-search', onQuickSearch)
   window.addEventListener('focus', syncWindowFocus)
   window.addEventListener('blur', syncWindowFocus)
   document.addEventListener('visibilitychange', syncWindowFocus)
@@ -1288,7 +1262,6 @@ onMounted(() => {
 onUnmounted(() => {
   if (holdsProbe) connStatus.release()
   holdsProbe = false
-  window.removeEventListener('app:quick-search', onQuickSearch)
   window.removeEventListener('focus', syncWindowFocus)
   window.removeEventListener('blur', syncWindowFocus)
   document.removeEventListener('visibilitychange', syncWindowFocus)

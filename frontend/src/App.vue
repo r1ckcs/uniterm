@@ -159,6 +159,13 @@
     <PasswordSaveOffer />
     <KeychainLostDialog v-model:visible="keychainLostVisible" @done="onKeychainLostDone" />
     <HostKeyChangedDialog :request="hostKeyChangedQueue[0] ?? null" @resolve="onHostKeyChangedResolve" />
+    <SessionPicker
+      :visible="pickerVisible"
+      :mode="pickerMode"
+      :shortcut="quickSearchLabel(isMacUi)"
+      @close="closeSessionPicker"
+      @connect="(c: ConnectionConfig) => onSidebarConnect(c)"
+    />
     <DeleteConfirmDialog />
     <PendingDeleteToasts />
     <!-- Startup credential dialogs first; the vault welcome waits its turn. -->
@@ -170,7 +177,9 @@
 </template>
 
 <script setup lang="ts">
-import { isQuickSearchShortcut, type QuickSearchRequest } from './utils/quickSearch'
+import { isQuickSearchShortcut, quickSearchLabel } from './utils/quickSearch'
+import type { PickerMode } from './utils/sessionPicker'
+import SessionPicker from './components/SessionPicker.vue'
 import { ref, computed, watch, nextTick, onMounted, onUnmounted, provide, h } from 'vue'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import zhTw from 'element-plus/es/locale/lang/zh-tw'
@@ -952,20 +961,27 @@ function onWheel(e: WheelEvent) {
 // hide. Panel maximizing moved to the configurable keyboard settings
 // (maximizePanel action).
 let isMac = false
-// ⌘K / Ctrl+Shift+P: bring a start tab forward with its search focused.
-// Reuses the active start tab, else the first one, else opens one; Esc in
-// the search goes back (StartTabContent handles it).
-function openQuickSearch() {
-  const prev = tabStore.activeTabId
-  const active = tabStore.activeTab
-  let start = (active?.type === 'start' ? active : tabStore.tabs.find(t => t.type === 'start')) as StartTab | undefined
-  const created = !start
-  if (!start) start = tabStore.createStartTab()
-  else tabStore.setActiveTab(start.id)
-  start.viewMode = 'home'
-  start.groupId = undefined
-  const detail: QuickSearchRequest = { tabId: start.id, returnTo: prev && prev !== start.id ? prev : null, created }
-  nextTick(() => window.dispatchEvent(new CustomEvent('app:quick-search', { detail })))
+const isMacUi = ref(false)
+// ⌘K / Ctrl+Shift+P: the session picker (open sessions first, then saved
+// connections). The tab bar's "…" opens the same list with every tab.
+const pickerVisible = ref(false)
+const pickerMode = ref<PickerMode>('all')
+function openSessionPicker(mode: PickerMode = 'all') {
+  if (pickerVisible.value) {
+    pickerMode.value = mode
+    return
+  }
+  pickerMode.value = mode
+  pickerVisible.value = true
+  RDPHideForOverlay()
+}
+function closeSessionPicker() {
+  if (!pickerVisible.value) return
+  pickerVisible.value = false
+  RDPShowForOverlay()
+}
+function onSessionPickerEvent(e: Event) {
+  openSessionPicker((e as CustomEvent<{ mode?: PickerMode }>).detail?.mode || 'all')
 }
 
 function onPlatformSystemShortcut(e: KeyboardEvent) {
@@ -975,7 +991,7 @@ function onPlatformSystemShortcut(e: KeyboardEvent) {
   if (isQuickSearchShortcut(e, isMac)) {
     e.preventDefault()
     e.stopImmediatePropagation()
-    openQuickSearch()
+    openSessionPicker('all')
     return
   }
   const digitMatch = e.code.match(/^Digit([1-9])$/)
@@ -1051,7 +1067,9 @@ onMounted(async () => {
   } catch {
     isMac = false
   }
+  isMacUi.value = isMac
   document.addEventListener('keydown', onPlatformSystemShortcut, true)
+  window.addEventListener('app:session-picker', onSessionPickerEvent)
   // Keyboard shortcuts — load once on mount, watch for settings changes
   applyKeybindings()
   installGlobalListener()
@@ -1322,6 +1340,7 @@ onUnmounted(() => {
   window.removeEventListener('input:contextmenu', onInputContextMenu)
   document.removeEventListener('wheel', onWheel, { capture: true })
   document.removeEventListener('keydown', onPlatformSystemShortcut, true)
+  window.removeEventListener('app:session-picker', onSessionPickerEvent)
   // RDP overlay tracking
   window.removeEventListener('rdp:overlay-push', RDPHideForOverlay)
   window.removeEventListener('rdp:overlay-pop', RDPShowForOverlay)
