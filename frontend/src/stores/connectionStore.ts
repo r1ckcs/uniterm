@@ -120,8 +120,12 @@ export const useConnectionStore = defineStore('connection', () => {
     loading.value = true
     try {
       const data = await LoadConnections() as { groups?: ConnectionGroup[]; connections?: ConnectionConfig[] }
-      groups.value = data.groups || []
-      connections.value = migrateLegacyDatabaseTypes((data.connections || []) as ConnectionConfig[])
+      // The disk still has the pending deletions: keep them off the screen.
+      let conns = migrateLegacyDatabaseTypes((data.connections || []) as ConnectionConfig[])
+      let grps = data.groups || []
+      for (const op of deleteOps.values()) ({ conns, groups: grps } = applyDelete(op, conns, grps))
+      groups.value = grps
+      connections.value = conns
     } catch (e) {
       console.error('Failed to load connections:', e)
     } finally {
@@ -329,6 +333,11 @@ export const useConnectionStore = defineStore('connection', () => {
     clearTimeout(op.timer)
     deleteOps.delete(opId)
     pendingDeletes.value = pendingDeletes.value.filter(p => p.id !== opId)
+    // Re-apply on the live state first: a load() or broadcast in between may
+    // have swapped it for the disk copy, and the commit saves what is live.
+    const live = applyDelete(op, connections.value, groups.value)
+    connections.value = live.conns
+    groups.value = live.groups
     await op.commit()
   }
 

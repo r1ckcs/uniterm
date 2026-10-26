@@ -11,13 +11,14 @@ vi.mock('../../bindings/github.com/ys-ll/uniterm/app', () => ({
   SaveConnections: vi.fn().mockResolvedValue(undefined),
 }))
 
-import { SaveConnections } from '../../bindings/github.com/ys-ll/uniterm/app'
+import { LoadConnections, SaveConnections } from '../../bindings/github.com/ys-ll/uniterm/app'
 import { DELETE_UNDO_MS, useConnectionStore } from './connectionStore'
 import type { ConnectionConfig, ConnectionGroup } from '../types/session'
 
 const conn = (id: string, groupId?: string) => ({ id, name: id.toUpperCase(), host: `h-${id}`, type: 'ssh', groupId }) as unknown as ConnectionConfig
 type Saved = { connections: ConnectionConfig[]; groups: ConnectionGroup[] }
 const saves = (): Saved[] => vi.mocked(SaveConnections).mock.calls.map((c: unknown[]) => c[0] as Saved)
+const last = (): Saved => saves()[saves().length - 1]
 const ids = (xs: { id: string }[]) => xs.map(x => x.id)
 
 function setup() {
@@ -142,6 +143,29 @@ describe('deferred deletion', () => {
     st.undoDelete(op)
     expect(st.connections.find(c => c.id === 'c')!.name).toBe('edited')
     expect(ids(st.connections)).toEqual(['a', 'b', 'c', 'd', 'e'])
+  })
+
+  it('a load() inside the window keeps pending items hidden and the group still goes at the deadline', async () => {
+    const st = setup()
+    const disk = { groups: st.groups.map(g => ({ ...g })), connections: st.connections.map(c => ({ ...c })) }
+    vi.mocked(LoadConnections).mockResolvedValue(disk as never)
+    st.scheduleDeleteGroup('g1', 'delete-connections', 'delete-all')
+    st.scheduleRemoveMany(['a'])
+    await st.load()
+    expect(ids(st.groups)).toEqual(['g3'])
+    expect(ids(st.connections)).toEqual(['c', 'e'])
+    await vi.advanceTimersByTimeAsync(DELETE_UNDO_MS)
+    expect(ids(last().groups)).toEqual(['g3'])
+    expect(ids(last().connections)).toEqual(['c', 'e'])
+  })
+
+  it('the commit re-applies its own deletion even if the live state came back from the disk', async () => {
+    const st = setup()
+    st.scheduleDeleteGroup('g1', 'delete-connections', 'delete-all')
+    pushChanged!({ data: {} })
+    st.groups = [{ id: 'g1', name: 'POP' }, { id: 'g2', name: 'Sub', parentId: 'g1' }, { id: 'g3', name: 'Other' }]
+    await vi.advanceTimersByTimeAsync(DELETE_UNDO_MS)
+    expect(ids(last().groups)).toEqual(['g3'])
   })
 
   it('nothing to delete schedules nothing', () => {
