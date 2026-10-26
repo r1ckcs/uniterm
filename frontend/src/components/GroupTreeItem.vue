@@ -64,7 +64,7 @@
     >
       <span class="conn-icon"><ConnStyleIcon :conn="conn" :fallback="connIcon(conn)" /></span>
       <div class="conn-details">
-        <span class="name">{{ conn.name }}</span>
+        <span class="name"><MiddleEllipsis :text="conn.name" /></span>
         <span class="conn-meta">
           <span class="host">{{ getSubtitle(conn) }}</span>
           <VaultChangedBadge :connection-id="conn.id" />
@@ -90,6 +90,7 @@
 
 <script setup lang="ts">
 import ConnStyleIcon from './ConnStyleIcon.vue'
+import MiddleEllipsis from './MiddleEllipsis.vue'
 import VaultChangedBadge from './VaultChangedBadge.vue'
 import { inject, computed } from 'vue'
 import { ChevronDown, ChevronRight, Folder, MoreHorizontal, Star } from '@lucide/vue'

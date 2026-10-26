@@ -85,6 +85,30 @@ func TestLocalStateSftpHiddenColumns(t *testing.T) {
 	}
 }
 
+func TestLocalStateSidebarWidth(t *testing.T) {
+	s := NewLocalStateStore(t.TempDir())
+
+	loaded, err := s.Load()
+	if err != nil {
+		t.Fatalf("initial load: %v", err)
+	}
+	if loaded.SidebarWidth != 0 {
+		t.Fatalf("default SidebarWidth should be 0 (default width), got %d", loaded.SidebarWidth)
+	}
+
+	loaded.SidebarWidth = 320
+	if err := s.Save(loaded); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	again, err := s.Load()
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if again.SidebarWidth != 320 {
+		t.Fatalf("roundtrip mismatch: got %d", again.SidebarWidth)
+	}
+}
+
 func TestLocalStateAISidebarClosedOnFirstRun(t *testing.T) {
 	s := NewLocalStateStore(t.TempDir())
 

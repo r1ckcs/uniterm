@@ -39,7 +39,10 @@
             >
               <span class="sp-state" :class="item.kind === 'session' ? `sp-state-${item.state}` : 'sp-state-none'" aria-hidden="true"></span>
               <span class="sp-main">
-                <span class="sp-name">{{ item.name }}</span>
+                <!-- "…" list (tabs mode): the full name, wrapped; ⌘K: cut in the
+                     middle so similar names keep their distinguishing end. -->
+                <span v-if="mode === 'tabs'" class="sp-name">{{ item.name }}</span>
+                <span v-else class="sp-name sp-name-cut"><MiddleEllipsis :text="item.name" /></span>
                 <span class="sp-meta">
                   <span v-if="item.kind !== 'tab'" class="sp-proto">{{ item.protocol }}</span>
                   <span v-if="item.kind !== 'tab' && item.host" class="sp-host">{{ item.host }}</span>
@@ -75,6 +78,7 @@
 // aria-activedescendant.
 import { computed, nextTick, ref, watch } from 'vue'
 import { Radio, Search } from '@lucide/vue'
+import MiddleEllipsis from './MiddleEllipsis.vue'
 import type { ConnectionConfig } from '../types/session'
 import { useTabStore } from '../stores/tabStore'
 import { usePanelStore } from '../stores/panelStore'
@@ -305,8 +309,13 @@ function close() {
 }
 .sp-name {
   overflow-wrap: anywhere;
+  min-width: 0;
   font-size: 0.8125rem;
   font-weight: 700;
+}
+.sp-name-cut {
+  display: flex;
+  overflow: hidden;
 }
 .sp-meta {
   display: flex;
