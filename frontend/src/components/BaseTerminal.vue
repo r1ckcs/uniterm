@@ -176,7 +176,7 @@ import { stripCursorBlink } from '../utils/cursor'
 import { applyBackspaceKey } from '../utils/backspaceKey'
 import { formatFontFamily } from '../utils/formatFontFamily'
 import { terminalLineHeight } from '../utils/terminalFonts'
-import { pasteToTargets, type NamedPasteTarget } from '../utils/terminalPaste'
+import { aiSuggestionText, pasteToTargets, withWritePrefix, type NamedPasteTarget } from '../utils/terminalPaste'
 import { confirmBroadcastPaste } from '../composables/useBroadcastPasteConfirm'
 import {
   sanitizeTerminalOutput,
@@ -645,7 +645,18 @@ async function applySuggestion(item: ReturnType<typeof suggestions.getSelectedIt
 
   const sid = props.sessionId
 
-  if (item.type === 'ai-result' || item.type === 'history' || item.type === 'quick-command') {
+  if (item.type === 'ai-result') {
+    // AI output is foreign text: reduced to one line without controls, it
+    // goes like a paste (bracket when the session has the mode), led by ^U
+    // to replace the line (item 53).
+    const text = aiSuggestionText(item.value)
+    const ok = !!text && await pasteToTargets(text, withWritePrefix(buildPasteTargets(), '\x15'), confirmBroadcastPaste)
+    if (ok) {
+      terminalInput.lineBuffer.value = text
+      terminalInput.cursorIndex.value = text.length
+      terminalInput.currentToken.value = ''
+    }
+  } else if (item.type === 'history' || item.type === 'quick-command') {
     // Replace entire line with Ctrl+U. Using backspaces only works when the
     // replacement is exactly the currentToken; for multi-token input (e.g.
     // "git che" → "git checkout") backspaces leave the earlier text behind.
@@ -2200,44 +2211,50 @@ function pasteToTerminal(text: string) {
   }
 }
 
+// The sessions a paste reaches: every broadcast target with a terminal, or
+// this session alone.
+function buildPasteTargets(): NamedPasteTarget[] {
+  const targets: NamedPasteTarget[] = []
+  // Broadcast mode: write to every target panel instead of only this
+  // session (issue #597 — pasted command must sync like keyboard input).
+  const broadcastIds = props.broadcastActive ? tabStore.getAllBroadcastPanelIds() : []
+  if (broadcastIds.length > 0) {
+    for (const pid of broadcastIds) {
+      const p = panelStore.getPanel(pid)
+      const sid = p?.sessionId
+      const managed = sid ? getManagedTerminal(sid) : undefined
+      if (sid && p && (p.type === 'ssh' || p.type === 'local' || p.type === 'wsl') && managed) {
+        // Bracket per target session — each has its own paste mode, read
+        // when writing (after the confirmation, if one is asked). Scroll
+        // each target's viewport to the bottom too, so broadcast paste
+        // behaves like keyboard input everywhere (issue 629).
+        targets.push({
+          name: p.config?.name || p.title,
+          host: p.config?.host || '',
+          get bracketedPasteMode() { return managed.terminal.modes.bracketedPasteMode },
+          write: (payload) => queuedSessionWrite(sid, payload),
+          scrollToBottom: () => managed.terminal.scrollToBottom(),
+        })
+      }
+    }
+  } else if (props.sessionId) {
+    const sid = props.sessionId
+    targets.push({
+      name: '',
+      host: '',
+      get bracketedPasteMode() { return getManagedTerminal(sid)?.terminal.modes.bracketedPasteMode ?? false },
+      write: (payload) => queuedSessionWrite(sid, payload),
+      scrollToBottom: () => terminal?.scrollToBottom(),
+    })
+  }
+  return targets
+}
+
 async function pasteToSession(text: string) {
   if (props.mode === 'ssh' || props.mode === 'local') {
     // Line endings are normalized (CRLF -> LF, stray CR dropped) by
     // pasteWithScroll, so pasting into vim doesn't double newlines.
-    let targets: NamedPasteTarget[] = []
-
-    // Broadcast mode: write to every target panel instead of only this
-    // session (issue #597 — pasted command must sync like keyboard input).
-    const broadcastIds = props.broadcastActive ? tabStore.getAllBroadcastPanelIds() : []
-    if (broadcastIds.length > 0) {
-      for (const pid of broadcastIds) {
-        const p = panelStore.getPanel(pid)
-        const sid = p?.sessionId
-        const managed = sid ? getManagedTerminal(sid) : undefined
-        if (sid && p && (p.type === 'ssh' || p.type === 'local' || p.type === 'wsl') && managed) {
-          // Bracket per target session — each has its own paste mode, read
-          // when writing (after the confirmation, if one is asked). Scroll
-          // each target's viewport to the bottom too, so broadcast paste
-          // behaves like keyboard input everywhere (issue 629).
-          targets.push({
-            name: p.config?.name || p.title,
-            host: p.config?.host || '',
-            get bracketedPasteMode() { return managed.terminal.modes.bracketedPasteMode },
-            write: (payload) => queuedSessionWrite(sid, payload),
-            scrollToBottom: () => managed.terminal.scrollToBottom(),
-          })
-        }
-      }
-    } else if (props.sessionId) {
-      const sid = props.sessionId
-      targets = [{
-        name: '',
-        host: '',
-        get bracketedPasteMode() { return getManagedTerminal(sid)?.terminal.modes.bracketedPasteMode ?? false },
-        write: (payload) => queuedSessionWrite(sid, payload),
-        scrollToBottom: () => terminal?.scrollToBottom(),
-      }]
-    }
+    const targets = buildPasteTargets()
     // A multi-line paste into several broadcast sessions asks first (item 48).
     const pasted = await pasteToTargets(text, targets, confirmBroadcastPaste)
     if (pasted && targets.length > 1) focus()
