@@ -19,9 +19,24 @@ export function normalizePastedText(text: string): string {
 }
 
 /** Wrap in bracketed-paste markers when the app enabled the mode, so vim etc.
- * don't re-indent each pasted line. */
+ * don't re-indent each pasted line. Every ESC (and the 8-bit CSI, 0x9B) in
+ * the text is dropped first: a pasted "ESC[201~" would otherwise end the
+ * bracket early and the lines after it would run as they arrive (item 52).
+ * Without the mode there is no bracket to break, and the text goes as is. */
 export function bracketPaste(text: string, enabled: boolean): string {
-  return enabled ? `\x1b[200~${text}\x1b[201~` : text
+  return enabled ? `\x1b[200~${text.replace(/[\x1b\x9b]/g, '')}\x1b[201~` : text
+}
+
+/** Control characters as visible symbols for the paste preview: C0 as the
+ * Unicode control pictures (ESC → ␛, BEL → ␇), DEL → ␡, C1 as ⟨9B⟩.
+ * Tabs stay tabs. */
+export function visibleControls(line: string): string {
+  return line.replace(/[\x00-\x08\x0a-\x1f\x7f-\x9f]/g, (c) => {
+    const code = c.charCodeAt(0)
+    if (code < 0x20) return String.fromCharCode(0x2400 + code)
+    if (code === 0x7f) return '\u2421'
+    return `⟨${code.toString(16).toUpperCase()}⟩`
+  })
 }
 
 // Paste a block of text into one session: normalize + bracket-wrap, write to
@@ -65,7 +80,7 @@ export function needsBroadcastPasteConfirm(text: string, targetCount: number): b
 
 export function broadcastPasteRequest(text: string, targets: { name: string; host: string }[]): BroadcastPasteRequest {
   const lines = normalizePastedText(text).replace(/\n$/, '').split('\n')
-  const preview = lines.slice(0, BROADCAST_PASTE_PREVIEW_LINES)
+  const preview = lines.slice(0, BROADCAST_PASTE_PREVIEW_LINES).map(visibleControls)
   return {
     lineCount: lines.length,
     sessions: targets.map(({ name, host }) => ({ name, host })),
