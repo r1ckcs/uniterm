@@ -22,6 +22,9 @@ const TEXT_PAIRS: Array<[string, string[]]> = [
   ['--accent-text', ['--bg-base', '--bg-surface', '--bg-sunken', '--accent-subtle']],
   ['--on-accent', ['--accent']],
   ['--on-danger', ['--danger-solid', '--danger-solid-hover']],
+  // Broadcast: the band's text, the footer flag.
+  ['--on-broadcast', ['--broadcast-band']],
+  ['--broadcast-text', ['--bg-base', '--bg-elevated', '--bg-surface']],
   ['--success', ['--bg-base', '--bg-surface', '--success-subtle']],
   // --bg-elevated: the terminal status bar paints LOG / broadcast on it.
   ['--warning', ['--bg-base', '--bg-surface', '--bg-elevated', '--warning-subtle']],
@@ -76,6 +79,34 @@ describe('FlexTerm (D1c) themes', () => {
     })
   }
 
+  for (const theme of ['flexterm', 'flexterm-light']) {
+    it(`${theme}: broadcast has its own hue, framed at >= 3:1`, () => {
+      const tokens = themeTokens(theme)
+      for (const bg of ['--bg-base', '--bg-elevated', '--bg-surface']) {
+        expect(contrastRatio(tokens['--broadcast'], tokens[bg]), `${theme} --broadcast on ${bg}`).toBeGreaterThanOrEqual(3)
+      }
+      for (const bg of ['--header-bg', '--header-tab-active']) {
+        expect(contrastRatio(tokens['--broadcast-header'], tokens[bg]), `${theme} --broadcast-header on ${bg}`).toBeGreaterThanOrEqual(3)
+      }
+      // Not the action blue, the TELNET/OLT orange, the warning or the alert red.
+      const taken = ['--accent', '--accent-text', '--tag-olt', '--conn-orange', '--warning', '--error', '--danger-solid']
+        .map((k) => tokens[k]?.toLowerCase())
+      for (const k of ['--broadcast', '--broadcast-text', '--broadcast-header', '--broadcast-band']) {
+        expect(taken, `${theme} ${k}`).not.toContain(tokens[k].toLowerCase())
+      }
+    })
+  }
+
+  it('broadcast is drawn with the tested tokens: band, terminal frame, tab mark, footer', () => {
+    const raw = (f: string) => Object.values(import.meta.glob(['./components/Panel.vue', './components/TabItem.vue', './components/TerminalStatusBar.vue'], { query: '?raw', import: 'default', eager: true }))
+      .find((src) => (src as string).includes(f)) as string
+    const panel = raw('panel-broadcast-band')
+    expect(panel).toMatch(/\.panel-broadcasting::after \{[^}]*border: 2px solid var\(--broadcast\);/)
+    expect(panel).toMatch(/\.panel-broadcast-band \{[^}]*background: var\(--broadcast-band\);\s*color: var\(--on-broadcast\);/)
+    expect(raw('tab-broadcasting')).toMatch(/\.tab-item\.tab-broadcasting::after \{[^}]*border: 2px solid var\(--broadcast-header\);/)
+    expect(raw('tsb-broadcast')).toMatch(/\.tsb-broadcast \{\s*color: var\(--broadcast-text\);/)
+  })
+
   it('header tabs paint text with solid tokens that the contrast test covers', () => {
     // The dropped (red) tab's shortcut hint uses the alert text color, and a
     // tab without a session gets a solid dimmer color, not opacity.
@@ -95,7 +126,11 @@ describe('FlexTerm (D1c) themes', () => {
     const dlg = Object.values(import.meta.glob('./components/HostKeyChangedDialog.vue', { query: '?raw', import: 'default', eager: true }))[0] as string
     expect(dlg).toMatch(/\.hkc-alert \{[^}]*background: var\(--alert-card\);\s*color: var\(--alert-text\);/)
     expect(dlg).toMatch(/\.hkc-title \{[^}]*color: var\(--error\);/)
-    expect(dlg).toMatch(/\.hkc-replace \{[^}]*--el-button-bg-color: var\(--danger-solid\);[^}]*--el-button-text-color: var\(--on-danger\);/)
+    // Replace is a red outline (text --error, covered on every surface);
+    // the --danger-solid fill shows only on hover/press.
+    expect(dlg).toMatch(/\.hkc-replace \{[^}]*--el-button-bg-color: transparent;[^}]*--el-button-text-color: var\(--error\);[^}]*--el-button-hover-bg-color: var\(--danger-solid\);[^}]*--el-button-hover-text-color: var\(--on-danger\);/)
+    expect(dlg).toMatch(/\.hkc-downgrade \{[^}]*background: var\(--alert-card\);\s*color: var\(--alert-text\);/)
+    expect(dlg).toMatch(/ref="safeRef" type="primary" class="hkc-cancel"/)
   })
 
   it('the terminal follows the app theme with the matching palette', () => {

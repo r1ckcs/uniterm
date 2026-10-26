@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canAnswerHostKeyChanged, enqueueHostKeyChanged, hostKeyFileLabelKey, type HostKeyChangedRequest } from './hostKeyChanged'
+import { canAnswerHostKeyChanged, connectionNameFor, enqueueHostKeyChanged, hostKeyFileLabelKey, keyDowngrade, keyTypeLabel, splitHostPort, type HostKeyChangedRequest } from './hostKeyChanged'
 
 const req = (over: Partial<HostKeyChangedRequest> = {}): HostKeyChangedRequest => ({
   id: 'k1', host: '10.0.0.1:22', keyType: 'ssh-ed25519', fingerprint: 'SHA256:new',
@@ -30,5 +30,33 @@ describe('changed host key', () => {
   it('names the file the trusted key came from', () => {
     expect(hostKeyFileLabelKey('app')).toBe('hostKeyChanged.fileApp')
     expect(hostKeyFileLabelKey('user')).toBe('hostKeyChanged.fileUser')
+  })
+})
+
+describe('changed host key: name and downgrade', () => {
+  it('labels key types', () => {
+    expect(keyTypeLabel('ssh-ed25519')).toBe('ED25519')
+    expect(keyTypeLabel('ssh-rsa')).toBe('RSA')
+    expect(keyTypeLabel('rsa-sha2-512')).toBe('RSA')
+    expect(keyTypeLabel('ecdsa-sha2-nistp256')).toBe('ECDSA P-256')
+    expect(keyTypeLabel('ssh-dss')).toBe('DSA')
+  })
+
+  it('flags a type change and a weak new key, not a same-type change', () => {
+    expect(keyDowngrade(req({ keyType: 'ssh-rsa', keyBits: 527, weak: true, oldKeys: [{ keyType: 'ssh-ed25519', fingerprint: 'x', file: 'app' }] })))
+      .toEqual({ from: 'ED25519', to: 'RSA 527 bits', weak: true })
+    expect(keyDowngrade(req({ keyType: 'ssh-ed25519', oldKeys: [{ keyType: 'ssh-ed25519', fingerprint: 'x', file: 'app' }] }))).toBeNull()
+    expect(keyDowngrade(req({ keyType: 'ssh-rsa', keyBits: 768, weak: true, oldKeys: [{ keyType: 'ssh-rsa', fingerprint: 'x', file: 'user' }] })))
+      .toEqual({ from: '', to: 'RSA 768 bits', weak: true })
+  })
+
+  it('finds the connection name by host:port, sessions first, never a guess', () => {
+    const saved = [{ name: 'PE01-REI', host: '10.20.2.1' }, { name: 'SW', host: '10.20.3.5', port: 2222 }, { name: 'A', host: '10.9.9.9' }, { name: 'B', host: '10.9.9.9' }]
+    expect(splitHostPort('[fe80::1]:2222')).toEqual({ host: 'fe80::1', port: 2222 })
+    expect(connectionNameFor('10.20.2.1:22', [], saved)).toBe('PE01-REI')
+    expect(connectionNameFor('10.20.3.5:2222', [], saved)).toBe('SW')
+    expect(connectionNameFor('10.20.3.5:22', [], saved)).toBe('')
+    expect(connectionNameFor('10.9.9.9:22', [], saved)).toBe('')
+    expect(connectionNameFor('10.9.9.9:22', [{ name: 'B', host: '10.9.9.9' }], saved)).toBe('B')
   })
 })

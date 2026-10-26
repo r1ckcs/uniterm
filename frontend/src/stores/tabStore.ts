@@ -3,6 +3,7 @@ import { reactive, computed } from 'vue'
 import type { Tab, TerminalTab, WorkspaceTab, StartTab, PanelLayout, LayoutNode } from '../types/workspace'
 import type { IProgressState } from '@xterm/addon-progress'
 import { usePanelStore } from './panelStore'
+import { useSessionStore } from './sessionStore'
 import { t } from '../i18n'
 
 const tabState = reactive<{
@@ -146,6 +147,25 @@ export const useTabStore = defineStore('tab', () => {
     if (!tab) return
     const ids = tab.type === 'workspace' ? tab.panelIds : 'panelId' in tab ? [tab.panelId] : []
     for (const id of ids) tabState.broadcastPanelIds.delete(id)
+  }
+
+  // Sessions that receive broadcast input right now: broadcasting panels
+  // with a connected ssh/local/wsl session (the band count).
+  const broadcastSessionCount = computed(() => {
+    const panelStore = usePanelStore()
+    const sessionStore = useSessionStore()
+    let n = 0
+    for (const id of tabState.broadcastPanelIds) {
+      const p = panelStore.getPanel(id)
+      if (p?.sessionId && (p.type === 'ssh' || p.type === 'local' || p.type === 'wsl')
+        && sessionStore.getStatus(p.sessionId) === 'connected') n++
+    }
+    return n
+  })
+
+  // The band's "Stop broadcasting": every panel, every tab.
+  function disableAllBroadcast() {
+    tabState.broadcastPanelIds.clear()
   }
 
   // Every panel participating in broadcast across all tabs. Cross-tab: the
@@ -883,6 +903,8 @@ export const useTabStore = defineStore('tab', () => {
     toggleTabLock,
     broadcastPanelIds,
     getAllBroadcastPanelIds,
+    broadcastSessionCount,
+    disableAllBroadcast,
     toggleBroadcast,
     toggleBroadcastPanel,
     isBroadcasting,

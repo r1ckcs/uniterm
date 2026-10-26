@@ -215,7 +215,7 @@ import KeychainLostDialog from './components/KeychainLostDialog.vue'
 import HostKeyChangedDialog from './components/HostKeyChangedDialog.vue'
 import DeleteConfirmDialog from './components/DeleteConfirmDialog.vue'
 import PendingDeleteToasts from './components/PendingDeleteToasts.vue'
-import { canAnswerHostKeyChanged, enqueueHostKeyChanged, type HostKeyChangedRequest } from './utils/hostKeyChanged'
+import { canAnswerHostKeyChanged, connectionNameFor, enqueueHostKeyChanged, type HostKeyChangedRequest } from './utils/hostKeyChanged'
 import VaultOnboardingDialog from './components/VaultOnboardingDialog.vue'
 import VaultJoinApprovalDialog from './components/VaultJoinApprovalDialog.vue'
 import { useVaultStore } from './stores/vaultStore'
@@ -721,7 +721,11 @@ let unsubHostKeyChanged: (() => void) | null = null
 
 function onHostKeyChanged(req: HostKeyChangedRequest) {
   if (!hostKeyChangedQueue.value.length) RDPHideForOverlay()
-  hostKeyChangedQueue.value = enqueueHostKeyChanged(hostKeyChangedQueue.value, req)
+  // The event has no connection name: find it by host:port, sessions being
+  // opened first, then the saved connections.
+  const opening = [...panelStore.panels.values()].filter((p) => p.status !== 'connected').map((p) => p.config || {})
+  const connName = connectionNameFor(req.host, opening, connectionStore.connections)
+  hostKeyChangedQueue.value = enqueueHostKeyChanged(hostKeyChangedQueue.value, { ...req, connName })
 }
 
 function onHostKeyChangedResolve(replace: boolean) {

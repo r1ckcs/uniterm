@@ -146,6 +146,6 @@ const latencyHint = computed(() => latencyHintKey(latency.value))
   color: var(--error);
 }
 .tsb-broadcast {
-  color: var(--warning);
+  color: var(--broadcast-text);
 }
 </style>
