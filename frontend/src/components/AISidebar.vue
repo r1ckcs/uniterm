@@ -259,6 +259,7 @@
 </template>
 
 <script setup lang="ts">
+import { scrollBehavior } from '../utils/motion'
 import { ref, nextTick, computed, watch, onMounted, onUnmounted } from 'vue'
 import { X, Trash2, Expand, Shrink, History, MessageSquarePlus, Search, ChevronDown, ChevronUp, ArrowUp, Square, Plus, BookOpen, Terminal, Pencil } from '@lucide/vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -462,7 +463,7 @@ function updateActiveMark() {
     m.classList.toggle('active', i === currentMatchIndex.value)
   })
   if (marks && marks[currentMatchIndex.value]) {
-    marks[currentMatchIndex.value].scrollIntoView({ block: 'center', behavior: 'smooth' })
+    marks[currentMatchIndex.value].scrollIntoView({ block: 'center', behavior: scrollBehavior() })
   }
 }
 

@@ -222,7 +222,11 @@ async function importRules() {
     if (rules.length === 0) throw new Error(t('hl.importBadFormat'))
     // Imported rules go first (priority) and stay unsaved until Save.
     draft.value.unshift(...rules)
-    ElMessage.success(t('hl.importedCount', { count: rules.length, dropped }))
+    ElMessage.success([
+      t('hl.importedCount', { count: rules.length }),
+      dropped ? t('hl.importedDropped', { count: dropped }) : '',
+      t('hl.importSaveHint'),
+    ].filter(Boolean).join(' '))
   } catch (e) {
     ElMessage.error(e instanceof Error ? e.message : String(e))
   }

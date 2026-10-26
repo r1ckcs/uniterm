@@ -66,7 +66,7 @@
       <div class="conn-details">
         <span class="name"><MiddleEllipsis :text="labels.get(conn.id) ?? conn.name" :full="conn.name" /></span>
         <span class="conn-meta">
-          <span class="host">{{ getSubtitle(conn) }}<template v-if="(sessionOf(conn.id)?.count ?? 0) > 1"> · ×{{ sessionOf(conn.id)!.count }}</template></span>
+          <span class="host">{{ getSubtitle(conn) }}<template v-if="(sessionOf(conn.id)?.count ?? 0) > 1"> ×{{ sessionOf(conn.id)!.count }}</template></span>
           <VaultChangedBadge :connection-id="conn.id" />
         </span>
       </div>
@@ -411,8 +411,10 @@ function onMoreClick(e: MouseEvent, conn: ConnectionConfig) {
 }
 
 .host {
-  font-family: var(--font-ui);
-  font-size: 0.6875rem;
+  /* Mono with tabular digits, like the Sites cards: IPs line up. */
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.625rem;
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;

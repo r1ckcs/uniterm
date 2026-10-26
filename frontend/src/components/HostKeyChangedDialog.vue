@@ -147,8 +147,7 @@ async function copyCommand() {
   gap: 0.5rem;
   margin: 0 0 0.75rem;
   padding: 0.5rem 0.75rem;
-  border: 1px solid var(--alert-border);
-  border-left: 4px solid var(--error);
+  border: 1px solid var(--error);
   border-radius: var(--radius-row);
   background: var(--alert-card);
   color: var(--alert-text);

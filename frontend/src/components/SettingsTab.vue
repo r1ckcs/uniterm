@@ -185,7 +185,7 @@
           <div class="setting-card">
             <div class="setting-info">
               <div class="setting-title">{{ t('settings.showTabShortcutHints') }}</div>
-              <div class="setting-desc">{{ t('settings.showTabShortcutHintsDesc') }}</div>
+              <div class="setting-desc">{{ t('settings.showTabShortcutHintsDesc', { example: tabShortcutExample }) }}</div>
             </div>
             <div class="setting-control">
               <el-switch v-model="settingsStore.settings.showTabShortcutHints" @change="settingsStore.save()" />
@@ -651,8 +651,8 @@
 
           <div v-if="!isMobile" class="setting-card">
             <div class="setting-info">
-              <div class="setting-title">{{ t('settings.ctrlWheelZoom') }}</div>
-              <div class="setting-desc">{{ t('settings.ctrlWheelZoomDesc') }}</div>
+              <div class="setting-title">{{ t('settings.ctrlWheelZoom', { mod: isMac ? '⌘' : 'Ctrl' }) }}</div>
+              <div class="setting-desc">{{ t('settings.ctrlWheelZoomDesc', { mod: isMac ? '⌘' : 'Ctrl' }) }}</div>
             </div>
             <div class="setting-control">
               <el-switch :model-value="settingsStore.settings.terminal.ctrlWheelZoom ?? true" @update:model-value="(v: boolean) => { settingsStore.settings.terminal.ctrlWheelZoom = v; settingsStore.save() }" />
@@ -1487,6 +1487,7 @@
 </template>
 
 <script setup lang="ts">
+import { detectPlatformSync } from '../utils/platform'
 import { ref, reactive, watch, computed, onMounted, onUnmounted } from 'vue'
 import { Highlighter, Settings, Monitor, MessageCircleMore, Info, RefreshCw, Pencil, Trash2, Globe, Keyboard, Plus, BookOpen, Wrench, FolderOpen, Key, Network, ArrowRightLeft, ChevronLeft, ChevronRight, Copy, CloudCog } from '@lucide/vue'
 import { msg } from '../services/message'
@@ -1509,7 +1510,7 @@ import { DEFAULT_MCP_SETTINGS } from '../types/mcp'
 import type { MCPStatus } from '../types/mcp'
 import MCPSetupDialog from './MCPSetupDialog.vue'
 import { useTerminalThemeOptions } from '../composables/useTerminalThemeOptions'
-import { uninstallGlobalListener, installGlobalListener, formatKeyBinding, digitModifierCollides, digitModifierFlagsEqual, TAB_DEFAULT_FLAGS, PANEL_DEFAULT_FLAGS, setRebinding } from '../composables/useKeyboardShortcuts'
+import { uninstallGlobalListener, installGlobalListener, formatKeyBinding, digitModifierCollides, digitModifierFlagsEqual, TAB_DEFAULT_FLAGS, PANEL_DEFAULT_FLAGS, setRebinding, formatDigitShortcut, tabDigitShortcutPrefix } from '../composables/useKeyboardShortcuts'
 import AddRepoDialog from './AddRepoDialog.vue'
 import EditRepoDialog from './EditRepoDialog.vue'
 import ChangePasswordDialog from './ChangePasswordDialog.vue'
@@ -1543,8 +1544,13 @@ const { resolveTunnelCredentials } = useTunnelCredentials()
 // system-managed data dir — settings that only make sense on the desktop are
 // hidden there via `v-if="!isMobile"` / category filtering below.
 const isMobile = isMobilePlatform()
-const platform = ref('')
+// Starts from the user agent; GetPlatform() confirms it (and the browser
+// preview, without a backend, keeps the user-agent guess).
+const platform = ref<string>(detectPlatformSync())
 const isMac = computed(() => platform.value === 'darwin')
+// "(e.g. ⌘1)" in the tab-hint setting: the real binding, ⌘ on macOS.
+const tabShortcutExample = computed(() =>
+  formatDigitShortcut(tabDigitShortcutPrefix(isMac.value, settingsStore.settings.keyboard.tabSwitchModifier) || (isMac.value ? '⌘' : 'Ctrl'), 1, isMac.value))
 
 // Editors detected on this host (from the backend). The dropdown shows exactly
 // these; empty means no editor was found installed, so nothing is listed.
@@ -1853,7 +1859,7 @@ onMounted(async () => {
   try {
     platform.value = await GetPlatform()
   } catch {
-    platform.value = ''
+    platform.value = detectPlatformSync()
   }
   // Populate the external-editor dropdown with editors actually installed on
   // this host; fall back to the curated presets if detection returns nothing.

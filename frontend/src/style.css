@@ -1970,3 +1970,18 @@ html[data-theme^="flexterm"] .app-header .tab-item .transfer-indicator {
   --el-button-active-border-color: var(--danger-solid-hover);
   font-weight: 700;
 }
+
+/* Reduce motion (item 51): transitions and animations collapse to an
+   instant for people who ask the OS for less movement — dialogs, toasts,
+   the ⌘K picker, the broadcast band, tab and menu effects alike. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}
