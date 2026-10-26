@@ -80,9 +80,9 @@ describe('session picker', () => {
 })
 
 describe('session picker markup (a11y)', () => {
-  const raw = import.meta.glob(['../components/SessionPicker.vue', '../components/TabBar.vue'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+  const raw = import.meta.glob(['../components/SessionPicker.vue', '../components/TabsList.vue'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>
   const picker = raw['../components/SessionPicker.vue']
-  const bar = raw['../components/TabBar.vue']
+  const bar = raw['../components/TabsList.vue']
 
   it('is a combobox driving a listbox, with the active option announced', () => {
     expect(picker).toMatch(/role="combobox"/)

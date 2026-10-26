@@ -3,6 +3,13 @@
     class="tab-item"
     :class="{ active: isActive, 'ai-locked': isAILocked, 'tab-down': isDown, 'tab-broadcasting': canBroadcast && isBroadcastTarget }"
     :data-tab-id="tab.id"
+    role="tab"
+    :aria-selected="isActive"
+    :aria-label="tabAriaLabel"
+    :tabindex="(tabStop ?? isActive) ? 0 : -1"
+    @focus="emit('focusTab', tab.id)"
+    @keydown.enter.self.prevent="$emit('activate', tab.id)"
+    @keydown.space.self.prevent="$emit('activate', tab.id)"
     @click="$emit('activate', tab.id)"
     @mouseenter="hovered = true"
     @mouseleave="hovered = false"
@@ -15,6 +22,8 @@
     <button
       v-if="!tabCloseRight && hovered && !tab.locked"
       class="tab-close"
+      tabindex="-1"
+      :aria-label="t('tab.close')"
       @click.stop="$emit('close', tab.id)"
     ><X /></button>
     <span
@@ -67,6 +76,8 @@
     <button
       v-if="tabCloseRight && !showBroadcastIcon"
       class="tab-close tab-close-right"
+      tabindex="-1"
+      :aria-label="t('tab.close')"
       :class="{ 'tab-close-right-ghost': !hovered || tab.locked }"
       @click.stop="$emit('close', tab.id)"
     ><X /></button>
@@ -177,6 +188,8 @@ const props = defineProps<{
   showClose?: boolean
   /** OSC 9;4 progress state (null/absent = no active progress). */
   progress?: { state: 0 | 1 | 2 | 3 | 4; value: number } | null
+  /** Roving tab stop of the tablist (defaults to the active tab). */
+  tabStop?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -184,6 +197,7 @@ const emit = defineEmits<{
   close: [id: string]
   closeBatch: [ids: string[]]
   toggleAiLock: [panelId: string]
+  focusTab: [id: string]
 }>()
 
 const tabStore = useTabStore()
@@ -342,6 +356,17 @@ const isDown = computed(() => {
     const p = panelStore.getPanel(pid)
     return !!p?.sessionId
   })
+})
+
+// What a screen reader hears: the name plus the states that the tab shows
+// only by color and icon (dropped, connecting, receiving broadcast).
+const tabAriaLabel = computed(() => {
+  const parts = [props.tab.name]
+  if (isDown.value) parts.push(t('tab.a11yDown'))
+  else if (isDisconnected.value) parts.push(t('tab.a11yConnecting'))
+  if (canBroadcast.value && isBroadcastTarget.value) parts.push(t('tab.a11yBroadcast'))
+  if (props.tab.locked) parts.push(t('tab.a11yLocked'))
+  return parts.join(', ')
 })
 
 const tabTitle = computed(() => {
@@ -780,6 +805,11 @@ onMounted(async () => {
   height: 3px;
   border-radius: 3px 3px 0 0;
   pointer-events: none;
+}
+/* Outside the tab, so it stays distinct from the broadcast frame (inset). */
+.tab-item:focus-visible {
+  outline: 2px solid var(--header-focus-ring);
+  outline-offset: 1px;
 }
 .tab-item:hover {
   background: var(--bg-hover);

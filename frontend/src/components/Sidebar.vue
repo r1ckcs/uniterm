@@ -7,14 +7,14 @@
   >
     <div class="resize-handle" @mousedown="onResizeStart" />
     <div class="sidebar-header" @contextmenu.prevent="onTabStripContextMenu">
-      <button class="sidebar-tab" :class="{ active: activeView === 'connections' }" @click="activeView = 'connections'" :title="t('header.connections')"><el-icon><Network :size="'0.875rem'" /></el-icon></button>
-      <button v-if="tabVisible('files')" class="sidebar-tab" :class="{ active: activeView === 'files' }" @click="onFilesTabClick" :title="t('header.files')"><el-icon><FolderTree :size="'0.875rem'" /></el-icon></button>
-      <button v-if="tabVisible('monitor')" class="sidebar-tab" :class="{ active: activeView === 'monitor' }" @click="onMonitorTabClick" :title="t('header.monitor')"><el-icon><Activity :size="'0.875rem'" /></el-icon></button>
-      <button v-if="tabVisible('tunnels')" class="sidebar-tab" :class="{ active: activeView === 'tunnels' }" @click="activeView = 'tunnels'" :title="t('tunnels.tunnelsTab')"><el-icon><ArrowRightLeft :size="'0.875rem'" /></el-icon></button>
-      <button v-if="tabVisible('quickCommands')" class="sidebar-tab" :class="{ active: activeView === 'quickCommands' }" @click="activeView = 'quickCommands'" :title="quickCommandsTitle"><el-icon><Zap :size="'0.875rem'" /></el-icon></button>
-      <button v-if="tabVisible('history')" class="sidebar-tab" :class="{ active: activeView === 'history' }" @click="activeView = 'history'" :title="t('quickCommands.historyTab')"><el-icon><Clock :size="'0.875rem'" /></el-icon></button>
-      <button v-if="tabVisible('personalization')" class="sidebar-tab" :class="{ active: activeView === 'personalization' }" @click="activeView = 'personalization'" :title="t('sidebar.personalization')"><el-icon><Palette :size="'0.875rem'" /></el-icon></button>
-      <button class="icon-btn" @click="emit('toggle')" :title="t('sidebar.collapse')"><el-icon><X :size="'0.875rem'" /></el-icon></button>
+      <button class="sidebar-tab" :class="{ active: activeView === 'connections' }" @click="activeView = 'connections'" :title="t('header.connections')" :aria-label="t('header.connections')" :aria-pressed="activeView === 'connections'"><el-icon><Network :size="'0.875rem'" /></el-icon></button>
+      <button v-if="tabVisible('files')" class="sidebar-tab" :class="{ active: activeView === 'files' }" @click="onFilesTabClick" :title="t('header.files')" :aria-label="t('header.files')" :aria-pressed="activeView === 'files'"><el-icon><FolderTree :size="'0.875rem'" /></el-icon></button>
+      <button v-if="tabVisible('monitor')" class="sidebar-tab" :class="{ active: activeView === 'monitor' }" @click="onMonitorTabClick" :title="t('header.monitor')" :aria-label="t('header.monitor')" :aria-pressed="activeView === 'monitor'"><el-icon><Activity :size="'0.875rem'" /></el-icon></button>
+      <button v-if="tabVisible('tunnels')" class="sidebar-tab" :class="{ active: activeView === 'tunnels' }" @click="activeView = 'tunnels'" :title="t('tunnels.tunnelsTab')" :aria-label="t('tunnels.tunnelsTab')" :aria-pressed="activeView === 'tunnels'"><el-icon><ArrowRightLeft :size="'0.875rem'" /></el-icon></button>
+      <button v-if="tabVisible('quickCommands')" class="sidebar-tab" :class="{ active: activeView === 'quickCommands' }" @click="activeView = 'quickCommands'" :title="quickCommandsTitle" :aria-label="quickCommandsTitle" :aria-pressed="activeView === 'quickCommands'"><el-icon><Zap :size="'0.875rem'" /></el-icon></button>
+      <button v-if="tabVisible('history')" class="sidebar-tab" :class="{ active: activeView === 'history' }" @click="activeView = 'history'" :title="t('quickCommands.historyTab')" :aria-label="t('quickCommands.historyTab')" :aria-pressed="activeView === 'history'"><el-icon><Clock :size="'0.875rem'" /></el-icon></button>
+      <button v-if="tabVisible('personalization')" class="sidebar-tab" :class="{ active: activeView === 'personalization' }" @click="activeView = 'personalization'" :title="t('sidebar.personalization')" :aria-label="t('sidebar.personalization')" :aria-pressed="activeView === 'personalization'"><el-icon><Palette :size="'0.875rem'" /></el-icon></button>
+      <button class="icon-btn" @click="emit('toggle')" :title="t('sidebar.collapse')" :aria-label="t('sidebar.collapse')"><el-icon><X :size="'0.875rem'" /></el-icon></button>
     </div>
 
     <template v-if="activeView === 'connections'">
@@ -27,13 +27,13 @@
           @keydown="onListKeydown"
         >
           <template #suffix>
-            <span class="filter-trigger" :class="{ active: selectedTypeFilter !== 'all' }" @click.stop="filterMenuRef?.toggle($event.currentTarget)">
+            <button type="button" class="filter-trigger" :class="{ active: selectedTypeFilter !== 'all' }" :aria-label="t('a11y.filterType', { value: selectedTypeFilter === 'all' ? t('a11y.filterAll') : selectedTypeFilter.toUpperCase() })" aria-haspopup="menu" @click.stop="filterMenuRef?.toggle($event.currentTarget)">
               <el-icon><Filter :size="'0.875rem'" /></el-icon>
-            </span>
+            </button>
             <TypeFilterMenu ref="filterMenuRef" align="end" v-model="selectedTypeFilter" />
           </template>
         </el-input>
-        <button class="sb-icon-btn" :title="t('header.newConnection')" @click.stop="newConnMenuRef?.toggle($event.currentTarget)">
+        <button class="sb-icon-btn" :title="t('header.newConnection')" :aria-label="t('header.newConnection')" @click.stop="newConnMenuRef?.toggle($event.currentTarget)">
           <Plus :size="'0.9375rem'" />
         </button>
         <!-- New-connection menu — Menu.vue, teleported + anchored right-edge (align=end). -->
@@ -46,10 +46,10 @@
         </Menu>
       </div>
 
-    <div class="connection-list" :class="{ 'density-compact': settingsStore.settings.listDensity === 'compact' }" tabindex="0" @keydown="onListKeydown" @contextmenu.prevent="onEmptyAreaContextMenu">
+    <div ref="treeEl" class="connection-list" :class="{ 'density-compact': settingsStore.settings.listDensity === 'compact' }" role="tree" :aria-label="t('header.connections')" aria-multiselectable="true" @keydown="onTreeKeydown" @contextmenu.prevent="onEmptyAreaContextMenu">
       <!-- Virtual favorites group — persisted in favorites.json, rendered above all groups -->
       <template v-if="favoriteConns.length > 0">
-        <div class="group-header" @click="favoritesExpanded = !favoritesExpanded" @contextmenu.prevent>
+        <div class="group-header" v-bind="treeAttrs('g:__fav__')" @focus="onTreeRowFocus('g:__fav__')" @click="favoritesExpanded = !favoritesExpanded" @contextmenu.prevent>
           <span class="group-arrow">
             <el-icon v-if="favoritesExpanded"><ChevronDown :size="'0.875rem'" /></el-icon>
             <el-icon v-else><ChevronRight :size="'0.875rem'" /></el-icon>
@@ -57,10 +57,12 @@
           <span class="group-name">{{ t('sidebar.favorites') }}</span>
           <span class="group-count">{{ favoriteConns.length }}</span>
         </div>
-        <template v-if="favoritesExpanded">
+        <div v-if="favoritesExpanded" role="group">
           <div
             v-for="conn in favoriteConns"
             :key="conn.id"
+            v-bind="treeAttrs(`f:${conn.id}`)"
+            @focus="onTreeRowFocus(`f:${conn.id}`)"
             class="connection-item indented"
             :title="compactTitle(conn)"
             :data-conn-id="conn.id"
@@ -89,10 +91,10 @@
             </div>
             <!-- Inside the favorites group the star is hover-only (everything
                  here is favorited; a lit star would be redundant noise) -->
-            <button v-if="showHostRowButtons" class="conn-fav-btn lit" :title="t('sidebar.removeFromFavorites')" @click.stop="favoriteStore.toggle(conn.id)"><Star :size="'0.75rem'" /></button>
-            <button v-if="showHostRowButtons" class="conn-more-btn" @click.stop="onConnMoreClick($event, conn)" :title="t('terminal.more')"><MoreHorizontal :size="'0.875rem'" /></button>
+            <button v-if="showHostRowButtons" class="conn-fav-btn lit" tabindex="-1" :title="t('sidebar.removeFromFavorites')" :aria-label="t('sidebar.removeFromFavorites')" @click.stop="favoriteStore.toggle(conn.id)"><Star :size="'0.75rem'" /></button>
+            <button v-if="showHostRowButtons" class="conn-more-btn" tabindex="-1" @click.stop="onConnMoreClick($event, conn)" :title="t('terminal.more')" :aria-label="t('terminal.more')"><MoreHorizontal :size="'0.875rem'" /></button>
           </div>
-        </template>
+        </div>
       </template>
 
       <!-- Nested group tree -->
@@ -108,6 +110,8 @@
         <div
           class="group-header"
           :class="{ 'drag-over': dragOverGroupId === '__ungrouped__' }"
+          v-bind="treeAttrs('g:__ungrouped__')"
+          @focus="onTreeRowFocus('g:__ungrouped__')"
           @click="toggleGroup('__ungrouped__')"
           @contextmenu.prevent="onVirtualGroupContextMenu($event)"
           @dragover.prevent="onGroupDragOver('__ungrouped__', $event)"
@@ -121,10 +125,12 @@
           <span class="group-name">{{ t('conn.noGroup') }}</span>
           <span v-if="filteredGrouped.ungrouped.length > 0" class="group-count">{{ filteredGrouped.ungrouped.length }}</span>
         </div>
-        <template v-if="expandedGroups.has('__ungrouped__')">
+        <div v-if="expandedGroups.has('__ungrouped__')" role="group">
           <div
             v-for="conn in filteredGrouped.ungrouped"
             :key="conn.id"
+            v-bind="treeAttrs(`c:${conn.id}`)"
+            @focus="onTreeRowFocus(`c:${conn.id}`)"
             class="connection-item indented"
             :title="compactTitle(conn)"
             :data-conn-id="conn.id"
@@ -151,10 +157,10 @@
                 <VaultChangedBadge :connection-id="conn.id" />
               </span>
             </div>
-            <button v-if="showHostRowButtons" class="conn-fav-btn" :class="{ on: favoriteStore.isFavorite(conn.id) }" :title="favoriteStore.isFavorite(conn.id) ? t('sidebar.removeFromFavorites') : t('sidebar.addToFavorites')" @click.stop="favoriteStore.toggle(conn.id)"><Star :size="'0.75rem'" /></button>
-            <button v-if="showHostRowButtons" class="conn-more-btn" @click.stop="onConnMoreClick($event, conn)" :title="t('terminal.more')"><MoreHorizontal :size="'0.875rem'" /></button>
+            <button v-if="showHostRowButtons" class="conn-fav-btn" tabindex="-1" :class="{ on: favoriteStore.isFavorite(conn.id) }" :title="favoriteStore.isFavorite(conn.id) ? t('sidebar.removeFromFavorites') : t('sidebar.addToFavorites')" :aria-label="favoriteStore.isFavorite(conn.id) ? t('sidebar.removeFromFavorites') : t('sidebar.addToFavorites')" @click.stop="favoriteStore.toggle(conn.id)"><Star :size="'0.75rem'" /></button>
+            <button v-if="showHostRowButtons" class="conn-more-btn" tabindex="-1" @click.stop="onConnMoreClick($event, conn)" :title="t('terminal.more')" :aria-label="t('terminal.more')"><MoreHorizontal :size="'0.875rem'" /></button>
           </div>
-        </template>
+        </div>
       </template>
 
       <!-- Flat ungrouped connections (only when no real groups exist) -->
@@ -162,6 +168,8 @@
         <div
           v-for="conn in filteredGrouped.ungrouped"
           :key="conn.id"
+          v-bind="treeAttrs(`c:${conn.id}`)"
+          @focus="onTreeRowFocus(`c:${conn.id}`)"
           class="connection-item"
           :title="compactTitle(conn)"
           :data-conn-id="conn.id"
@@ -188,13 +196,15 @@
               <VaultChangedBadge :connection-id="conn.id" />
             </span>
           </div>
-          <button v-if="showHostRowButtons" class="conn-more-btn" @click.stop="onConnMoreClick($event, conn)" :title="t('terminal.more')"><MoreHorizontal :size="'0.875rem'" /></button>
+          <button v-if="showHostRowButtons" class="conn-more-btn" tabindex="-1" @click.stop="onConnMoreClick($event, conn)" :title="t('terminal.more')" :aria-label="t('terminal.more')"><MoreHorizontal :size="'0.875rem'" /></button>
         </div>
       </template>
 
       <!-- Virtual "New Connection..." when searching -->
       <div
         v-if="searchQuery.trim()"
+        v-bind="treeAttrs('__new_connection__')"
+        @focus="onTreeRowFocus('__new_connection__')"
         class="connection-item virtual-new-conn"
         :class="{ active: focusedId === '__new_connection__' }"
         @click="focusedId = '__new_connection__'; selectedIds = new Set(); lastClickId = '__new_connection__'"
@@ -434,6 +444,7 @@ import MonitorOverviewSidebar from './MonitorOverviewSidebar.vue'
 import { useCompanionStore } from '../stores/companionStore'
 import CustomThemeEditor from './CustomThemeEditor.vue'
 import GroupTreeItem from './GroupTreeItem.vue'
+import { treeKeyAction, treeRowInfo, typeaheadKey, type TreeRow } from '../utils/treeNav'
 import Menu from './Menu.vue'
 import MenuItem from './MenuItem.vue'
 import MenuDivider from './MenuDivider.vue'
@@ -1642,7 +1653,143 @@ onUnmounted(() => {
   window.removeEventListener('app:locate-connection', onLocateConnection)
 })
 
+// ── Tree keyboard (item 45): WAI-ARIA tree, one tab stop (roving tabindex) ──
+// Rows in render order: favorites, the group tree (child groups before
+// connections, like GroupTreeItem), "No group", the flat list, the virtual
+// "new connection". Favorite rows get their own key: a favorite also shows
+// in its group.
+const treeRows = computed<TreeRow[]>(() => {
+  const rows: TreeRow[] = []
+  if (favoriteConns.value.length > 0) {
+    rows.push({ key: 'g:__fav__', kind: 'group', label: t('sidebar.favorites'), level: 1, expanded: favoritesExpanded.value })
+    if (favoritesExpanded.value) {
+      for (const c of favoriteConns.value) rows.push({ key: `f:${c.id}`, kind: 'conn', label: c.name, level: 2, parentKey: 'g:__fav__' })
+    }
+  }
+  const walk = (nodes: GroupTreeNode[], depth: number, parentKey?: string) => {
+    for (const node of nodes) {
+      const key = `g:${node.group.id}`
+      const open = expandedGroups.value.has(node.group.id)
+      rows.push({ key, kind: 'group', label: node.group.name, level: depth + 1, parentKey, expanded: open })
+      if (!open) continue
+      walk(node.children, depth + 1, key)
+      for (const c of node.connections) rows.push({ key: `c:${c.id}`, kind: 'conn', label: c.name, level: depth + 2, parentKey: key })
+    }
+  }
+  walk(filteredGrouped.value.roots, 0)
+  if (connectionStore.groups.length > 0) {
+    if (filteredGrouped.value.ungrouped.length > 0) {
+      const open = expandedGroups.value.has('__ungrouped__')
+      rows.push({ key: 'g:__ungrouped__', kind: 'group', label: t('conn.noGroup'), level: 1, expanded: open })
+      if (open) for (const c of filteredGrouped.value.ungrouped) rows.push({ key: `c:${c.id}`, kind: 'conn', label: c.name, level: 2, parentKey: 'g:__ungrouped__' })
+    }
+  } else {
+    for (const c of filteredGrouped.value.ungrouped) rows.push({ key: `c:${c.id}`, kind: 'conn', label: c.name, level: 1 })
+  }
+  if (searchQuery.value.trim()) rows.push({ key: '__new_connection__', kind: 'action', label: t('sidebar.newConnectionFromSearch'), level: 1 })
+  return rows
+})
+const treeInfo = computed(() => treeRowInfo(treeRows.value))
+const treeFocusKey = ref<string | null>(null)
+const treeEl = ref<HTMLElement | null>(null)
+// The tab stop always sits on a rendered row.
+const treeTabKey = computed(() =>
+  treeFocusKey.value && treeInfo.value.has(treeFocusKey.value) ? treeFocusKey.value : treeRows.value[0]?.key ?? null)
+
+const rowConnId = (key: string) => (key.startsWith('c:') || key.startsWith('f:') ? key.slice(2) : '')
+const rowGroupId = (key: string) => (key.startsWith('g:') ? key.slice(2) : '')
+
+function treeAttrs(key: string) {
+  const info = treeInfo.value.get(key)
+  if (!info) return {}
+  const { row } = info
+  return {
+    role: 'treeitem',
+    'data-tree-key': key,
+    tabindex: treeTabKey.value === key ? 0 : -1,
+    'aria-level': row.level,
+    'aria-posinset': info.posinset,
+    'aria-setsize': info.setsize,
+    ...(row.kind === 'group' ? { 'aria-expanded': !!row.expanded } : { 'aria-selected': row.kind === 'conn' && selectedIds.value.has(rowConnId(key)) }),
+  }
+}
+
+function onTreeRowFocus(key: string) {
+  treeFocusKey.value = key
+}
+
+function focusTreeRow(key: string) {
+  treeFocusKey.value = key
+  const id = rowConnId(key)
+  if (id) {
+    focusedId.value = id
+    selectedIds.value = new Set([id])
+    lastClickId.value = id
+  } else if (key === '__new_connection__') {
+    focusedId.value = key
+    selectedIds.value = new Set()
+  }
+  nextTick(() => {
+    const el = treeEl.value?.querySelector(`[data-tree-key="${CSS.escape(key)}"]`) as HTMLElement | null
+    el?.focus()
+    el?.scrollIntoView({ block: 'nearest' })
+  })
+}
+
+function setGroupOpen(key: string, open: boolean) {
+  const gid = rowGroupId(key)
+  if (gid === '__fav__') favoritesExpanded.value = open
+  else if (expandedGroups.value.has(gid) !== open) toggleGroup(gid)
+}
+
+let typeBuffer = ''
+let typeTimer: ReturnType<typeof setTimeout> | null = null
+
+function onTreeKeydown(e: KeyboardEvent) {
+  if (showForm.value || menuVisible.value || groupMenuVisible.value) return
+  // Keys typed in a row's own buttons (star, ⋯) stay theirs.
+  if ((e.target as HTMLElement)?.closest?.('button')) return
+  const rows = treeRows.value
+  const current = treeTabKey.value
+  if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && e.key !== ' ') {
+    typeBuffer += e.key
+    if (typeTimer) clearTimeout(typeTimer)
+    typeTimer = setTimeout(() => { typeBuffer = '' }, 600)
+    const hit = typeaheadKey(rows, current, typeBuffer)
+    if (hit) { e.preventDefault(); focusTreeRow(hit) }
+    return
+  }
+  const action = treeKeyAction(rows, current, e)
+  if (action.type === 'none') return
+  e.preventDefault()
+  e.stopPropagation()
+  if (action.type === 'focus') focusTreeRow(action.key)
+  else if (action.type === 'expand') setGroupOpen(action.key, true)
+  else if (action.type === 'collapse') setGroupOpen(action.key, false)
+  else if (action.type === 'activate') {
+    const id = rowConnId(action.key)
+    if (action.key === '__new_connection__') openNewFormFromSearch()
+    else if (id) {
+      const ids = selectedIds.value.has(id) ? getSelectedConnectionIds() : [id]
+      for (const cid of ids) {
+        const c = connectionStore.connections.find(x => x.id === cid)
+        if (c) emit('connect', c)
+      }
+    } else {
+      const row = treeInfo.value.get(action.key)?.row
+      setGroupOpen(action.key, !row?.expanded)
+    }
+  } else if (action.type === 'menu') {
+    // Shift+F10 / the menu key: the row's own context menu, at the row.
+    const el = treeEl.value?.querySelector(`[data-tree-key="${CSS.escape(action.key)}"]`) as HTMLElement | null
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + 24, clientY: r.bottom }))
+  }
+}
+
 // Provide to GroupTreeItem (after all refs/functions are defined)
+provide('tree', { attrs: treeAttrs, onRowFocus: onTreeRowFocus })
 provide('expandedGroups', expandedGroups)
 provide('selectedIds', selectedIds)
 provide('openPanelConnIds', openPanelConnIds)
@@ -1681,6 +1828,14 @@ defineExpose({ focusSearch, openQuickCommands, openChangeGroupFor, openChangeGro
 </script>
 
 <style scoped>
+/* Keyboard focus in the tree (roving tabindex, item 45). */
+.connection-list [role="treeitem"]:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+.connection-list [role="treeitem"]:focus:not(:focus-visible) {
+  outline: none;
+}
 .sidebar {
   background: var(--bg-elevated);
   border-right: 1px solid var(--border-subtle);
@@ -2033,6 +2188,9 @@ defineExpose({ focusSearch, openQuickCommands, openChangeGroupFor, openChangeGro
 }
 
 .filter-trigger {
+  border: none;
+  background: transparent;
+  font: inherit;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2041,6 +2199,14 @@ defineExpose({ focusSearch, openQuickCommands, openChangeGroupFor, openChangeGro
   transition: color 0.12s ease;
   padding: 0.125rem;
   border-radius: var(--radius-sm);
+}
+
+.filter-trigger:focus-visible,
+.sidebar-tab:focus-visible,
+.icon-btn:focus-visible,
+.sb-icon-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
 }
 
 .filter-trigger:hover {

@@ -9,10 +9,11 @@
         class="csp-swatch"
         :class="[{ active: colorMode === opt.value }, opt.kind]"
         :aria-checked="colorMode === opt.value"
+        :aria-label="t('a11y.colorOption', { name: opt.label })"
         :title="opt.label"
         @click="pickColor(opt.value)"
       >
-        <span v-if="opt.kind === 'palette'" class="csp-dot" :style="{ background: colorCss(opt.value) }"></span>
+        <span v-if="opt.kind === 'palette'" aria-hidden="true" class="csp-dot" :style="{ background: colorCss(opt.value) }"></span>
         <span v-else class="csp-text">{{ opt.label }}</span>
       </button>
       <button
@@ -21,6 +22,7 @@
         class="csp-swatch custom"
         :class="{ active: colorMode === 'custom' }"
         :aria-checked="colorMode === 'custom'"
+        :aria-label="t('a11y.colorOption', { name: customHexValid ? `${t('connStyle.custom')} ${customHex}` : t('connStyle.custom') })"
         :title="t('connStyle.custom')"
         @click="startCustom"
       >
@@ -48,10 +50,11 @@
         class="csp-icon"
         :class="{ active: (icon || '') === opt.value }"
         :aria-checked="(icon || '') === opt.value"
+        :aria-label="t('a11y.iconOption', { name: opt.label })"
         :title="opt.label"
         @click="emit('update:icon', opt.value as ConnectionIcon | '')"
       >
-        <component :is="opt.comp" v-if="opt.comp" class="csp-glyph" />
+        <component :is="opt.comp" v-if="opt.comp" class="csp-glyph" aria-hidden="true" />
         <span v-else class="csp-text">{{ opt.label }}</span>
       </button>
     </div>
@@ -165,7 +168,7 @@ const inheritedNote = computed(() => {
   min-width: 1.75rem;
   height: 1.75rem;
   padding: 0 0.375rem;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-field);
   border-radius: var(--radius-row);
   background: var(--bg-input);
   color: var(--text-primary);
@@ -175,7 +178,7 @@ const inheritedNote = computed(() => {
 }
 .csp-swatch:hover,
 .csp-icon:hover {
-  border-color: var(--border-hover);
+  border-color: var(--border-field-hover);
 }
 .csp-swatch.active,
 .csp-icon.active {

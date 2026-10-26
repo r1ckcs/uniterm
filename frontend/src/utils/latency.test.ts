@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatLatency, latencyHintKey, latencyLevel, type LatencySample } from './latency'
+import { formatLatency, latencyHintKey, latencyLevel, latencySpokenKey, type LatencySample } from './latency'
 
 const ok = (rttMs: number, via: LatencySample['via'] = 'direct'): LatencySample => ({ state: 'ok', rttMs, via })
 const off = (reason: LatencySample['reason']): LatencySample => ({ state: 'unavailable', rttMs: 0, reason })
@@ -28,5 +28,12 @@ describe('footer latency', () => {
     expect(latencyHintKey(ok(5, 'proxy'))).toBe('terminal.latencyProxy')
     expect(latencyHintKey(ok(5, 'jump'))).toBe('terminal.latencyJump')
     expect(latencyHintKey(off('closed'))).toBe('terminal.latencyUnavailable')
+  })
+
+  it('speaks the latency instead of the arrow and the asterisk', () => {
+    expect(latencySpokenKey(ok(180, 'jump'))).toBe('terminal.latencySpokenJump')
+    expect(latencySpokenKey(ok(20, 'proxy'))).toBe('terminal.latencySpokenProxy')
+    expect(latencySpokenKey(ok(20))).toBe('terminal.latencySpoken')
+    expect(latencySpokenKey(off('mosh'))).toBe('terminal.latencySpokenUnavailable')
   })
 })

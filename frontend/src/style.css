@@ -1,4 +1,12 @@
 :root {
+  /* Outline of form fields (inputs, selects, checkboxes, switches): an
+     interface boundary, >= 3:1 (WCAG 1.4.11). Card/divider borders stay on
+     --border-subtle, which is decorative. */
+  --border-field: var(--border-subtle);
+  --border-field-hover: var(--border-hover);
+  /* Keyboard focus ring: >= 3:1 on the surfaces it sits on (WCAG 2.4.11). */
+  --focus-ring: var(--accent);
+  --header-focus-ring: var(--accent);
   /* Broadcast (input sent to several sessions): its own hue, not the
      action blue, the TELNET/OLT orange or the alert red. */
   --broadcast: #e055b5;
@@ -337,6 +345,10 @@
 /* FlexTerm (D1c, solid colors). No shadows, no transparency, no blur, no
    gradients: a 1px border does the separation. Default for new installs. */
 [data-theme="flexterm"] {
+  --border-field: #5b6ea6;
+  --border-field-hover: #7a8bc4;
+  --focus-ring: #8b9bff;
+  --header-focus-ring: #8b9bff;
   --broadcast: #ff5ccf;
   --broadcast-text: #ff8ade;
   --broadcast-header: #ff5ccf;
@@ -469,7 +481,7 @@
   --el-text-color-primary: #eef2ff;
   --el-text-color-regular: #c7d0ee;
   --el-text-color-secondary: #a3aed6;
-  --el-text-color-placeholder: #6d79a3;
+  --el-text-color-placeholder: #8590b8;
   --el-text-color-disabled: #6d79a3;
   --el-border-color: #24335c;
   --el-border-color-light: #24335c;
@@ -494,6 +506,10 @@
 /* FlexTerm light: same hierarchy as the dark one, derived from the D light
    mock (navy header, white surfaces on a cool gray page). */
 [data-theme="flexterm-light"] {
+  --border-field: #7d88a8;
+  --border-field-hover: #5f6a8a;
+  --focus-ring: #2b3dbc;
+  --header-focus-ring: #a5b1ff;
   --broadcast: #b3127f;
   --broadcast-text: #a3106f;
   --broadcast-header: #ff7ad6;
@@ -629,7 +645,7 @@
   --el-text-color-primary: #0f2351;
   --el-text-color-regular: #4a5470;
   --el-text-color-secondary: #56607d;
-  --el-text-color-placeholder: #8a93ad;
+  --el-text-color-placeholder: #646d8a;
   --el-text-color-disabled: #8a93ad;
   --el-border-color: #dfe4f0;
   --el-border-color-light: #dfe4f0;
@@ -1586,6 +1602,61 @@ html[data-theme^="flexterm"] .el-select .el-input__wrapper,
 html[data-theme^="flexterm"] .el-input-number .el-input__wrapper,
 html[data-theme^="flexterm"] .el-textarea__inner {
   background-color: var(--bg-input) !important;
+}
+/* Field outlines at >= 3:1 (item 45), separate from the decorative
+   card borders. Element Plus scopes its checkbox/radio/switch variables on
+   the component, so they are set there. */
+html[data-theme^="flexterm"] .el-input__wrapper,
+html[data-theme^="flexterm"] .el-textarea__inner {
+  box-shadow: 0 0 0 1px var(--border-field) inset !important;
+}
+html[data-theme^="flexterm"] .el-input__wrapper:hover,
+html[data-theme^="flexterm"] .el-textarea__inner:hover {
+  box-shadow: 0 0 0 1px var(--border-field-hover) inset !important;
+}
+html[data-theme^="flexterm"] .el-checkbox {
+  --el-checkbox-input-border: 1px solid var(--border-field);
+  --el-checkbox-input-border-color-hover: var(--border-field-hover);
+}
+html[data-theme^="flexterm"] .el-radio {
+  --el-radio-input-border: 1px solid var(--border-field);
+  --el-radio-input-border-color-hover: var(--border-field-hover);
+}
+html[data-theme^="flexterm"] .el-switch {
+  --el-switch-off-color: var(--border-field);
+}
+/* Destructive buttons (item 41): the dark --el-color-danger under white
+   text is 3.7:1, so filled ones use --danger-solid and plain/text ones the
+   --error text tone. */
+html[data-theme^="flexterm"] .el-button--danger:not(.is-plain):not(.is-text):not(.is-link) {
+  --el-button-bg-color: var(--danger-solid);
+  --el-button-border-color: var(--danger-solid);
+  --el-button-text-color: var(--on-danger);
+  --el-button-hover-bg-color: var(--danger-solid-hover);
+  --el-button-hover-border-color: var(--danger-solid-hover);
+  --el-button-hover-text-color: var(--on-danger);
+  --el-button-active-bg-color: var(--danger-solid-hover);
+  --el-button-active-border-color: var(--danger-solid-hover);
+  --el-button-disabled-bg-color: var(--bg-sunken);
+  --el-button-disabled-border-color: var(--border-subtle);
+  --el-button-disabled-text-color: var(--text-muted);
+}
+html[data-theme^="flexterm"] .el-button--danger.is-plain,
+html[data-theme^="flexterm"] .el-button--danger.is-text,
+html[data-theme^="flexterm"] .el-button--danger.is-link {
+  --el-button-text-color: var(--error);
+  --el-button-border-color: var(--error);
+  --el-button-bg-color: transparent;
+  --el-button-hover-text-color: var(--on-danger);
+  --el-button-hover-bg-color: var(--danger-solid);
+  --el-button-hover-border-color: var(--danger-solid);
+  --el-button-active-text-color: var(--on-danger);
+  --el-button-active-bg-color: var(--danger-solid-hover);
+  --el-button-active-border-color: var(--danger-solid-hover);
+}
+html[data-theme^="flexterm"] .el-button--danger.is-text,
+html[data-theme^="flexterm"] .el-button--danger.is-link {
+  --el-button-border-color: transparent;
 }
 /* Solid focus ring instead of the translucent glow. */
 html[data-theme^="flexterm"] .el-input__wrapper.is-focus,
