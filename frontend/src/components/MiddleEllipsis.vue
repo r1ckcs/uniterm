@@ -3,10 +3,10 @@
        its baseline); sizer: invisible full text, so a shrink-to-fit parent
        (tab) still sizes for the whole name; sr: the full name for screen
        readers. -->
-  <span ref="el" class="mid-ellipsis" :title="noTitle ? undefined : text">
+  <span ref="el" class="mid-ellipsis" :title="noTitle ? undefined : (full || text)">
     <span ref="line" class="me-line" aria-hidden="true">{{ shown }}</span>
     <span ref="sizer" class="me-sizer" aria-hidden="true">{{ text }}</span>
-    <span class="me-sr">{{ text }}</span>
+    <span class="me-sr">{{ full || text }}</span>
   </span>
 </template>
 
@@ -57,7 +57,9 @@ function measurer(font: string): (s: string) => number {
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { fitMiddle } from '../utils/middleEllipsis'
 
-const props = defineProps<{ text: string; noTitle?: boolean }>()
+// full: the real name when `text` is a shortened label (item 50); it goes in
+// the title and in the screen-reader text.
+const props = defineProps<{ text: string; full?: string; noTitle?: boolean }>()
 const el = ref<HTMLElement | null>(null)
 const line = ref<HTMLElement | null>(null)
 const sizer = ref<HTMLElement | null>(null)

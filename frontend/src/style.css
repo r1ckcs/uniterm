@@ -1928,16 +1928,23 @@ html[data-theme^="flexterm"] .el-table__body tr.el-table__row--striped.current-r
 .connection-list.density-compact .conn-details {
   flex: 1;
   flex-direction: row;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 0.5rem;
+  column-gap: 0.5rem;
+  row-gap: 0;
+  /* One line: a host that cannot keep ~8 characters wraps to a second line
+     that is clipped away, and the name takes the width (item 50). The host
+     stays in the row's title and aria-label. */
+  max-height: 1.125rem;
+  overflow: hidden;
 }
 .connection-list.density-compact .conn-details .name {
   flex: 0 1 auto;
   min-width: 2.5rem;
 }
 .connection-list.density-compact .conn-details .conn-meta {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 1 0 8ch;
+  min-width: 8ch;
 }
 .connection-list.density-compact .conn-details .host {
   font-family: var(--font-mono);
