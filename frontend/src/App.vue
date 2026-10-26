@@ -178,6 +178,7 @@
 
 <script setup lang="ts">
 import { isQuickSearchShortcut, quickSearchLabel } from './utils/quickSearch'
+import { detectPlatformSync } from './utils/platform'
 import type { PickerMode } from './utils/sessionPicker'
 import SessionPicker from './components/SessionPicker.vue'
 import { ref, computed, watch, nextTick, onMounted, onUnmounted, provide, h } from 'vue'
@@ -960,8 +961,10 @@ function onWheel(e: WheelEvent) {
 // resolve to the same combo the panel shortcuts step aside and their badges
 // hide. Panel maximizing moved to the configurable keyboard settings
 // (maximizePanel action).
-let isMac = false
-const isMacUi = ref(false)
+// Start from the user agent so the ⌘K label is right before GetPlatform()
+// answers, and stays right when it cannot (browser preview).
+let isMac = detectPlatformSync() === 'darwin'
+const isMacUi = ref(isMac)
 // ⌘K / Ctrl+Shift+P: the session picker (open sessions first, then saved
 // connections). The tab bar's "…" opens the same list with every tab.
 const pickerVisible = ref(false)
@@ -1065,7 +1068,7 @@ onMounted(async () => {
     const platform = await GetPlatform()
     isMac = platform === 'darwin'
   } catch {
-    isMac = false
+    isMac = detectPlatformSync() === 'darwin'
   }
   isMacUi.value = isMac
   document.addEventListener('keydown', onPlatformSystemShortcut, true)

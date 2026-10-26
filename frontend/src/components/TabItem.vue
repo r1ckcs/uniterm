@@ -806,9 +806,10 @@ onMounted(async () => {
   border-radius: 3px 3px 0 0;
   pointer-events: none;
 }
+/* Outside the tab, so it stays distinct from the broadcast frame (inset). */
 .tab-item:focus-visible {
   outline: 2px solid var(--header-focus-ring);
-  outline-offset: -2px;
+  outline-offset: 1px;
 }
 .tab-item:hover {
   background: var(--bg-hover);
