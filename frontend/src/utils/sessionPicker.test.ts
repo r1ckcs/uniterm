@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Panel, Tab } from '../types/workspace'
 import type { ConnectionConfig } from '../types/session'
-import { buildPickerGroups, filterPickerGroups, flattenPickerGroups, movePickerIndex, type PickerSources } from './sessionPicker'
+import { buildPickerGroups, connectionSessions, filterPickerGroups, flattenPickerGroups, movePickerIndex, sessionStateKey, type PickerSources } from './sessionPicker'
 
 const panel = (id: string, name: string, host: string, sessionId?: string, type = 'ssh'): Panel =>
   ({ id, type, title: name, status: 'disconnected', sessionId, config: { id: `c-${id}`, name, host, type } } as unknown as Panel)
@@ -95,5 +95,60 @@ describe('session picker markup (a11y)', () => {
   it('the tab overflow is a real button with a label', () => {
     expect(bar).toMatch(/<button\s+type="button"\s+class="tab-more-btn"[^>]*:aria-label=/)
     expect(bar).not.toMatch(/<span class="tab-more-btn"/)
+  })
+})
+
+describe('session state per connection (item 49)', () => {
+  const mkp = (id: string, connId: string, sessionId?: string) =>
+    ({ id, type: 'ssh', title: id, status: 'disconnected', sessionId, config: { id: connId, name: connId, host: 'h', type: 'ssh' } } as unknown as Panel)
+  const panels: Record<string, Panel> = {
+    a1: mkp('a1', 'PE01', 's1'), a2: mkp('a2', 'PE01', 's2'), b1: mkp('b1', 'OLT', 's3'), c1: mkp('c1', 'SW', 's4'), w1: mkp('w1', 'PE01', 's5'),
+  }
+  const status: Record<string, 'connected' | 'connecting' | 'disconnected'> = { s1: 'connected', s2: 'disconnected', s3: 'connecting', s4: 'connected', s5: 'connected' }
+  const tabs = [
+    { id: 't1', type: 'terminal', name: 'PE01', panelId: 'a1' },
+    { id: 't2', type: 'terminal', name: 'PE01', panelId: 'a2' },
+    { id: 't3', type: 'terminal', name: 'OLT', panelId: 'b1' },
+    { id: 'tw', type: 'workspace', name: 'Núcleo', panelIds: ['w1', 'c1'], activePanelId: 'w1' },
+  ] as unknown as Tab[]
+  const m = connectionSessions({ tabs, getPanel: (id) => panels[id], sessionStatus: (sid) => status[sid] })
+
+  it('shows the worst state and how many sessions', () => {
+    expect(m.get('PE01')).toMatchObject({ state: 'down', count: 3 })
+    expect(m.get('OLT')).toMatchObject({ state: 'connecting', count: 1 })
+    expect(m.get('SW')).toMatchObject({ state: 'connected', count: 1, focus: { tabId: 'tw', panelId: 'c1', workspace: true } })
+    expect(m.has('closed-one')).toBe(false)
+  })
+
+  it('double-click goes to the best session of the connection', () => {
+    expect(m.get('PE01')!.focus).toEqual({ tabId: 't1', panelId: 'a1', workspace: false })
+  })
+
+  it('state in words for the row label', () => {
+    expect(sessionStateKey('down')).toBe('sessionState.down')
+  })
+})
+
+describe('item 49 markup', () => {
+  const raw = import.meta.glob(['../components/Sidebar.vue', '../components/GroupTreeItem.vue', '../components/StartTabContent.vue', '../components/ConnectionContextMenu.vue', '../components/SessionStateBadge.vue'],
+    { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+  const src = (n: string) => raw[`../components/${n}.vue`]
+
+  it('rows in the sidebar and in Sites carry the badge and say the state', () => {
+    for (const n of ['Sidebar', 'GroupTreeItem', 'StartTabContent']) {
+      expect(src(n), n).toMatch(/<SessionStateBadge /)
+      expect(src(n), n).toMatch(/:aria-label="rowLabel\(/)
+    }
+  })
+
+  it('a dropped session has its own shape, not only a color', () => {
+    expect(src('SessionStateBadge')).toMatch(/\.ssb-down \.ssb-mark \{[^}]*transform: rotate\(45deg\)/)
+    expect(src('SessionStateBadge')).toMatch(/\.ssb-connecting \.ssb-mark \{[^}]*border: 2px solid/)
+  })
+
+  it('double-click / Enter focus an open session; the menu opens another', () => {
+    expect(src('Sidebar')).toMatch(/if \(!focusSession\(conn\.id\)\) emit\('connect', conn\)/)
+    expect(src('StartTabContent')).toMatch(/if \(!keep && focusSession\(config\.id\)\) return/)
+    expect(src('ConnectionContextMenu')).toMatch(/isConnected && targets\.length === 1 \? t\('sidebar\.openNewSession'\)/)
   })
 })

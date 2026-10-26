@@ -79,9 +79,9 @@
             class="connection-item indented"
             :title="compactTitle(conn)"
             :data-conn-id="conn.id"
+            :aria-label="rowLabel(conn.name, getSubtitle(conn), conn.id)"
             :class="{
               active: selectedIds.has(conn.id),
-              'has-session': openPanelConnIds.has(conn.id),
               'drop-before': dropIndicator?.id === conn.id && dropIndicator?.position === 'before',
               'drop-after': dropIndicator?.id === conn.id && dropIndicator?.position === 'after',
             }"
@@ -94,11 +94,11 @@
             @dblclick="onItemDblClick(conn)"
             @contextmenu.prevent="onContextMenu($event, conn)"
           >
-            <span class="conn-icon"><ConnStyleIcon :conn="conn" :fallback="connIcon(conn)" /></span>
+            <span class="conn-icon"><ConnStyleIcon :conn="conn" :fallback="connIcon(conn)" /><SessionStateBadge class="conn-session" hide-count :info="sessionOf(conn.id)" /></span>
             <div class="conn-details">
               <span class="name"><MiddleEllipsis :text="conn.name" /></span>
               <span class="conn-meta">
-                <span class="host">{{ getSubtitle(conn) }}</span>
+                <span class="host">{{ getSubtitle(conn) }}<template v-if="(sessionOf(conn.id)?.count ?? 0) > 1"> · ×{{ sessionOf(conn.id)!.count }}</template></span>
                 <VaultChangedBadge :connection-id="conn.id" />
               </span>
             </div>
@@ -147,9 +147,9 @@
             class="connection-item indented"
             :title="compactTitle(conn)"
             :data-conn-id="conn.id"
+            :aria-label="rowLabel(conn.name, getSubtitle(conn), conn.id)"
             :class="{
               active: selectedIds.has(conn.id),
-              'has-session': openPanelConnIds.has(conn.id),
               'drop-before': dropIndicator?.id === conn.id && dropIndicator?.position === 'before',
               'drop-after': dropIndicator?.id === conn.id && dropIndicator?.position === 'after',
             }"
@@ -162,11 +162,11 @@
             @dblclick="onItemDblClick(conn)"
             @contextmenu.prevent="onContextMenu($event, conn)"
           >
-            <span class="conn-icon"><ConnStyleIcon :conn="conn" :fallback="connIcon(conn)" /></span>
+            <span class="conn-icon"><ConnStyleIcon :conn="conn" :fallback="connIcon(conn)" /><SessionStateBadge class="conn-session" hide-count :info="sessionOf(conn.id)" /></span>
             <div class="conn-details">
               <span class="name"><MiddleEllipsis :text="conn.name" /></span>
               <span class="conn-meta">
-                <span class="host">{{ getSubtitle(conn) }}</span>
+                <span class="host">{{ getSubtitle(conn) }}<template v-if="(sessionOf(conn.id)?.count ?? 0) > 1"> · ×{{ sessionOf(conn.id)!.count }}</template></span>
                 <VaultChangedBadge :connection-id="conn.id" />
               </span>
             </div>
@@ -186,9 +186,9 @@
           class="connection-item"
           :title="compactTitle(conn)"
           :data-conn-id="conn.id"
+            :aria-label="rowLabel(conn.name, getSubtitle(conn), conn.id)"
           :class="{
             active: selectedIds.has(conn.id),
-            'has-session': openPanelConnIds.has(conn.id),
             'drop-before': dropIndicator?.id === conn.id && dropIndicator?.position === 'before',
             'drop-after': dropIndicator?.id === conn.id && dropIndicator?.position === 'after',
           }"
@@ -201,11 +201,11 @@
           @dblclick="onItemDblClick(conn)"
           @contextmenu.prevent="onContextMenu($event, conn)"
         >
-          <span class="conn-icon"><ConnStyleIcon :conn="conn" :fallback="connIcon(conn)" /></span>
+          <span class="conn-icon"><ConnStyleIcon :conn="conn" :fallback="connIcon(conn)" /><SessionStateBadge class="conn-session" hide-count :info="sessionOf(conn.id)" /></span>
           <div class="conn-details">
             <span class="name"><MiddleEllipsis :text="conn.name" /></span>
             <span class="conn-meta">
-              <span class="host">{{ getSubtitle(conn) }}</span>
+              <span class="host">{{ getSubtitle(conn) }}<template v-if="(sessionOf(conn.id)?.count ?? 0) > 1"> · ×{{ sessionOf(conn.id)!.count }}</template></span>
               <VaultChangedBadge :connection-id="conn.id" />
             </span>
           </div>
@@ -444,7 +444,6 @@ import { getShellLabel as getShellLabelBase } from '../utils/shellLabel'
 import { useConnectionStore } from '../stores/connectionStore'
 import { useFavoriteStore } from '../stores/favoriteStore'
 import type { GroupTreeNode } from '../stores/connectionStore'
-import { usePanelStore } from '../stores/panelStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useI18n } from '../i18n'
 import ConnectionForm from './ConnectionForm.vue'
@@ -458,6 +457,8 @@ import MonitorOverviewSidebar from './MonitorOverviewSidebar.vue'
 import { useCompanionStore } from '../stores/companionStore'
 import CustomThemeEditor from './CustomThemeEditor.vue'
 import GroupTreeItem from './GroupTreeItem.vue'
+import SessionStateBadge from './SessionStateBadge.vue'
+import { useConnSessions } from '../composables/useConnSessions'
 import { treeKeyAction, treeRowInfo, typeaheadKey, type TreeRow } from '../utils/treeNav'
 import Menu from './Menu.vue'
 import MenuItem from './MenuItem.vue'
@@ -489,7 +490,6 @@ const settingsStore = useSettingsStore()
 // "Right-click menu" host-list mode hides the hover star/⋯ buttons entirely —
 // the same connection menu stays reachable via right-click (issue #934).
 const showHostRowButtons = computed(() => settingsStore.settings.hostListMenuStyle !== 'rightclick')
-const panelStore = usePanelStore()
 const companionStore = useCompanionStore()
 const { t } = useI18n()
 const isMacPlatform = /Mac|iPhone|iPad/.test(navigator.userAgent)
@@ -498,15 +498,9 @@ const quickCommandsTitle = computed(() => {
   const shortcut = binding ? formatKeyBinding(binding, isMacPlatform) : ''
   return shortcut ? `${t('quickCommands.quickCommandsTab')} (${shortcut})` : t('quickCommands.quickCommandsTab')
 })
-// Connection ids that currently have an open panel/session (panel.config.id).
-// Reactive over the panelStore map, so it updates as panels open/close.
-const openPanelConnIds = computed<Set<string>>(() => {
-  const s = new Set<string>()
-  for (const p of panelStore.panels.values()) {
-    if (p.config?.id) s.add(p.config.id)
-  }
-  return s
-})
+// Open-session state per connection (item 49): badge, aria-label, and
+// double-click/Enter focusing the open session instead of a duplicate.
+const { sessionOf, focusSession, rowLabel } = useConnSessions()
 const showForm = ref(false)
 const showExportDialog = ref(false)
 const showImportDialog = ref(false)
@@ -1013,7 +1007,7 @@ function onListKeydown(e: KeyboardEvent) {
       for (const id of ids) {
         const c = connectionStore.connections.find(c => c.id === id)
         if (c) {
-          emit('connect', c)
+          connectOrFocus(c)
         }
       }
       selectedIds.value = new Set()
@@ -1261,9 +1255,15 @@ function onLocateConnection(e: Event) {
   if (typeof id === 'string') locateConnectionById(id)
 }
 
+// An open connection is brought forward instead of opened twice; "Open new
+// session" in its context menu is the way to get another one.
+function connectOrFocus(conn: ConnectionConfig) {
+  if (!focusSession(conn.id)) emit('connect', conn)
+}
+
 function onItemDblClick(conn: ConnectionConfig) {
   selectedIds.value = new Set()
-  emit('connect', conn)
+  connectOrFocus(conn)
 }
 
 // ── Context menu helper ──
@@ -1825,7 +1825,7 @@ function onTreeKeydown(e: KeyboardEvent) {
       const ids = selectedIds.value.has(id) ? getSelectedConnectionIds() : [id]
       for (const cid of ids) {
         const c = connectionStore.connections.find(x => x.id === cid)
-        if (c) emit('connect', c)
+        if (c) connectOrFocus(c)
       }
     } else {
       const row = treeInfo.value.get(action.key)?.row
@@ -1844,7 +1844,7 @@ function onTreeKeydown(e: KeyboardEvent) {
 provide('tree', { attrs: treeAttrs, onRowFocus: onTreeRowFocus })
 provide('expandedGroups', expandedGroups)
 provide('selectedIds', selectedIds)
-provide('openPanelConnIds', openPanelConnIds)
+provide('connSessions', { sessionOf, rowLabel })
 provide('dragOverGroupId', dragOverGroupId)
 provide('dropIndicator', dropIndicator)
 provide('groupHandlers', {
@@ -2122,10 +2122,6 @@ defineExpose({ focusSearch, openQuickCommands, openChangeGroupFor, openChangeGro
   color: var(--accent-text);
 }
 
-/* Connection has an open session → highlight its icon with the AI-lock amber */
-.connection-item.has-session .conn-icon {
-  color: var(--warning);
-}
 
 .conn-more-btn {
   display: none;
@@ -2188,12 +2184,23 @@ defineExpose({ focusSearch, openQuickCommands, openChangeGroupFor, openChangeGro
 }
 
 .conn-icon {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 1rem;
   flex-shrink: 0;
   color: var(--text-muted);
+}
+/* Session state on the icon's corner, cut out from the row with the
+   sidebar color so it reads against the glyph. */
+.conn-icon :deep(.conn-session) {
+  position: absolute;
+  right: -0.3125rem;
+  bottom: -0.25rem;
+  padding: 0.0625rem;
+  border-radius: 0.375rem;
+  background: var(--bg-elevated);
 }
 
 .conn-details {
