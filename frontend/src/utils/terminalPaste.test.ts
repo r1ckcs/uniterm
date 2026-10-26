@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { normalizePastedText, bracketPaste, pasteWithScroll, pastedLineCount, needsBroadcastPasteConfirm, pasteToTargets, type BroadcastPasteRequest } from './terminalPaste'
+import { normalizePastedText, bracketPaste, visibleControls, pasteWithScroll, pastedLineCount, needsBroadcastPasteConfirm, pasteToTargets, type BroadcastPasteRequest } from './terminalPaste'
 import type { PasteTarget } from './terminalPaste'
 
 function mkTarget(overrides: Partial<PasteTarget> = {}): PasteTarget & { scrollToBottom: ReturnType<typeof vi.fn> } {
@@ -69,10 +69,10 @@ describe('broadcast paste confirmation (item 48)', () => {
 
   it('multi-line into several sessions asks with lines, sessions and a preview', async () => {
     const olts = ['OLT1', 'OLT2', 'OLT3', 'OLT4'].map((n) => target(n))
-    const confirm = vi.fn(async () => true)
+    const confirm = vi.fn(async (_req: BroadcastPasteRequest) => true)
     expect(await pasteToTargets(config, olts.map((o) => o.t), confirm)).toBe(true)
     expect(confirm).toHaveBeenCalledTimes(1)
-    const req = confirm.mock.calls[0][0] as unknown as BroadcastPasteRequest
+    const req = confirm.mock.calls[0][0]
     expect(req.lineCount).toBe(40)
     expect(req.sessions.map((s) => s.name)).toEqual(['OLT1', 'OLT2', 'OLT3', 'OLT4'])
     expect(req.preview).toEqual(['line 1', 'line 2', 'line 3', 'line 4', 'line 5', 'line 6'])
@@ -91,7 +91,7 @@ describe('broadcast paste confirmation (item 48)', () => {
   })
 
   it('one line, or broadcast off (a single target), pastes as before without asking', async () => {
-    const confirm = vi.fn(async () => false)
+    const confirm = vi.fn(async (_req: BroadcastPasteRequest) => false)
     const many = ['A', 'B'].map((n) => target(n))
     await pasteToTargets('show run\n', many.map((o) => o.t), confirm)
     const single = target('self', true)
@@ -108,5 +108,40 @@ describe('broadcast paste confirmation (item 48)', () => {
     const b = target('B')
     await pasteToTargets('x\ny', [a, b.t], async () => { mode = true; return true })
     expect(writes).toEqual(['\x1b[200~x\ny\x1b[201~'])
+  })
+})
+
+describe('pasted text cannot end the bracket (item 52)', () => {
+  const evil = 'echo safe\x1b[201~\nrm -rf /tmp/x\n\x1b[200~more'
+
+  it('drops every ESC inside the bracket, so only the outer markers remain', () => {
+    const out = bracketPaste(evil, true)
+    expect(out).toBe('\x1b[200~echo safe[201~\nrm -rf /tmp/x\n[200~more\x1b[201~')
+    expect(out.split('\x1b[201~')).toHaveLength(2)
+    expect(out.indexOf('\x1b[201~')).toBe(out.length - 6)
+    expect(bracketPaste('a\x9b201~b', true)).toBe('\x1b[200~a201~b\x1b[201~')
+  })
+
+  it('without bracketed mode the text goes unchanged', () => {
+    expect(bracketPaste(evil, false)).toBe(evil)
+  })
+
+  it('normal and broadcast paste both send the sanitized payload', async () => {
+    const writes: string[] = []
+    const t = (name: string) => ({ name, host: '', bracketedPasteMode: true, write: (p: string) => { writes.push(p) }, scrollToBottom: () => {} })
+    await pasteToTargets(evil, [t('self')], async () => true)
+    await pasteToTargets(evil, [t('A'), t('B')], async () => true)
+    expect(writes).toHaveLength(3)
+    for (const w of writes) expect(w.match(/\x1b\[201~/g)).toHaveLength(1)
+  })
+
+  it('the preview shows control characters as symbols', async () => {
+    expect(visibleControls('a\x1b[201~b\x07c\x7f\x9bd\te')).toBe('a␛[201~b␇c␡⟨9B⟩d\te')
+    const confirm = vi.fn(async (_req: BroadcastPasteRequest) => false)
+    const t = (name: string) => ({ name, host: '', bracketedPasteMode: true, write: () => {}, scrollToBottom: () => {} })
+    await pasteToTargets(evil, [t('A'), t('B')], confirm)
+    const req = confirm.mock.calls[0][0]
+    expect(req.preview[0]).toBe('echo safe␛[201~')
+    expect(req.preview[2]).toBe('␛[200~more')
   })
 })
