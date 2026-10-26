@@ -1,29 +1,50 @@
 import { describe, expect, it } from 'vitest'
-import { splitMiddle } from './middleEllipsis'
+import { fitMiddle, splitMiddle } from './middleEllipsis'
 
 describe('middle ellipsis', () => {
-  it('keeps the distinguishing end of similar names', () => {
-    expect(splitMiddle('OLT-ZTE-CORDOVIL')).toEqual({ head: 'OLT-ZTE-', tail: 'CORDOVIL' })
-    expect(splitMiddle('OLT-ZTE-PILAR')).toEqual({ head: 'OLT-ZTE-', tail: 'PILAR' })
-    expect(splitMiddle('sw01.pop-rei.netflex.local')).toEqual({ head: 'sw01.pop-rei.netflex.', tail: 'local' })
+  it('keeps the distinguishing end, separator included', () => {
+    expect(splitMiddle('OLT-ZTE-CORDOVIL')).toEqual({ head: 'OLT-ZTE', tail: '-CORDOVIL' })
+    expect(splitMiddle('SW-HUAWEI-S5732-PILAR')).toEqual({ head: 'SW-HUAWEI-S5732', tail: '-PILAR' })
+    expect(splitMiddle('OLT-CORDOVIL-01')).toEqual({ head: 'OLT', tail: '-CORDOVIL-01' })
   })
 
-  it('short names stay whole; no separator falls back to the last 8 chars', () => {
+  it('a domain keeps the segment before the last dot', () => {
+    expect(splitMiddle('sw01.pop-cordovil.netflex.local')).toEqual({ head: 'sw01.pop-cordovil', tail: '.netflex.local' })
+  })
+
+  it('short names stay whole; no usable separator falls back to the last 8 chars', () => {
     expect(splitMiddle('PE01-REI')).toEqual({ head: 'PE01-REI', tail: '' })
     expect(splitMiddle('ABCDEFGHIJKLMNOPQRST')).toEqual({ head: 'ABCDEFGHIJKL', tail: 'MNOPQRST' })
+    expect(splitMiddle('HW-AGGREGATIONSWITCHCORE')).toEqual({ head: 'HW-AGGREGATIONSW', tail: 'ITCHCORE' })
     expect(splitMiddle('')).toEqual({ head: '', tail: '' })
   })
 
-  it('a too-short last segment takes the one before; a too-long one falls back to 8 chars', () => {
-    expect(splitMiddle('HW-AGGREGATIONSWITCHCORE')).toEqual({ head: 'HW-AGGREGATIONSW', tail: 'ITCHCORE' })
-    expect(splitMiddle('OLT-CORDOVIL-01')).toEqual({ head: 'OLT-', tail: 'CORDOVIL-01' })
-  })
-
   it('head + tail is always the full name', () => {
-    for (const n of ['OLT-ZTE-CORDOVIL', 'x', 'MK-BORDA01', 'RDN-PJT22-SW-ACCESS-0001']) {
+    for (const n of ['OLT-ZTE-CORDOVIL', 'x', 'MK-BORDA01', 'RDN-PJT22-SW-ACCESS-0001', 'sw02.pop-pilar.netflex.local']) {
       const { head, tail } = splitMiddle(n)
       expect(head + tail).toBe(n)
     }
+  })
+})
+
+describe('fitting the cut to the box (1 px per character)', () => {
+  const m = (s: string) => s.length
+
+  it('whole when it fits; else head + "…" + tail with no gap and the separator kept', () => {
+    expect(fitMiddle('SW-HUAWEI-S5732-PILAR', 21, m)).toBe('SW-HUAWEI-S5732-PILAR')
+    expect(fitMiddle('SW-HUAWEI-S5732-PILAR', 19, m)).toBe('SW-HUAWEI-S5…-PILAR')
+    expect(fitMiddle('sw01.pop-cordovil.netflex.local', 22, m)).toBe('sw01.pop…netflex.local')
+  })
+
+  it('the head never drops below 4 characters + "…"', () => {
+    expect(fitMiddle('OLT-ZTE-C600-CORDOVIL-02', 17, m)).toBe('OLT-…-CORDOVIL-02')
+    expect(fitMiddle('OLT-ZTE-C600-CORDOVIL-02', 20, m)).toBe('OLT-ZTE…-CORDOVIL-02')
+  })
+
+  it('when even that does not fit, the tail gives way from its start', () => {
+    expect(fitMiddle('OLT-ZTE-C600-CORDOVIL-02', 13, m)).toBe('OLT-…DOVIL-02')
+    expect(fitMiddle('OLT-ZTE-C600-CORDOVIL-02', 8, m)).toBe('OLT-…-02')
+    expect(fitMiddle('OLT-ZTE-C600-CORDOVIL-02', 13, m).split('…').length).toBe(2)
   })
 })
 
