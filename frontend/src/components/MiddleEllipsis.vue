@@ -1,10 +1,11 @@
 <template>
-  <!-- sizer: invisible full text, so a shrink-to-fit parent (tab) still
-       sizes for the whole name; line: what fits, cut in the middle; sr: the
-       full name for screen readers. -->
+  <!-- line: what fits, cut in the middle (first, so the row's baseline is
+       its baseline); sizer: invisible full text, so a shrink-to-fit parent
+       (tab) still sizes for the whole name; sr: the full name for screen
+       readers. -->
   <span ref="el" class="mid-ellipsis" :title="noTitle ? undefined : text">
-    <span ref="sizer" class="me-sizer" aria-hidden="true">{{ text }}</span>
     <span ref="line" class="me-line" aria-hidden="true">{{ shown }}</span>
+    <span ref="sizer" class="me-sizer" aria-hidden="true">{{ text }}</span>
     <span class="me-sr">{{ text }}</span>
   </span>
 </template>
