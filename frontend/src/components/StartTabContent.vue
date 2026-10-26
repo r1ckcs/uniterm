@@ -65,10 +65,10 @@
 
       <!-- Search row -->
     <div class="start-search-row">
-      <span class="start-filter-btn" :class="{ active: selectedTypeFilter !== 'all' }" @click.stop="filterMenuRef?.toggle($event.currentTarget)">
+      <button type="button" class="start-filter-btn" :class="{ active: selectedTypeFilter !== 'all' }" :aria-label="t('a11y.filterType', { value: filterDisplay })" aria-haspopup="menu" @click.stop="filterMenuRef?.toggle($event.currentTarget)">
         <el-icon><Filter :size="'0.875rem'" /></el-icon>
         <span>{{ filterDisplay }}</span>
-      </span>
+      </button>
       <TypeFilterMenu ref="filterMenuRef" align="start" v-model="selectedTypeFilter" />
       <el-input
         ref="searchInputRef"
@@ -1707,6 +1707,7 @@ function doEditConnection(config: ConnectionConfig | null) {
 }
 
 .start-filter-btn {
+  font: inherit;
   display: flex;
   align-items: center;
   gap: 0.25rem;

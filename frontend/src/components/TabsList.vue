@@ -1,5 +1,5 @@
 <template>
-  <div class="tabs-list" ref="tabsListRef" @wheel="onWheel" @dragover.prevent="onTabsContainerDragOver" @dragleave="onTabsDragLeave" @drop="onTabsContainerDrop">
+  <div class="tabs-list" ref="tabsListRef" role="tablist" :aria-label="t('tab.listLabel')" @keydown="onTablistKeydown" @wheel="onWheel" @dragover.prevent="onTabsContainerDragOver" @dragleave="onTabsDragLeave" @drop="onTabsContainerDrop">
     <template v-for="(tab, index) in tabs" :key="tab.id">
       <div
         v-if="(dragOverTabIndex === index && !dragOverInsertAfter) || (dragOverTabIndex === index - 1 && dragOverInsertAfter)"
@@ -10,9 +10,11 @@
         :tab="tab"
         :shortcut-index="index + 1"
         :is-active="tab.id === activeTabId"
+        :tab-stop="tab.id === tabStopId"
         :has-notification="tabStore.hasTabNotification(tab.id)"
         :progress="tabStore.getTabProgress(tab.id)"
         @activate="setActiveTab"
+        @focus-tab="(id: string) => (tabFocusId = id)"
         @close="(id: string) => $emit('close-tab', id)"
         @close-batch="(ids: string[]) => $emit('close-tab-batch', ids)"
         @toggle-ai-lock="(panelId: string) => $emit('toggle-ai-lock', panelId)"
@@ -44,19 +46,18 @@
     </button>
   </div>
   <div class="tab-more" v-if="showMore">
-    <span class="tab-more-btn" :title="t('tab.more')" @click.stop="tabMoreRef?.toggle($event.currentTarget)">
+    <!-- Every tab by name, keyboard included: the session picker in 'tabs'
+         mode (item 44), with full names. -->
+    <button
+      type="button"
+      class="tab-more-btn"
+      :title="t('tab.moreHint', { count: tabs.length })"
+      :aria-label="t('tab.moreHint', { count: tabs.length })"
+      aria-haspopup="dialog"
+      @click.stop="openTabList"
+    >
       <el-icon class="tab-more-icon"><MoreHorizontal :size="'0.875rem'" /></el-icon>
-    </span>
-    <Menu ref="tabMoreRef" v-model:visible="tabMoreVisible" align="end">
-      <MenuItem
-        v-for="tab in tabs"
-        :key="tab.id"
-        :class="{ active: tab.id === activeTabId }"
-        @click="onTabMoreSelect(tab.id)"
-      >
-        {{ tab.name }}
-      </MenuItem>
-    </Menu>
+    </button>
     <button
       class="tab-add-btn"
       :title="t('startTab.defaultName') + shortcutSuffix('newConnection')"
@@ -76,8 +77,6 @@ import { useI18n } from '../i18n'
 import { useSettingsStore } from '../stores/settingsStore'
 import { formatKeyBinding } from '../composables/useKeyboardShortcuts'
 import TabItem from './TabItem.vue'
-import Menu from './Menu.vue'
-import MenuItem from './MenuItem.vue'
 
 const tabStore = useTabStore()
 const panelStore = usePanelStore()
@@ -148,19 +147,39 @@ function onWheel(e: WheelEvent) {
   tabsListRef.value.scrollLeft += e.deltaY
 }
 
-const tabMoreRef = ref<InstanceType<typeof Menu> | null>(null)
-const tabMoreVisible = ref(false)
-// Push/pop the native RDP overlay while the tab-more menu is open, so the menu
-// floats above it (mirrors the old el-dropdown @visible-change behavior).
-watch(tabMoreVisible, (v) => {
-  if (v) window.dispatchEvent(new CustomEvent('rdp:overlay-push'))
-  else window.dispatchEvent(new CustomEvent('rdp:overlay-pop'))
-})
+function openTabList() {
+  window.dispatchEvent(new CustomEvent('app:session-picker', { detail: { mode: 'tabs' } }))
+}
+// A tab picked from the list (or ⌘K) may be scrolled out of the bar.
+watch(activeTabId, (id) => { if (id) nextTick(() => scrollToTab(id)) })
 
-function onTabMoreSelect(id: string) {
-  tabMoreVisible.value = false
-  tabStore.setActiveTab(id)
-  scrollToTab(id)
+// ── Tablist keyboard (item 45): one tab stop, ←/→/Home/End move the focus,
+// Enter/Space open the focused tab (manual activation: switching a terminal
+// on every arrow press would be heavy). ──
+const tabFocusId = ref<string | null>(null)
+const tabStopId = computed(() =>
+  tabFocusId.value && tabs.value.some(t => t.id === tabFocusId.value) ? tabFocusId.value : activeTabId.value)
+watch(activeTabId, () => { tabFocusId.value = null })
+
+function onTablistKeydown(e: KeyboardEvent) {
+  const target = (e.target as HTMLElement)?.closest?.('[role="tab"]') as HTMLElement | null
+  if (!target || (e.target as HTMLElement).closest('input')) return
+  const ids = tabs.value.map(t => t.id)
+  const i = ids.indexOf(target.dataset.tabId || '')
+  if (i < 0) return
+  let next = -1
+  if (e.key === 'ArrowRight') next = (i + 1) % ids.length
+  else if (e.key === 'ArrowLeft') next = (i - 1 + ids.length) % ids.length
+  else if (e.key === 'Home') next = 0
+  else if (e.key === 'End') next = ids.length - 1
+  if (next < 0) return
+  e.preventDefault()
+  tabFocusId.value = ids[next]
+  nextTick(() => {
+    const el = tabsListRef.value?.querySelector(`[data-tab-id="${ids[next]}"]`) as HTMLElement | null
+    el?.focus()
+    el?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  })
 }
 
 function setActiveTab(id: string) {
@@ -365,6 +384,10 @@ function onTabDrop(e: DragEvent, targetTabId: string, index: number) {
   height: 1.75rem;
 }
 .tab-more-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -379,6 +402,10 @@ function onTabDrop(e: DragEvent, targetTabId: string, index: number) {
   user-select: none;
   transition: all 0.15s;
   --wails-draggable: no-drag;
+}
+.tab-more-btn:focus-visible {
+  outline: 2px solid var(--header-focus-ring);
+  outline-offset: 1px;
 }
 .tab-more-btn:hover {
   background: var(--bg-hover);

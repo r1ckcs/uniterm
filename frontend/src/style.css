@@ -1,4 +1,7 @@
 :root {
+  /* Keyboard focus ring: >= 3:1 on the surfaces it sits on (WCAG 2.4.11). */
+  --focus-ring: var(--accent);
+  --header-focus-ring: var(--accent);
   /* Broadcast (input sent to several sessions): its own hue, not the
      action blue, the TELNET/OLT orange or the alert red. */
   --broadcast: #e055b5;
@@ -337,6 +340,8 @@
 /* FlexTerm (D1c, solid colors). No shadows, no transparency, no blur, no
    gradients: a 1px border does the separation. Default for new installs. */
 [data-theme="flexterm"] {
+  --focus-ring: #8b9bff;
+  --header-focus-ring: #8b9bff;
   --broadcast: #ff5ccf;
   --broadcast-text: #ff8ade;
   --broadcast-header: #ff5ccf;
@@ -494,6 +499,8 @@
 /* FlexTerm light: same hierarchy as the dark one, derived from the D light
    mock (navy header, white surfaces on a cool gray page). */
 [data-theme="flexterm-light"] {
+  --focus-ring: #2b3dbc;
+  --header-focus-ring: #a5b1ff;
   --broadcast: #b3127f;
   --broadcast-text: #a3106f;
   --broadcast-header: #ff7ad6;

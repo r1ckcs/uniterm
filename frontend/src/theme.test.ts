@@ -107,6 +107,18 @@ describe('FlexTerm (D1c) themes', () => {
     expect(raw('tsb-broadcast')).toMatch(/\.tsb-broadcast \{\s*color: var\(--broadcast-text\);/)
   })
 
+  for (const theme of ['flexterm', 'flexterm-light']) {
+    it(`${theme}: the keyboard focus ring shows at >= 3:1 where it is drawn`, () => {
+      const tokens = themeTokens(theme)
+      for (const bg of ['--bg-base', '--bg-elevated', '--bg-surface', '--bg-hover', '--bg-active']) {
+        expect(contrastRatio(tokens['--focus-ring'], tokens[bg]), `${theme} --focus-ring on ${bg}`).toBeGreaterThanOrEqual(3)
+      }
+      for (const bg of ['--header-bg', '--header-tab-active']) {
+        expect(contrastRatio(tokens['--header-focus-ring'], tokens[bg]), `${theme} --header-focus-ring on ${bg}`).toBeGreaterThanOrEqual(3)
+      }
+    })
+  }
+
   it('header tabs paint text with solid tokens that the contrast test covers', () => {
     // The dropped (red) tab's shortcut hint uses the alert text color, and a
     // tab without a session gets a solid dimmer color, not opacity.

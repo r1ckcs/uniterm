@@ -39,3 +39,12 @@ export function latencyHintKey(s: LatencySample | undefined): string {
   if (s.via === 'proxy') return 'terminal.latencyProxy'
   return 'terminal.latencyDirect'
 }
+
+// What a screen reader says instead of "↔ 180 ms*": "latency 180 ms to the
+// first jump host", "latency unavailable". The {value} is formatLatency's.
+export function latencySpokenKey(s: LatencySample | undefined): string {
+  if (!s || s.state !== 'ok') return 'terminal.latencySpokenUnavailable'
+  if (s.via === 'jump') return 'terminal.latencySpokenJump'
+  if (s.via === 'proxy') return 'terminal.latencySpokenProxy'
+  return 'terminal.latencySpoken'
+}

@@ -3,9 +3,10 @@
     <span class="tsb-item tsb-proto">{{ protocol }}</span>
     <span v-if="target" class="tsb-item tsb-mono" :title="target">{{ target }}</span>
     <span v-if="encoding" class="tsb-item">{{ encoding }}</span>
-    <span v-if="size" class="tsb-item tsb-mono">{{ size }}</span>
-    <span class="tsb-item" :class="{ 'tsb-down': !connected }">{{ connected ? uptime : t('tab.disconnected') }}</span>
-    <span v-if="latency" class="tsb-item tsb-latency" :class="`tsb-latency-${latencyClass}`" :title="t(latencyHint)">↔ {{ latencyText }}<span v-if="latency.via === 'jump' || latency.via === 'proxy'" class="tsb-latency-via">*</span></span>
+    <span v-if="size" class="tsb-item tsb-mono" aria-live="off">{{ size }}</span>
+    <!-- Uptime and size change every second: not announced. -->
+    <span class="tsb-item" :class="{ 'tsb-down': !connected }" :aria-live="connected ? 'off' : undefined">{{ connected ? uptime : t('tab.disconnected') }}</span>
+    <span v-if="latency" class="tsb-item tsb-latency" :class="`tsb-latency-${latencyClass}`" :title="t(latencyHint)" role="img" :aria-label="latencySpoken" aria-live="off"><span aria-hidden="true">↔ {{ latencyText }}<span v-if="latency.via === 'jump' || latency.via === 'proxy'" class="tsb-latency-via">*</span></span></span>
     <span class="tsb-spacer"></span>
     <span v-if="panel.outputLog?.enabled" class="tsb-flag tsb-log" :title="panel.outputLog.path">● LOG</span>
     <span v-if="broadcasting" class="tsb-flag tsb-broadcast" :title="t('terminal.broadcastInput')">{{ t('terminal.statusBroadcast') }}</span>
@@ -23,7 +24,7 @@ import { useTabStore } from '../stores/tabStore'
 import { getTerminalSize } from '../services/terminalManager'
 import { formatUptime, statusBarTarget } from '../utils/terminalStatus'
 import { useLatencyStore } from '../stores/latencyStore'
-import { formatLatency, latencyHintKey, latencyLevel } from '../utils/latency'
+import { formatLatency, latencyHintKey, latencyLevel, latencySpokenKey } from '../utils/latency'
 import { getShellLabel } from '../utils/shellLabel'
 import { useI18n } from '../i18n'
 
@@ -82,6 +83,7 @@ const latency = computed(() => latencyStore.sampleOf(props.panel.sessionId))
 const latencyText = computed(() => formatLatency(latency.value))
 const latencyClass = computed(() => latencyLevel(latency.value))
 const latencyHint = computed(() => latencyHintKey(latency.value))
+const latencySpoken = computed(() => t(latencySpokenKey(latency.value), { value: latencyText.value }))
 </script>
 
 <style scoped>

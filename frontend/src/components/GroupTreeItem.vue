@@ -8,6 +8,8 @@
       'drop-after': dropIndicator?.id === node.group.id && dropIndicator?.position === 'after',
     }"
     :style="{ paddingLeft: (6 + depth * 16) + 'px' }"
+    v-bind="tree.attrs(`g:${node.group.id}`)"
+    @focus="tree.onRowFocus(`g:${node.group.id}`)"
     draggable="true"
     @click="onToggle"
     @contextmenu.prevent="onCtxMenu"
@@ -26,7 +28,7 @@
   </div>
 
   <!-- Children (when expanded): child groups first, then connections -->
-  <template v-if="expanded.has(node.group.id)">
+  <div v-if="expanded.has(node.group.id)" role="group">
     <!-- Child groups (recursive) -->
     <GroupTreeItem
       v-for="child in node.children"
@@ -49,6 +51,8 @@
         'drop-after': dropIndicator?.id === conn.id && dropIndicator?.position === 'after',
       }"
       :style="{ paddingLeft: (24 + depth * 16) + 'px' }"
+      v-bind="tree.attrs(`c:${conn.id}`)"
+      @focus="tree.onRowFocus(`c:${conn.id}`)"
       draggable="true"
       @dragstart="onConnDragStart($event, conn)"
       @dragend="onConnDragEnd"
@@ -69,17 +73,19 @@
       <button
         v-if="showHostRowButtons"
         class="conn-fav-btn"
+        tabindex="-1"
         :class="{ on: favoriteStore.isFavorite(conn.id) }"
         :title="favoriteStore.isFavorite(conn.id) ? t('sidebar.removeFromFavorites') : t('sidebar.addToFavorites')"
+        :aria-label="favoriteStore.isFavorite(conn.id) ? t('sidebar.removeFromFavorites') : t('sidebar.addToFavorites')"
         @click.stop="favoriteStore.toggle(conn.id)"
       >
         <Star :size="'0.75rem'" />
       </button>
-      <button v-if="showHostRowButtons" class="conn-more-btn" @click.stop="onMoreClick($event, conn)" :title="t('terminal.more')">
+      <button v-if="showHostRowButtons" class="conn-more-btn" tabindex="-1" @click.stop="onMoreClick($event, conn)" :title="t('terminal.more')" :aria-label="t('terminal.more')">
         <MoreHorizontal :size="'0.875rem'" />
       </button>
     </div>
-  </template>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -117,6 +123,8 @@ const dragOverId = inject<any>('dragOverGroupId')!
 const dropIndicator = inject<any>('dropIndicator')!
 const handlers = inject<any>('groupHandlers')!
 const utils = inject<any>('utils')!
+// Tree a11y attributes and roving focus (Sidebar, item 45).
+const tree = inject<{ attrs: (key: string) => Record<string, unknown>; onRowFocus: (key: string) => void }>('tree')!
 
 const { connIcon, getSubtitle, t } = utils
 const connectionStore = useConnectionStore()
