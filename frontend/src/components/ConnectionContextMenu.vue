@@ -50,6 +50,8 @@ import type { ConnectionConfig } from '../types/session'
 import { CONNECTION_TYPES } from '../utils/connectionTypes'
 import { connectFileMenuKey } from '../utils/fileTransferUtils'
 import { useI18n } from '../i18n'
+import { confirmDelete } from '../composables/useDeleteConfirm'
+import { deleteConnectionsPrompt } from '../utils/deleteText'
 import { useFavoriteStore } from '../stores/favoriteStore'
 import { usePanelStore } from '../stores/panelStore'
 import { useTabStore } from '../stores/tabStore'
@@ -255,19 +257,15 @@ async function onForgetHostKey() {
   }
 }
 
-// Confirms internally, then hands the targets to the parent for removal.
+// Confirms internally (naming what goes, Cancel focused), then hands the
+// targets to the parent, which schedules the removal with an undo window.
 async function onDeleteClick() {
   close()
-  const ids = props.targets.map(c => c.id)
-  try {
-    await ElMessageBox.confirm(
-      t('sidebar.deleteConfirm', { count: ids.length }),
-      t('sidebar.delete'),
-      { confirmButtonText: t('sftp.dialog.confirm'), cancelButtonText: t('sftp.dialog.cancel'), type: 'warning' }
-    )
-  } catch {
-    return
-  }
-  emit('delete', props.targets)
+  const ok = await confirmDelete({
+    title: t('sidebar.delete'),
+    message: deleteConnectionsPrompt(t, props.targets),
+    confirmText: t('sidebar.delete'),
+  })
+  if (ok) emit('delete', props.targets)
 }
 </script>

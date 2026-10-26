@@ -1295,7 +1295,7 @@ function onCtxCreateWorkspace(targets: ConnectionConfig[]) {
 }
 
 function onCtxDelete(targets: ConnectionConfig[]) {
-  connectionStore.removeMany(targets.map(c => c.id))
+  connectionStore.scheduleRemoveMany(targets.map(c => c.id))
   selectedIds.value = new Set()
 }
 
@@ -1504,7 +1504,7 @@ function doDeleteGroup() {
   const connCount = connectionStore.connections.filter(c => c.groupId === selectedGroup.value!.id).length
   const childCount = connectionStore.groups.filter(cg => cg.parentId === selectedGroup.value!.id).length
   if (connCount === 0 && childCount === 0) {
-    connectionStore.deleteGroup(selectedGroup.value.id, 'move-out')
+    connectionStore.scheduleDeleteGroup(selectedGroup.value.id, 'move-out')
     return
   }
   showDeleteGroupDialog.value = true
@@ -1514,7 +1514,7 @@ async function confirmDeleteGroup(connAction: 'delete-connections' | 'move-out')
   if (selectedGroup.value) {
     // Deleting the connections too implies deleting nested child groups.
     const childAction = connAction === 'delete-connections' ? 'delete-all' : 'move-up'
-    await connectionStore.deleteGroup(selectedGroup.value.id, connAction, childAction)
+    connectionStore.scheduleDeleteGroup(selectedGroup.value.id, connAction, childAction)
   }
   showDeleteGroupDialog.value = false
   selectedGroup.value = null

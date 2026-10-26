@@ -1239,7 +1239,7 @@ async function doDeleteGroup() {
   const connCount = connectionStore.connections.filter(c => c.groupId === g.id).length
   const childCount = connectionStore.groups.filter(cg => cg.parentId === g.id).length
   if (connCount === 0 && childCount === 0) {
-    await connectionStore.deleteGroup(g.id, 'move-out')
+    connectionStore.scheduleDeleteGroup(g.id, 'move-out')
     return
   }
   deleteGroupTarget.value = g
@@ -1248,7 +1248,10 @@ async function doDeleteGroup() {
 
 async function confirmDeleteGroup(action: 'delete-connections' | 'move-out') {
   if (deleteGroupTarget.value) {
-    await connectionStore.deleteGroup(deleteGroupTarget.value.id, action)
+    // Same as the sidebar: deleting the connections takes the nested
+    // sub-groups too, which is what the dialog counts.
+    const childAction = action === 'delete-connections' ? 'delete-all' : 'move-up'
+    connectionStore.scheduleDeleteGroup(deleteGroupTarget.value.id, action, childAction)
   }
   showDeleteGroupDialog.value = false
   deleteGroupTarget.value = null
@@ -1329,7 +1332,7 @@ function onCtxChangeGroup(targets: ConnectionConfig[]) {
 }
 
 function onCtxDelete(targets: ConnectionConfig[]) {
-  connectionStore.removeMany(targets.map(c => c.id))
+  connectionStore.scheduleRemoveMany(targets.map(c => c.id))
   selectedIds.value = new Set()
 }
 
