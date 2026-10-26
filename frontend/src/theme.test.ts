@@ -19,6 +19,8 @@ const TEXT_PAIRS: Array<[string, string[]]> = [
   ['--text-primary', ['--bg-base', '--bg-elevated', '--bg-surface', '--bg-sunken', '--bg-input', '--bg-hover', '--bg-active']],
   ['--text-secondary', ['--bg-base', '--bg-elevated', '--bg-surface', '--bg-sunken', '--bg-input', '--bg-hover']],
   ['--text-muted', ['--bg-base', '--bg-elevated', '--bg-surface', '--bg-sunken', '--bg-input']],
+  // Placeholder text of Element Plus fields (selects, pickers…).
+  ['--el-text-color-placeholder', ['--bg-input', '--bg-elevated', '--bg-surface', '--bg-base']],
   ['--accent-text', ['--bg-base', '--bg-surface', '--bg-sunken', '--accent-subtle']],
   ['--on-accent', ['--accent']],
   ['--on-danger', ['--danger-solid', '--danger-solid-hover']],
@@ -105,6 +107,26 @@ describe('FlexTerm (D1c) themes', () => {
     expect(panel).toMatch(/\.panel-broadcast-band \{[^}]*background: var\(--broadcast-band\);\s*color: var\(--on-broadcast\);/)
     expect(raw('tab-broadcasting')).toMatch(/\.tab-item\.tab-broadcasting::after \{[^}]*border: 2px solid var\(--broadcast-header\);/)
     expect(raw('tsb-broadcast')).toMatch(/\.tsb-broadcast \{\s*color: var\(--broadcast-text\);/)
+  })
+
+  for (const theme of ['flexterm', 'flexterm-light']) {
+    it(`${theme}: field outlines read at >= 3:1 (WCAG 1.4.11), card borders stay decorative`, () => {
+      const tokens = themeTokens(theme)
+      for (const k of ['--border-field', '--border-field-hover']) {
+        for (const bg of ['--bg-input', '--bg-base', '--bg-elevated', '--bg-surface']) {
+          expect(contrastRatio(tokens[k], tokens[bg]), `${theme} ${k} on ${bg}`).toBeGreaterThanOrEqual(3)
+        }
+      }
+      expect(tokens['--border-field']).not.toBe(tokens['--border-subtle'])
+    })
+  }
+
+  it('fields, checkboxes, switches and danger buttons use the tested tokens', () => {
+    expect(css).toMatch(/html\[data-theme\^="flexterm"\] \.el-input__wrapper,\s*html\[data-theme\^="flexterm"\] \.el-textarea__inner \{\s*box-shadow: 0 0 0 1px var\(--border-field\) inset !important;/)
+    expect(css).toMatch(/\.el-checkbox \{\s*--el-checkbox-input-border: 1px solid var\(--border-field\);/)
+    expect(css).toMatch(/\.el-switch \{\s*--el-switch-off-color: var\(--border-field\);/)
+    expect(css).toMatch(/\.el-button--danger:not\(\.is-plain\):not\(\.is-text\):not\(\.is-link\) \{\s*--el-button-bg-color: var\(--danger-solid\);[^}]*--el-button-text-color: var\(--on-danger\);/)
+    expect(css).toMatch(/\.el-button--danger\.is-link \{\s*--el-button-text-color: var\(--error\);/)
   })
 
   for (const theme of ['flexterm', 'flexterm-light']) {

@@ -168,7 +168,7 @@ const inheritedNote = computed(() => {
   min-width: 1.75rem;
   height: 1.75rem;
   padding: 0 0.375rem;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-field);
   border-radius: var(--radius-row);
   background: var(--bg-input);
   color: var(--text-primary);
@@ -178,7 +178,7 @@ const inheritedNote = computed(() => {
 }
 .csp-swatch:hover,
 .csp-icon:hover {
-  border-color: var(--border-hover);
+  border-color: var(--border-field-hover);
 }
 .csp-swatch.active,
 .csp-icon.active {
