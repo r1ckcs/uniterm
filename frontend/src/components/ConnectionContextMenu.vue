@@ -9,7 +9,9 @@
     </template>
     <template v-else>
       <!-- Connect: the「连接 X」label resolves from the connectionTypes registry -->
-      <MenuItem v-if="connectMenuLabelKey" @click="onConnectClick($event)">{{ t(connectMenuLabelKey) }}</MenuItem>
+      <!-- Already open: double-click focuses the session (item 49), so the
+           menu says plainly that this one opens another. -->
+      <MenuItem v-if="connectMenuLabelKey" @click="onConnectClick($event)">{{ isConnected && targets.length === 1 ? t('sidebar.openNewSession') : t(connectMenuLabelKey) }}</MenuItem>
       <MenuSubmenu v-if="isWorkspaceHostType(config?.type)" :label="t('sidebar.connectToWorkspace')">
         <MenuItem iconic :icon="Plus" @click="onCreateWorkspace">{{ t('workspace.newWorkspace') }}</MenuItem>
         <MenuItem v-for="w in workspaceTabs" :key="w.id" @click="onConnectToWorkspace(w.id)">{{ w.name }}</MenuItem>

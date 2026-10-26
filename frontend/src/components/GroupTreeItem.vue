@@ -44,9 +44,9 @@
       class="connection-item indented"
       :title="compactTitle(conn)"
       :data-conn-id="conn.id"
+            :aria-label="rowLabel(conn.name, getSubtitle(conn), conn.id)"
       :class="{
         active: selected.has(conn.id),
-        'has-session': openConns.has(conn.id),
         'drop-before': dropIndicator?.id === conn.id && dropIndicator?.position === 'before',
         'drop-after': dropIndicator?.id === conn.id && dropIndicator?.position === 'after',
       }"
@@ -62,11 +62,11 @@
       @dblclick="onItemDblClick(conn)"
       @contextmenu.prevent="onConnCtxMenu($event, conn)"
     >
-      <span class="conn-icon"><ConnStyleIcon :conn="conn" :fallback="connIcon(conn)" /></span>
+      <span class="conn-icon"><ConnStyleIcon :conn="conn" :fallback="connIcon(conn)" /><SessionStateBadge class="conn-session" hide-count :info="sessionOf(conn.id)" /></span>
       <div class="conn-details">
         <span class="name"><MiddleEllipsis :text="conn.name" /></span>
         <span class="conn-meta">
-          <span class="host">{{ getSubtitle(conn) }}</span>
+          <span class="host">{{ getSubtitle(conn) }}<template v-if="(sessionOf(conn.id)?.count ?? 0) > 1"> · ×{{ sessionOf(conn.id)!.count }}</template></span>
           <VaultChangedBadge :connection-id="conn.id" />
         </span>
       </div>
@@ -90,6 +90,8 @@
 
 <script setup lang="ts">
 import ConnStyleIcon from './ConnStyleIcon.vue'
+import SessionStateBadge from './SessionStateBadge.vue'
+import type { ConnSessionInfo } from '../utils/sessionPicker'
 import MiddleEllipsis from './MiddleEllipsis.vue'
 import VaultChangedBadge from './VaultChangedBadge.vue'
 import { inject, computed } from 'vue'
@@ -119,7 +121,7 @@ const totalCount = computed(() => {
 // Injected from Sidebar
 const expanded = inject<Set<string>>('expandedGroups')!
 const selected = inject<Set<string>>('selectedIds')!
-const openConns = inject<Set<string>>('openPanelConnIds')!
+const { sessionOf, rowLabel } = inject<{ sessionOf: (id: string) => ConnSessionInfo | undefined; rowLabel: (name: string, detail: string, id: string) => string }>('connSessions')!
 const dragOverId = inject<any>('dragOverGroupId')!
 const dropIndicator = inject<any>('dropIndicator')!
 const handlers = inject<any>('groupHandlers')!
@@ -305,14 +307,10 @@ function onMoreClick(e: MouseEvent, conn: ConnectionConfig) {
   color: var(--accent-text);
 }
 
-/* Connection has an open session → highlight its icon with the AI-lock amber */
-.connection-item.has-session .group-style {
+/* A styled group shows its color/icon before the name. */
+.group-style {
   margin-right: 0.375rem;
   color: var(--text-secondary);
-}
-
-.conn-icon {
-  color: var(--warning);
 }
 
 .conn-more-btn {
@@ -371,12 +369,22 @@ function onMoreClick(e: MouseEvent, conn: ConnectionConfig) {
 }
 
 .conn-icon {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 1rem;
   flex-shrink: 0;
   color: var(--text-muted);
+}
+/* Session state on the icon's corner (mirror Sidebar.vue). */
+.conn-icon :deep(.conn-session) {
+  position: absolute;
+  right: -0.3125rem;
+  bottom: -0.25rem;
+  padding: 0.0625rem;
+  border-radius: 0.375rem;
+  background: var(--bg-elevated);
 }
 
 .conn-details {

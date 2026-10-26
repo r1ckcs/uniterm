@@ -116,11 +116,13 @@
             v-for="config in site.rows"
             :key="config.id"
             class="site-row"
+            :aria-label="rowLabel(config.name, connStatus.stateOf(config.id) === 'down' ? t('startTab.noResponse') : rowDetail(config), config.id)"
             :class="{ focused: isCardFocused('site:' + config.id), selected: selectedIds.has('site:' + config.id), down: connStatus.stateOf(config.id) === 'down' }"
             @click="onCardClick(config, $event, 'site:')"
             @dblclick="onCardDblClick(config, $event)"
             @contextmenu.prevent="onContextMenu($event, config, 'site:')"
           >
+            <SessionStateBadge v-if="sessionOf(config.id)" class="site-row-session" :info="sessionOf(config.id)" />
             <ConnStyleIcon v-if="styledConn(config)" class="site-row-style" :conn="config" :fallback="connTypeIcon(config) || Server" />
             <span class="site-tag" :class="'tag-' + tagKind(config)">{{ tagLabel(config) }}</span>
             <span class="site-row-name"><MiddleEllipsis :text="config.name" /></span>
@@ -405,6 +407,8 @@
 
 <script setup lang="ts">
 import MiddleEllipsis from './MiddleEllipsis.vue'
+import SessionStateBadge from './SessionStateBadge.vue'
+import { useConnSessions } from '../composables/useConnSessions'
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import Menu from './Menu.vue'
 import TypeFilterMenu from './TypeFilterMenu.vue'
@@ -454,6 +458,7 @@ const connectionStore = useConnectionStore()
 const favoriteStore = useFavoriteStore()
 const tabStore = useTabStore()
 const settingsStore = useSettingsStore()
+const { sessionOf, focusSession, rowLabel } = useConnSessions()
 const connStatus = useConnStatusStore()
 const vault = useVaultStore()
 
@@ -826,8 +831,12 @@ function onQuickClick() {
   }
 }
 
+// An open connection is brought forward instead of opened twice (item 49);
+// Ctrl/⌘ keeps the start tab open and connects anyway, as before.
 function onCardDblClick(config: ConnectionConfig, e?: { ctrlKey?: boolean; metaKey?: boolean }) {
-  emit('connect', config, e ? !!(e.ctrlKey || e.metaKey) : false)
+  const keep = e ? !!(e.ctrlKey || e.metaKey) : false
+  if (!keep && focusSession(config.id)) return
+  emit('connect', config, keep)
 }
 
 function enterGroup(groupId: string) {
@@ -1108,7 +1117,7 @@ function onKeydown(e: KeyboardEvent) {
       // Bulk connect: open all selected connections
       const configs = ids.map(id => connectionStore.connections.find(c => c.id === id)).filter(Boolean) as ConnectionConfig[]
       for (const c of configs) {
-        emit('connect', c, e.ctrlKey || e.metaKey)
+        onCardDblClick(c, e)
       }
       selectedIds.value = new Set()
     } else {
@@ -1556,6 +1565,11 @@ function doEditConnection(config: ConnectionConfig | null) {
 }
 .site-row-style {
   color: var(--text-secondary);
+}
+/* Open-session state leads the row; the reachability probe is the "no
+   response" text at its end. */
+.site-row-session {
+  flex-shrink: 0;
 }
 .site-card-head .site-name {
   flex: 1;

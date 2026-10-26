@@ -138,3 +138,43 @@ export function movePickerIndex(index: number, delta: number, length: number): n
   if (index < 0) return delta > 0 ? 0 : length - 1
   return (index + delta + length) % length
 }
+
+// ── Session state per saved connection (item 49): the sidebar and the Sites
+// rows show it. Same panels and states as the picker; several sessions of
+// one connection show the worst state (down > connecting > connected) and
+// their number. Double-click focuses `focus`, the best one. ──
+export interface ConnSessionInfo {
+  state: PickerState
+  count: number
+  focus: { tabId: string; panelId: string; workspace: boolean }
+}
+
+const WORST: Record<PickerState, number> = { connected: 0, connecting: 1, down: 2 }
+
+export function connectionSessions(src: Pick<PickerSources, 'tabs' | 'getPanel' | 'sessionStatus'>): Map<string, ConnSessionInfo> {
+  const out = new Map<string, ConnSessionInfo>()
+  const add = (tabId: string, panel: Panel | undefined, workspace: boolean) => {
+    const id = panel?.config?.id
+    if (!panel || !id) return
+    const state = stateOf(panel, src as PickerSources)
+    const cur = out.get(id)
+    if (!cur) {
+      out.set(id, { state, count: 1, focus: { tabId, panelId: panel.id, workspace } })
+      return
+    }
+    cur.count++
+    const focusState = stateOf(src.getPanel(cur.focus.panelId)!, src as PickerSources)
+    if (WORST[state] < WORST[focusState]) cur.focus = { tabId, panelId: panel.id, workspace }
+    if (WORST[state] > WORST[cur.state]) cur.state = state
+  }
+  for (const tab of src.tabs) {
+    if (tab.type === 'workspace') tab.panelIds.forEach((pid) => add(tab.id, src.getPanel(pid), true))
+    else if (tab.type !== 'settings' && 'panelId' in tab) add(tab.id, src.getPanel(tab.panelId), false)
+  }
+  return out
+}
+
+// i18n key of the state as words, for the row's aria-label.
+export function sessionStateKey(state: PickerState): string {
+  return `sessionState.${state}`
+}
