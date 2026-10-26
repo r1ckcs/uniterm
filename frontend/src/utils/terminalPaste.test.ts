@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { normalizePastedText, bracketPaste, visibleControls, pasteWithScroll, pastedLineCount, needsBroadcastPasteConfirm, pasteToTargets, type BroadcastPasteRequest } from './terminalPaste'
+import { normalizePastedText, bracketPaste, visibleControls, withWritePrefix, pasteWithScroll, pastedLineCount, needsBroadcastPasteConfirm, pasteToTargets, type BroadcastPasteRequest } from './terminalPaste'
 import type { PasteTarget } from './terminalPaste'
 
 function mkTarget(overrides: Partial<PasteTarget> = {}): PasteTarget & { scrollToBottom: ReturnType<typeof vi.fn> } {
@@ -143,5 +143,50 @@ describe('pasted text cannot end the bracket (item 52)', () => {
     const req = confirm.mock.calls[0][0]
     expect(req.preview[0]).toBe('echo safe␛[201~')
     expect(req.preview[2]).toBe('␛[200~more')
+  })
+})
+
+describe('controls inside the bracket and AI output (item 53)', () => {
+  it('drops C0 (but tab and line breaks), DEL and C1 inside the bracket', () => {
+    expect(bracketPaste('a\x03b\x1ac\x1cd\x00e\x7ff\x85g\x9bh', true)).toBe('\x1b[200~abcdefgh\x1b[201~')
+    expect(bracketPaste('if x;\tthen\n  y\r\nfi', true)).toBe('\x1b[200~if x;\tthen\n  y\r\nfi\x1b[201~')
+    // Ordinary text, accents and CJK pass untouched.
+    expect(bracketPaste('ação 配置 é', true)).toBe('\x1b[200~ação 配置 é\x1b[201~')
+    // No bracket, nothing changes (as a terminal without the mode).
+    expect(bracketPaste('a\x03b', false)).toBe('a\x03b')
+  })
+
+  const target = (name: string, bracketed = true) => {
+    const writes: string[] = []
+    return { writes, t: { name, host: '', bracketedPasteMode: bracketed, write: (p: string) => { writes.push(p) }, scrollToBottom: () => {} } }
+  }
+
+  it('AI output: ^U then the bracketed text, once per session, outside the bracket', async () => {
+    const one = target('self')
+    expect(await pasteToTargets('ls -la', withWritePrefix([one.t], '\x15'), async () => false)).toBe(true)
+    expect(one.writes).toEqual(['\x15\x1b[200~ls -la\x1b[201~'])
+  })
+
+  it('multi-line AI output with broadcast asks first; cancel leaves every line alone', async () => {
+    const a = target('A'); const b = target('B')
+    const confirm = vi.fn(async (_req: BroadcastPasteRequest) => false)
+    expect(await pasteToTargets('rm -rf x\nreboot', withWritePrefix([a.t, b.t], '\x15'), confirm)).toBe(false)
+    expect(confirm).toHaveBeenCalledTimes(1)
+    expect(a.writes).toEqual([])
+    expect(b.writes).toEqual([])
+    confirm.mockResolvedValueOnce(true)
+    await pasteToTargets('rm -rf x\nreboot', withWritePrefix([a.t, b.t], '\x15'), confirm)
+    expect(a.writes).toEqual(['\x15\x1b[200~rm -rf x\nreboot\x1b[201~'])
+    expect(b.writes).toEqual(a.writes)
+  })
+
+  it('the prefixed targets keep reading each paste mode at write time', async () => {
+    let mode = false
+    const writes: string[] = []
+    const base = { name: 'A', host: '', get bracketedPasteMode() { return mode }, write: (p: string) => { writes.push(p) }, scrollToBottom: () => {} }
+    const [wrapped] = withWritePrefix([base], '\x15')
+    mode = true
+    pasteWithScroll(wrapped, 'x')
+    expect(writes).toEqual(['\x15\x1b[200~x\x1b[201~'])
   })
 })

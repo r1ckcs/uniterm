@@ -19,12 +19,14 @@ export function normalizePastedText(text: string): string {
 }
 
 /** Wrap in bracketed-paste markers when the app enabled the mode, so vim etc.
- * don't re-indent each pasted line. Every ESC (and the 8-bit CSI, 0x9B) in
- * the text is dropped first: a pasted "ESC[201~" would otherwise end the
- * bracket early and the lines after it would run as they arrive (item 52).
- * Without the mode there is no bracket to break, and the text goes as is. */
+ * don't re-indent each pasted line. Every control character but tab and
+ * line breaks is dropped from the text first (C0, DEL and C1, as kitty
+ * does): a pasted "ESC[201~" would end the bracket early and run the lines
+ * after it (item 52), and ^C/^Z/^\ would still raise a signal on the remote
+ * tty and cut the paste short (item 53). Without the mode there is no
+ * bracket, and the text goes as is. */
 export function bracketPaste(text: string, enabled: boolean): string {
-  return enabled ? `\x1b[200~${text.replace(/[\x1b\x9b]/g, '')}\x1b[201~` : text
+  return enabled ? `\x1b[200~${text.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/g, '')}\x1b[201~` : text
 }
 
 /** Control characters as visible symbols for the paste preview: C0 as the
@@ -102,4 +104,17 @@ export async function pasteToTargets(
   }
   for (const target of targets) pasteWithScroll(target, text)
   return true
+}
+
+// The same targets, each write led by prefix: an AI suggestion clears the
+// line (^U) right before its text, and only once the paste is confirmed, so
+// a cancel leaves every line as it was.
+export function withWritePrefix(targets: NamedPasteTarget[], prefix: string): NamedPasteTarget[] {
+  return targets.map((t) => ({
+    name: t.name,
+    host: t.host,
+    get bracketedPasteMode() { return t.bracketedPasteMode },
+    write: (payload: string) => t.write(prefix + payload),
+    scrollToBottom: () => t.scrollToBottom(),
+  }))
 }
