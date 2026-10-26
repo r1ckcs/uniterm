@@ -2116,5 +2116,14 @@
   "conn.sshLegacySecureNote": "With \"Legacy device\" on, Secure mode is treated as Compatible.",
   "hostKey.weakKey": "{bits}-bit RSA key — weak. Only accept it for old equipment you know.",
   "ssh.legacyKeyError": "The device uses an old key/algorithm (RSA {bits} bits). Turn on \"Legacy device\" for this connection.",
-  "ssh.handshakeFailed": "SSH negotiation failed (not a password problem). Press Enter to try again."
+  "ssh.handshakeFailed": "SSH negotiation failed (not a password problem). Press Enter to try again.",
+  "broadcastPaste.title.one": "Paste {lines} lines into {count} session?",
+  "broadcastPaste.title.other": "Paste {lines} lines into {count} sessions?",
+  "broadcastPaste.sessions.one": "The session that receives it:",
+  "broadcastPaste.sessions.other": "The {count} sessions that receive it:",
+  "broadcastPaste.preview": "First lines:",
+  "broadcastPaste.more.one": "… and {count} more line",
+  "broadcastPaste.more.other": "… and {count} more lines",
+  "broadcastPaste.confirm.one": "Paste into {count} session",
+  "broadcastPaste.confirm.other": "Paste into {count} sessions"
 }

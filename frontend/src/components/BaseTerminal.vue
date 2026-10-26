@@ -176,7 +176,8 @@ import { stripCursorBlink } from '../utils/cursor'
 import { applyBackspaceKey } from '../utils/backspaceKey'
 import { formatFontFamily } from '../utils/formatFontFamily'
 import { terminalLineHeight } from '../utils/terminalFonts'
-import { normalizePastedText, pasteWithScroll } from '../utils/terminalPaste'
+import { pasteToTargets, type NamedPasteTarget } from '../utils/terminalPaste'
+import { confirmBroadcastPaste } from '../composables/useBroadcastPasteConfirm'
 import {
   sanitizeTerminalOutput,
   sanitizeLiveTerminalOutput,
@@ -304,6 +305,7 @@ let unsubscribe: (() => void) | null = null
 let statusUnsubscribe: (() => void) | null = null
 let onDocumentMouseDown: ((e: MouseEvent) => void) | null = null
 let onTerminalAuxClick: ((e: MouseEvent) => void) | null = null
+let onTerminalDomPaste: ((e: ClipboardEvent) => void) | null = null
 let onOpenSearch: ((e: Event) => void) | null = null
 let onExport: ((e: Event) => void) | null = null
 let onResetOutput: ((e: Event) => void) | null = null
@@ -1505,6 +1507,20 @@ onMounted(() => {
   }
   document.addEventListener('auxclick', onTerminalAuxClick)
 
+  // A native paste (Edit ▸ Paste, a platform paste the key handler did not
+  // catch) would reach xterm's textarea and go straight to onData, around
+  // the broadcast confirmation. Take it here, in the capture phase, and send
+  // it through pasteToSession like every other paste (item 48).
+  onTerminalDomPaste = (event: ClipboardEvent) => {
+    if (props.mode !== 'ssh' && props.mode !== 'local') return
+    if (!terminalRef.value?.contains(event.target as Node)) return
+    event.preventDefault()
+    event.stopPropagation()
+    const text = event.clipboardData?.getData('text/plain')
+    if (text) pasteToSession(text)
+  }
+  document.addEventListener('paste', onTerminalDomPaste, true)
+
   // Session data
   unsubscribe =Events.On('session:data', (ev) => { const payload: { id: string; data: string } = ev.data;
     if (!isActive.value) {
@@ -2143,6 +2159,10 @@ onUnmounted(() => {
     document.removeEventListener('mousedown', onDocumentMouseDown)
     onDocumentMouseDown = null
   }
+  if (onTerminalDomPaste) {
+    document.removeEventListener('paste', onTerminalDomPaste, true)
+    onTerminalDomPaste = null
+  }
   if (onTerminalAuxClick) {
     document.removeEventListener('auxclick', onTerminalAuxClick)
     onTerminalAuxClick = null
@@ -2182,48 +2202,45 @@ function pasteToTerminal(text: string) {
 
 async function pasteToSession(text: string) {
   if (props.mode === 'ssh' || props.mode === 'local') {
-    // Normalize line endings (CRLF -> LF, drop stray CR) so pasting into
-    // editors like vim doesn't double newlines (Windows clipboard has \r\n).
-    const normalized = normalizePastedText(text)
+    // Line endings are normalized (CRLF -> LF, stray CR dropped) by
+    // pasteWithScroll, so pasting into vim doesn't double newlines.
+    let targets: NamedPasteTarget[] = []
 
     // Broadcast mode: write to every target panel instead of only this
     // session (issue #597 — pasted command must sync like keyboard input).
-    if (props.broadcastActive) {
-      const targets = tabStore.getAllBroadcastPanelIds()
-      if (targets.length > 0) {
-        for (const pid of targets) {
-          const p = panelStore.getPanel(pid)
-          const managed = p?.sessionId ? getManagedTerminal(p.sessionId) : undefined
-          if (p?.sessionId && (p.type === 'ssh' || p.type === 'local' || p.type === 'wsl') && managed) {
-            // Bracket per target session — each has its own paste mode.
-            // Scroll each target's viewport to the bottom too, so broadcast
-            // paste behaves like keyboard input everywhere (issue 629).
-            pasteWithScroll(
-              {
-                bracketedPasteMode: managed.terminal.modes.bracketedPasteMode,
-                write: (payload) => queuedSessionWrite(p.sessionId, payload),
-                scrollToBottom: () => managed.terminal.scrollToBottom(),
-              },
-              normalized,
-            )
-          }
+    const broadcastIds = props.broadcastActive ? tabStore.getAllBroadcastPanelIds() : []
+    if (broadcastIds.length > 0) {
+      for (const pid of broadcastIds) {
+        const p = panelStore.getPanel(pid)
+        const sid = p?.sessionId
+        const managed = sid ? getManagedTerminal(sid) : undefined
+        if (sid && p && (p.type === 'ssh' || p.type === 'local' || p.type === 'wsl') && managed) {
+          // Bracket per target session — each has its own paste mode, read
+          // when writing (after the confirmation, if one is asked). Scroll
+          // each target's viewport to the bottom too, so broadcast paste
+          // behaves like keyboard input everywhere (issue 629).
+          targets.push({
+            name: p.config?.name || p.title,
+            host: p.config?.host || '',
+            get bracketedPasteMode() { return managed.terminal.modes.bracketedPasteMode },
+            write: (payload) => queuedSessionWrite(sid, payload),
+            scrollToBottom: () => managed.terminal.scrollToBottom(),
+          })
         }
-        return
       }
+    } else if (props.sessionId) {
+      const sid = props.sessionId
+      targets = [{
+        name: '',
+        host: '',
+        get bracketedPasteMode() { return getManagedTerminal(sid)?.terminal.modes.bracketedPasteMode ?? false },
+        write: (payload) => queuedSessionWrite(sid, payload),
+        scrollToBottom: () => terminal?.scrollToBottom(),
+      }]
     }
-
-    const sid = props.sessionId
-    if (sid) {
-      const managed = getManagedTerminal(sid)
-      pasteWithScroll(
-        {
-          bracketedPasteMode: managed?.terminal.modes.bracketedPasteMode ?? false,
-          write: (payload) => queuedSessionWrite(sid, payload),
-          scrollToBottom: () => terminal?.scrollToBottom(),
-        },
-        normalized,
-      )
-    }
+    // A multi-line paste into several broadcast sessions asks first (item 48).
+    const pasted = await pasteToTargets(text, targets, confirmBroadcastPaste)
+    if (pasted && targets.length > 1) focus()
   }
 }
 

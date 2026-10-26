@@ -2116,5 +2116,14 @@
   "conn.sshLegacySecureNote": "Com \"Equipamento legado\" ligado, o modo Seguro é tratado como Compatível.",
   "hostKey.weakKey": "Chave RSA de {bits} bits — fraca. Só aceite se for um equipamento antigo que você conhece.",
   "ssh.legacyKeyError": "O equipamento usa chave/algoritmo antigo (RSA {bits} bits). Ative \"Equipamento legado\" nesta conexão.",
-  "ssh.handshakeFailed": "Falha na negociação SSH (não é senha). Pressione Enter para tentar de novo."
+  "ssh.handshakeFailed": "Falha na negociação SSH (não é senha). Pressione Enter para tentar de novo.",
+  "broadcastPaste.title.one": "Colar {lines} linhas em {count} sessão?",
+  "broadcastPaste.title.other": "Colar {lines} linhas em {count} sessões?",
+  "broadcastPaste.sessions.one": "A sessão que recebe:",
+  "broadcastPaste.sessions.other": "As {count} sessões que recebem:",
+  "broadcastPaste.preview": "Primeiras linhas:",
+  "broadcastPaste.more.one": "… e mais {count} linha",
+  "broadcastPaste.more.other": "… e mais {count} linhas",
+  "broadcastPaste.confirm.one": "Colar em {count} sessão",
+  "broadcastPaste.confirm.other": "Colar em {count} sessões"
 }
