@@ -5,7 +5,7 @@
        `shortcut` renders a muted trailing hint (keyboard shortcut / aux text);
        the `#trailing` slot hosts right-aligned content that fades in on row
        hover (e.g. a delete button) without the host hand-rolling the reveal. -->
-  <div class="menu-item" :class="{ 'has-trailing': !!$slots.trailing, 'has-shortcut': !!shortcut, iconic }">
+  <div class="menu-item" role="menuitem" tabindex="-1" :class="{ 'has-trailing': !!$slots.trailing, 'has-shortcut': !!shortcut, iconic }">
     <component
       v-if="icon"
       :is="icon"

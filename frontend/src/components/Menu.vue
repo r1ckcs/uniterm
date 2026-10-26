@@ -6,6 +6,9 @@
       class="conn-context-menu"
       :class="[{ 'mirror-left': mirrorLeft, overflow: overflow }, rootClass]"
       :style="menuStyle"
+      role="menu"
+      tabindex="-1"
+      @keydown="onMenuKeydown"
       @mouseover="onInnerMouseOver"
       @mouseleave="submenu.active = ''"
       @contextmenu.stop
@@ -14,6 +17,25 @@
     </div>
   </Teleport>
 </template>
+
+<script lang="ts">
+// Module scope (runs once, shared by every <Menu>; <script setup> below runs
+// per instance).
+// The last input decides whether opening moves focus into the menu: a menu
+// opened by keyboard starts on its first item; one opened by mouse keeps the
+// focus where it was until an arrow key is pressed.
+let lastInputKeyboard = false
+document.addEventListener('keydown', () => { lastInputKeyboard = true }, true)
+document.addEventListener('pointerdown', () => { lastInputKeyboard = false }, true)
+
+function menuItemsIn(level: HTMLElement): HTMLElement[] {
+  return [...level.querySelectorAll<HTMLElement>('.menu-item')].filter((el) => {
+    // Only this level: not rows of a nested flyout.
+    const fly = el.parentElement?.closest('.menu-submenu, .conn-context-menu')
+    return fly === level && !el.classList.contains('disabled') && el.offsetParent !== null
+  })
+}
+</script>
 
 <script setup lang="ts">
 import { ref, reactive, provide, watch, nextTick } from 'vue'
@@ -101,8 +123,26 @@ function onDocClick(e: MouseEvent) {
   if (el && !el.contains(e.target as Node)) active.close()
 }
 function onDocKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') active?.close()
+  if (e.key === 'Escape') {
+    active?.close()
+    return
+  }
+  // A menu opened with the mouse: the first arrow press moves into it, unless
+  // the key belongs to a text field or the terminal.
+  if (!active || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return
+  const el = active.el()
+  const t = e.target as HTMLElement | null
+  if (!el || el.contains(t) || t?.closest?.('input, textarea, [contenteditable], .xterm')) return
+  const items = menuItemsIn(el)
+  if (!items.length) return
+  e.preventDefault()
+  ;(e.key === 'ArrowDown' ? items[0] : items[items.length - 1]).focus()
 }
+
+// ── Keyboard inside the menu (item 47): ↑↓ wrap, Home/End, Enter/Space pick,
+// → opens a submenu, ← / Esc go back, Tab leaves. Items are the .menu-item
+// rows of the level that holds the focus (the menu or an open flyout). ──
+
 
 const props = defineProps<{
   visible: boolean
@@ -211,6 +251,63 @@ function toggle(anchorEl: HTMLElement, data?: unknown) {
 
 defineExpose({ open, openAt, toggle, close: closeFn })
 
+// Focus goes back where it came from when the menu closes.
+let returnFocus: HTMLElement | null = null
+
+function focusFirstItem() {
+  const m = menuEl.value
+  if (!m) return
+  const items = menuItemsIn(m)
+  ;(items[0] ?? m).focus({ preventScroll: true })
+}
+
+function onMenuKeydown(e: KeyboardEvent) {
+  const m = menuEl.value
+  const cur = (e.target as HTMLElement).closest('.menu-item') as HTMLElement | null
+  if (!m) return
+  const level = (cur?.parentElement?.closest('.menu-submenu, .conn-context-menu') as HTMLElement | null) ?? m
+  const items = menuItemsIn(level)
+  const i = cur ? items.indexOf(cur) : -1
+  const go = (j: number) => { e.preventDefault(); e.stopPropagation(); items[j]?.focus() }
+  switch (e.key) {
+    case 'ArrowDown': return go(items.length ? (i + 1) % items.length : 0)
+    case 'ArrowUp': return go(items.length ? (i - 1 + items.length) % items.length : 0)
+    case 'Home': return go(0)
+    case 'End': return go(items.length - 1)
+    case 'Enter':
+    case ' ':
+      if (!cur) return
+      e.preventDefault()
+      e.stopPropagation()
+      if (cur.classList.contains('submenu-wrap')) openFlyout(cur)
+      else cur.click()
+      return
+    case 'ArrowRight':
+      if (cur?.classList.contains('submenu-wrap')) { e.preventDefault(); e.stopPropagation(); openFlyout(cur) }
+      return
+    case 'ArrowLeft':
+    case 'Escape': {
+      const wrap = level !== m ? (level.closest('.submenu-wrap') as HTMLElement | null) : null
+      e.preventDefault()
+      e.stopPropagation()
+      if (wrap) { submenu.active = ''; wrap.focus() }
+      else if (e.key === 'Escape') closeFn()
+      return
+    }
+    case 'Tab':
+      closeFn()
+      return
+  }
+}
+
+function openFlyout(wrap: HTMLElement) {
+  wrap.dispatchEvent(new MouseEvent('mouseenter'))
+  nextTick(() => {
+    const fly = wrap.querySelector('.menu-submenu') as HTMLElement | null
+    if (fly) menuItemsIn(fly)[0]?.focus()
+  })
+}
+
 // Hovering anywhere outside a submenu-wrap or its open flyout collapses it.
 function onInnerMouseOver(e: MouseEvent) {
   const t = e.target as HTMLElement
@@ -235,10 +332,17 @@ watch(() => submenu.active, (key) => {
 watch(() => props.visible, (v) => {
   if (v) {
     activate(menuController)
+    const prev = document.activeElement as HTMLElement | null
+    returnFocus = prev && prev !== document.body ? prev : null
+    if (lastInputKeyboard) nextTick(() => requestAnimationFrame(focusFirstItem))
   } else {
     deactivate(menuController)
     current.value = undefined
     submenu.active = ''
+    // Only when the focus was inside the menu: a click elsewhere keeps it.
+    const m = menuEl.value
+    if (returnFocus && m && m.contains(document.activeElement)) returnFocus.focus({ preventScroll: true })
+    returnFocus = null
   }
 })
 </script>
@@ -329,6 +433,18 @@ watch(() => props.visible, (v) => {
 .conn-context-menu .menu-item:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+.conn-context-menu .menu-item:focus {
+  outline: none;
+}
+.conn-context-menu .menu-item:focus-visible {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+.conn-context-menu:focus {
+  outline: none;
 }
 .conn-context-menu .menu-item.disabled {
   color: var(--text-disabled);
