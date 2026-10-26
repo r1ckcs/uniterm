@@ -123,7 +123,7 @@
           >
             <ConnStyleIcon v-if="styledConn(config)" class="site-row-style" :conn="config" :fallback="connTypeIcon(config) || Server" />
             <span class="site-tag" :class="'tag-' + tagKind(config)">{{ tagLabel(config) }}</span>
-            <span class="site-row-name">{{ config.name }}</span>
+            <span class="site-row-name"><MiddleEllipsis :text="config.name" /></span>
             <span v-if="connStatus.stateOf(config.id) === 'down'" class="site-row-down">{{ t('startTab.noResponse') }}</span>
             <span v-else class="site-row-host">{{ rowDetail(config) }}</span>
             <button class="row-fav-btn" :class="{ on: favoriteStore.isFavorite(config.id) }" :title="favoriteStore.isFavorite(config.id) ? t('sidebar.removeFromFavorites') : t('sidebar.addToFavorites')" @click.stop="favoriteStore.toggle(config.id)"><Star class="row-icon" /></button>
@@ -136,7 +136,8 @@
         </section>
       </div>
       <div v-else-if="connectionStore.connections.length > 0" class="start-empty-hint">
-        {{ siteFilter === 'alert' ? (connStatus.available ? t('startTab.noAlerts') : t('startTab.noStatus')) : t('startTab.noFavorites') }}
+        <span>{{ siteFilter === 'alert' ? (connStatus.available ? t('startTab.noAlerts') : t('startTab.noStatus')) : t('startTab.noFavorites') }}</span>
+        <button type="button" class="start-empty-all" @click="siteFilter = 'all'">{{ t('startTab.showAllSites') }}</button>
       </div>
 
       <section v-if="recentConfigs.length > 0" class="recent-strip">
@@ -176,7 +177,7 @@
                 <ConnStyleIcon :conn="config" :fallback="connTypeIcon(config) || Server" size="md" />
               </div>
               <div>
-                <div class="start-card-name">{{ config.name }}</div>
+                <div class="start-card-name"><MiddleEllipsis :text="config.name" /></div>
                 <div class="start-card-meta">{{ getCardSubtitle(config) }}</div>
               </div>
             </div>
@@ -206,7 +207,7 @@
                 <ConnStyleIcon :conn="config" :fallback="connTypeIcon(config) || Server" size="md" />
               </div>
               <div>
-                <div class="start-card-name">{{ config.name }}</div>
+                <div class="start-card-name"><MiddleEllipsis :text="config.name" /></div>
                 <div class="start-card-meta">{{ getCardSubtitle(config) }}</div>
               </div>
             </div>
@@ -274,7 +275,7 @@
                 <ConnStyleIcon :conn="config" :fallback="connTypeIcon(config) || Server" size="md" />
               </div>
               <div>
-                <div class="start-card-name">{{ config.name }}</div>
+                <div class="start-card-name"><MiddleEllipsis :text="config.name" /></div>
                 <div class="start-card-meta">{{ getCardSubtitle(config) }}</div>
               </div>
             </div>
@@ -329,7 +330,7 @@
               <ConnStyleIcon :conn="config" :fallback="connTypeIcon(config) || Server" size="md" />
             </div>
             <div>
-              <div class="start-card-name">{{ config.name }}</div>
+              <div class="start-card-name"><MiddleEllipsis :text="config.name" /></div>
               <div class="start-card-meta">{{ getCardSubtitle(config) }}</div>
             </div>
           </div>
@@ -403,6 +404,7 @@
 </template>
 
 <script setup lang="ts">
+import MiddleEllipsis from './MiddleEllipsis.vue'
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import Menu from './Menu.vue'
 import TypeFilterMenu from './TypeFilterMenu.vue'
@@ -679,7 +681,11 @@ const groupCards = computed(() => {
 const UNGROUPED = '__ungrouped__'
 const SITE_ROWS = 5
 type SiteFilter = 'all' | 'alert' | 'favorites'
-const siteFilter = ref<SiteFilter>('all')
+// Sites opens on "With alert" (item 46): the sidebar already lists every
+// connection, so the start page leads with the exceptions (the POP cards
+// with something down) and the recents, and "All" is one click away. With
+// the reachability check off there is nothing to flag, so it opens on "All".
+const siteFilter = ref<SiteFilter>(settingsStore.settings.connStatusCheck === false ? 'all' : 'alert')
 const showSites = computed(() => props.tab.viewMode === 'home' && !searchQuery.value.trim())
 
 function subtreeIds(groupId: string): Set<string> {
@@ -2048,6 +2054,26 @@ function doEditConnection(config: ConnectionConfig | null) {
   color: var(--accent-text);
 }
 
+.start-empty-all {
+  display: block;
+  margin: 0.75rem auto 0;
+  padding: 0.375rem 0.875rem;
+  border: 1px solid var(--border-field);
+  border-radius: var(--radius-btn, 0.5rem);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.start-empty-all:hover {
+  background: var(--bg-hover);
+}
+.start-empty-all:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
 .start-empty-hint,
 .start-empty-state {
   text-align: center;

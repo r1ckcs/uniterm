@@ -36,6 +36,9 @@ type LocalState struct {
 	// context menu (type/modTime/size/permission/owner/group). Local-only UI
 	// state, never synced; columns absent from the list stay visible.
 	SftpHiddenColumns []string `json:"sftpHiddenColumns,omitempty"`
+	// SidebarWidth is the connection sidebar width in CSS px set by dragging
+	// (or the keyboard) on its edge. 0 = the default width. Local-only.
+	SidebarWidth int `json:"sidebarWidth,omitempty"`
 }
 
 type LocalStateStore struct {

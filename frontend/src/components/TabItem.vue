@@ -44,7 +44,7 @@
     </span>
     <span v-if="!editing" class="tab-name" :class="{ 'tab-disconnected': isDisconnected && !isDown }" :title="tabTitle" @dblclick.stop="startEdit">
       <ArrowDownUp v-if="hasActiveTransfers" class="transfer-indicator" :size="'0.875rem'" :title="t('tab.transferring')" />
-      <span class="tab-name-text">{{ tab.name }}</span>
+      <span class="tab-name-text"><MiddleEllipsis :text="tab.name" no-title /></span>
     </span>
     <input
       v-else
@@ -147,6 +147,7 @@
 </template>
 
 <script setup lang="ts">
+import MiddleEllipsis from './MiddleEllipsis.vue'
 import { colorCss, connectionStyle } from '../utils/connectionStyle'
 import { useConnectionStore } from '../stores/connectionStore'
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
@@ -840,6 +841,8 @@ onMounted(async () => {
   font-weight: 500;
 }
 .tab-name-text {
+  display: flex;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

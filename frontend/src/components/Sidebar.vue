@@ -5,7 +5,20 @@
     :class="{ collapsed: !visible, resizing: isResizing }"
     :style="{ width: sidebarWidth + 'px' }"
   >
-    <div class="resize-handle" @mousedown="onResizeStart" />
+    <div
+      class="resize-handle"
+      role="separator"
+      aria-orientation="vertical"
+      tabindex="0"
+      :aria-label="t('sidebar.resize')"
+      :aria-valuenow="sidebarWidth"
+      :aria-valuemin="SIDEBAR_MIN"
+      :aria-valuemax="SIDEBAR_MAX"
+      :title="t('sidebar.resizeHint')"
+      @mousedown="onResizeStart"
+      @keydown="onResizeKeydown"
+      @dblclick="setSidebarWidth(SIDEBAR_DEFAULT)"
+    />
     <div class="sidebar-header" @contextmenu.prevent="onTabStripContextMenu">
       <button class="sidebar-tab" :class="{ active: activeView === 'connections' }" @click="activeView = 'connections'" :title="t('header.connections')" :aria-label="t('header.connections')" :aria-pressed="activeView === 'connections'"><el-icon><Network :size="'0.875rem'" /></el-icon></button>
       <button v-if="tabVisible('files')" class="sidebar-tab" :class="{ active: activeView === 'files' }" @click="onFilesTabClick" :title="t('header.files')" :aria-label="t('header.files')" :aria-pressed="activeView === 'files'"><el-icon><FolderTree :size="'0.875rem'" /></el-icon></button>
@@ -83,7 +96,7 @@
           >
             <span class="conn-icon"><ConnStyleIcon :conn="conn" :fallback="connIcon(conn)" /></span>
             <div class="conn-details">
-              <span class="name">{{ conn.name }}</span>
+              <span class="name"><MiddleEllipsis :text="conn.name" /></span>
               <span class="conn-meta">
                 <span class="host">{{ getSubtitle(conn) }}</span>
                 <VaultChangedBadge :connection-id="conn.id" />
@@ -151,7 +164,7 @@
           >
             <span class="conn-icon"><ConnStyleIcon :conn="conn" :fallback="connIcon(conn)" /></span>
             <div class="conn-details">
-              <span class="name">{{ conn.name }}</span>
+              <span class="name"><MiddleEllipsis :text="conn.name" /></span>
               <span class="conn-meta">
                 <span class="host">{{ getSubtitle(conn) }}</span>
                 <VaultChangedBadge :connection-id="conn.id" />
@@ -190,7 +203,7 @@
         >
           <span class="conn-icon"><ConnStyleIcon :conn="conn" :fallback="connIcon(conn)" /></span>
           <div class="conn-details">
-            <span class="name">{{ conn.name }}</span>
+            <span class="name"><MiddleEllipsis :text="conn.name" /></span>
             <span class="conn-meta">
               <span class="host">{{ getSubtitle(conn) }}</span>
               <VaultChangedBadge :connection-id="conn.id" />
@@ -423,6 +436,7 @@
 
 <script setup lang="ts">
 import ConnStyleIcon from './ConnStyleIcon.vue'
+import MiddleEllipsis from './MiddleEllipsis.vue'
 import VaultChangedBadge from './VaultChangedBadge.vue'
 import { ref, onMounted, onUnmounted, computed, watch, nextTick, provide } from 'vue'
 import { X, ChevronRight, ChevronDown, Filter, Check, Network, Zap, Clock, Plus, Palette, SquareTerminal, Activity, Pencil, MoreHorizontal, FolderTree, ArrowRightLeft, Star } from '@lucide/vue'
@@ -863,10 +877,49 @@ watch(searchQuery, (q) => {
   wasSearching.value = isSearching
 })
 
-// ── Resize ──
-const sidebarWidth = ref(240)
+// ── Resize (item 46): drag the edge, or ←/→ on it (Shift = bigger step,
+// Home/End = min/max, double-click = default). Remembered per device in
+// LocalState.sidebarWidth. ──
+const SIDEBAR_MIN = 220
+const SIDEBAR_MAX = 480
+const SIDEBAR_DEFAULT = 240
+const sidebarWidth = ref(SIDEBAR_DEFAULT)
 const isResizing = ref(false)
 const sidebarEl = ref<HTMLDivElement>()
+const clampWidth = (w: number) => Math.round(Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w)))
+let saveWidthTimer: ReturnType<typeof setTimeout> | null = null
+
+function setSidebarWidth(w: number) {
+  sidebarWidth.value = clampWidth(w)
+  if (sidebarEl.value) sidebarEl.value.style.width = sidebarWidth.value + 'px'
+  if (saveWidthTimer) clearTimeout(saveWidthTimer)
+  saveWidthTimer = setTimeout(() => {
+    useLocalStateStore().update({ sidebarWidth: sidebarWidth.value === SIDEBAR_DEFAULT ? 0 : sidebarWidth.value })
+  }, 400)
+}
+
+function onResizeKeydown(e: KeyboardEvent) {
+  const step = e.shiftKey ? 64 : 16
+  let w: number | null = null
+  if (e.key === 'ArrowLeft') w = sidebarWidth.value - step
+  else if (e.key === 'ArrowRight') w = sidebarWidth.value + step
+  else if (e.key === 'Home') w = SIDEBAR_MIN
+  else if (e.key === 'End') w = SIDEBAR_MAX
+  if (w === null) return
+  e.preventDefault()
+  setSidebarWidth(w)
+}
+
+async function initSidebarWidth() {
+  try {
+    const ls = useLocalStateStore()
+    if (!ls.loaded) await ls.init()
+    if (ls.state.sidebarWidth) sidebarWidth.value = clampWidth(ls.state.sidebarWidth)
+  } catch {
+    // default width
+  }
+}
+initSidebarWidth()
 
 function onResizeStart(e: MouseEvent) {
   isResizing.value = true
@@ -880,13 +933,12 @@ function onResizeStart(e: MouseEvent) {
   function onMouseMove(ev: MouseEvent) {
     if (!isResizing.value) return
     const delta = ev.clientX - startX
-    const newWidth = Math.min(Math.max(startWidth + delta, 240), 400)
-    el!.style.width = newWidth + 'px'
+    el!.style.width = clampWidth(startWidth + delta) + 'px'
   }
 
   function onMouseUp() {
     isResizing.value = false
-    sidebarWidth.value = el!.offsetWidth
+    setSidebarWidth(el!.offsetWidth)
     document.removeEventListener('mousemove', onMouseMove)
     document.removeEventListener('mouseup', onMouseUp)
     window.dispatchEvent(new CustomEvent('split:resize-end'))
@@ -1867,7 +1919,11 @@ defineExpose({ focusSearch, openQuickCommands, openChangeGroupFor, openChangeGro
 }
 
 /* Hover: 0.1875rem accent bar extending into sidebar */
-.resize-handle:hover::after {
+.resize-handle:focus {
+  outline: none;
+}
+.resize-handle:hover::after,
+.resize-handle:focus-visible::after {
   content: '';
   position: absolute;
   top: 0;
