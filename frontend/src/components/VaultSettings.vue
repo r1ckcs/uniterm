@@ -109,7 +109,7 @@
       <!-- Pending join requests the user closed -->
       <div v-if="vault.visibleJoinRequests.length > 0 && !vault.joinRequest" class="vault-card">
         <div class="vault-card-body vault-row">
-          <span class="vault-value">{{ t('vault.settings.pendingJoins', { n: vault.visibleJoinRequests.length }) }}</span>
+          <span class="vault-value">{{ t('vault.settings.pendingJoins', { count: vault.visibleJoinRequests.length }) }}</span>
           <el-button size="small" type="primary" @click="vault.unsnoozeJoins()">{{ t('vault.settings.review') }}</el-button>
         </div>
       </div>

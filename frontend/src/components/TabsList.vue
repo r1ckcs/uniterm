@@ -8,7 +8,7 @@
 
       <TabItem
         :tab="tab"
-        :shortcut-index="index + 1"
+        :shortcut-index="digits.get(tab.id)"
         :is-active="tab.id === activeTabId"
         :tab-stop="tab.id === tabStopId"
         :has-notification="tabStore.hasTabNotification(tab.id)"
@@ -69,6 +69,7 @@
 </template>
 
 <script setup lang="ts">
+import { scrollBehavior } from '../utils/motion'
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { MoreHorizontal, Plus } from '@lucide/vue'
 import { useTabStore } from '../stores/tabStore'
@@ -77,6 +78,7 @@ import { useI18n } from '../i18n'
 import { useSettingsStore } from '../stores/settingsStore'
 import { formatKeyBinding } from '../composables/useKeyboardShortcuts'
 import TabItem from './TabItem.vue'
+import { tabDigits } from '../utils/tabShortcuts'
 
 const tabStore = useTabStore()
 const panelStore = usePanelStore()
@@ -96,6 +98,8 @@ function shortcutSuffix(action: 'newConnection'): string {
 
 const tabs = computed(() => tabStore.tabs)
 const activeTabId = computed(() => tabStore.activeTabId)
+// ⌘1–9 badges count session tabs only (item 51).
+const digits = computed(() => tabDigits(tabs.value))
 
 const dragOverTabIndex = ref<number | null>(null)
 const dragOverInsertAfter = ref(false)
@@ -191,7 +195,7 @@ function scrollToTab(tabId: string) {
   if (!tabsListRef.value) return
   const el = tabsListRef.value.querySelector(`[data-tab-id="${tabId}"]`) as HTMLElement | null
   if (el) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+    el.scrollIntoView({ behavior: scrollBehavior(), block: 'nearest', inline: 'nearest' })
   }
 }
 

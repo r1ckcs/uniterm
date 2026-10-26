@@ -38,8 +38,8 @@ describe('delete prompt names what goes', () => {
 describe('undo notice', () => {
   it('names the connection, the list or the group with its count', () => {
     setLocale('pt-BR')
-    expect(deletedNotice(t, { id: 'x', kind: 'connections', names: ['PE01-REI'], host: '10.20.2.1' })).toBe('Excluída PE01-REI')
-    expect(deletedNotice(t, { id: 'x', kind: 'connections', names: ['A', 'B', 'C'] })).toBe('Excluídas 3 conexões: A, B e C')
+    expect(deletedNotice(t, { id: 'x', kind: 'connections', names: ['PE01-REI'], host: '10.20.2.1' })).toBe('PE01-REI excluída')
+    expect(deletedNotice(t, { id: 'x', kind: 'connections', names: ['A', 'B', 'C'] })).toBe('3 conexões excluídas: A, B e C')
     expect(deletedNotice(t, { id: 'x', kind: 'group', names: [], groupName: 'POP REI' })).toBe('Grupo POP REI excluído')
     expect(deletedNotice(t, { id: 'x', kind: 'group', names: ['A'], groupName: 'POP REI' })).toBe('Grupo POP REI excluído com 1 conexão')
     expect(deletedNotice(t, { id: 'x', kind: 'group', names: ['A', 'B'], groupName: 'POP REI' })).toBe('Grupo POP REI excluído com 2 conexões')

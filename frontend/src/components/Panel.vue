@@ -269,7 +269,7 @@ const panelBroadcastActive = computed(() =>
 )
 
 const broadcastTitle = computed(() =>
-  `${t('terminal.broadcastInput')}\n${t('terminal.broadcastCtrlHint')}`
+  `${t('terminal.broadcastInput')}\n${t('terminal.broadcastCtrlHint', { mod: isMac ? '⌘' : 'Ctrl+' })}`
 )
 
 function onBroadcastClick(e: MouseEvent) {

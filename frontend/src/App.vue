@@ -180,6 +180,7 @@
 <script setup lang="ts">
 import { isQuickSearchShortcut, quickSearchLabel } from './utils/quickSearch'
 import { detectPlatformSync } from './utils/platform'
+import { tabForDigit } from './utils/tabShortcuts'
 import type { PickerMode } from './utils/sessionPicker'
 import SessionPicker from './components/SessionPicker.vue'
 import { ref, computed, watch, nextTick, onMounted, onUnmounted, provide, h } from 'vue'
@@ -1015,7 +1016,8 @@ function onPlatformSystemShortcut(e: KeyboardEvent) {
       return
     }
     if (target === 'tab') {
-      const tab = tabStore.tabs[Number(digitMatch[1]) - 1]
+      // Session tabs only: the start page takes no number (item 51).
+      const tab = tabForDigit(tabStore.tabs, Number(digitMatch[1]))
       if (!tab) return
       e.preventDefault()
       e.stopImmediatePropagation()

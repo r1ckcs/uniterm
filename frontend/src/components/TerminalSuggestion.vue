@@ -61,6 +61,7 @@
 </template>
 
 <script setup lang="ts">
+import { scrollBehavior } from '../utils/motion'
 import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { Trash2, Clock, Zap, Sparkles } from '@lucide/vue'
 import type { SuggestionItem } from '../composables/useSuggestions'
@@ -207,7 +208,7 @@ watch(() => props.selectedIndex, (newIndex) => {
     if (!item || item.type === 'ai-preview' || item.type === 'ai-result') return
     const el = itemRefs.value[newIndex]
     if (el) {
-      el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      el.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() })
     }
   })
 })
