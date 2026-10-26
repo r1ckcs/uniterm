@@ -122,10 +122,10 @@
             @dblclick="onCardDblClick(config, $event)"
             @contextmenu.prevent="onContextMenu($event, config, 'site:')"
           >
-            <SessionStateBadge v-if="sessionOf(config.id)" class="site-row-session" :info="sessionOf(config.id)" />
+            <span class="site-row-session"><SessionStateBadge :info="sessionOf(config.id)" /></span>
             <ConnStyleIcon v-if="styledConn(config)" class="site-row-style" :conn="config" :fallback="connTypeIcon(config) || Server" />
             <span class="site-tag" :class="'tag-' + tagKind(config)">{{ tagLabel(config) }}</span>
-            <span class="site-row-name"><MiddleEllipsis :text="config.name" /></span>
+            <span class="site-row-name"><MiddleEllipsis :text="site.labels.get(config.id) ?? config.name" :full="config.name" /></span>
             <span v-if="connStatus.stateOf(config.id) === 'down'" class="site-row-down">{{ t('startTab.noResponse') }}</span>
             <span v-else class="site-row-host">{{ rowDetail(config) }}</span>
             <button class="row-fav-btn" :class="{ on: favoriteStore.isFavorite(config.id) }" :title="favoriteStore.isFavorite(config.id) ? t('sidebar.removeFromFavorites') : t('sidebar.addToFavorites')" @click.stop="favoriteStore.toggle(config.id)"><Star class="row-icon" /></button>
@@ -407,6 +407,7 @@
 
 <script setup lang="ts">
 import MiddleEllipsis from './MiddleEllipsis.vue'
+import { groupLabels } from '../utils/groupLabel'
 import SessionStateBadge from './SessionStateBadge.vue'
 import { useConnSessions } from '../composables/useConnSessions'
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
@@ -734,7 +735,9 @@ const siteCards = computed(() => {
       if (connStatus.available && down > 0) { badge = t('startTab.siteDown', { count: down }); badgeKind = 'alert' }
       else if (connStatus.available && ok > 0) { badge = t('startTab.siteOk', { count: ok }); badgeKind = 'ok' }
       else badge = t('startTab.connectionsCount', { count: typed.length })
-      return { id: site.id, name: site.name, group: site.group, styled: site.styled, rows: shown.slice(0, SITE_ROWS), total: shown.length, down, badge, badgeKind }
+      // The card already names the POP: rows drop it from their labels (item 50).
+      const labels = site.group ? groupLabels(site.conns, site.name) : new Map<string, string>()
+      return { id: site.id, name: site.name, group: site.group, styled: site.styled, rows: shown.slice(0, SITE_ROWS), total: shown.length, down, badge, badgeKind, labels }
     })
     .filter(site => siteFilter.value === 'all' ? true : site.total > 0)
 })
@@ -1567,9 +1570,13 @@ function doEditConnection(config: ConnectionConfig | null) {
   color: var(--text-secondary);
 }
 /* Open-session state leads the row; the reachability probe is the "no
-   response" text at its end. */
+   response" text at its end. A fixed column, empty when closed, so the
+   protocol tags and names line up in every row. */
 .site-row-session {
-  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 1.25rem;
+  width: 1.25rem;
 }
 .site-card-head .site-name {
   flex: 1;

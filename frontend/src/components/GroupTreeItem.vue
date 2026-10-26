@@ -64,7 +64,7 @@
     >
       <span class="conn-icon"><ConnStyleIcon :conn="conn" :fallback="connIcon(conn)" /><SessionStateBadge class="conn-session" hide-count :info="sessionOf(conn.id)" /></span>
       <div class="conn-details">
-        <span class="name"><MiddleEllipsis :text="conn.name" /></span>
+        <span class="name"><MiddleEllipsis :text="labels.get(conn.id) ?? conn.name" :full="conn.name" /></span>
         <span class="conn-meta">
           <span class="host">{{ getSubtitle(conn) }}<template v-if="(sessionOf(conn.id)?.count ?? 0) > 1"> · ×{{ sessionOf(conn.id)!.count }}</template></span>
           <VaultChangedBadge :connection-id="conn.id" />
@@ -97,6 +97,7 @@ import VaultChangedBadge from './VaultChangedBadge.vue'
 import { inject, computed } from 'vue'
 import { ChevronDown, ChevronRight, Folder, MoreHorizontal, Star } from '@lucide/vue'
 import { groupStyle } from '../utils/connectionStyle'
+import { groupLabels } from '../utils/groupLabel'
 import type { ConnectionConfig, ConnectionGroup } from '../types/session'
 import type { GroupTreeNode } from '../stores/connectionStore'
 import { useConnectionStore } from '../stores/connectionStore'
@@ -138,6 +139,10 @@ function compactTitle(conn: ConnectionConfig): string | undefined {
   return settingsStore.settings.listDensity === 'compact' ? `${conn.name}\n${getSubtitle(conn)}` : undefined
 }
 
+
+// Names shown without the group's own name (item 50): "OLT-ZTE-C600-CORDOVIL"
+// under "POP Cordovil" reads "OLT-ZTE-C600" before any middle cut.
+const labels = computed(() => groupLabels(props.node.connections, props.node.group.name))
 
 // A styled group (own color/icon, or inherited) shows it before its name.
 const hasGroupStyle = computed(() => {
