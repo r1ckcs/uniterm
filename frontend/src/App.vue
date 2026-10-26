@@ -159,6 +159,8 @@
     <PasswordSaveOffer />
     <KeychainLostDialog v-model:visible="keychainLostVisible" @done="onKeychainLostDone" />
     <HostKeyChangedDialog :request="hostKeyChangedQueue[0] ?? null" @resolve="onHostKeyChangedResolve" />
+    <DeleteConfirmDialog />
+    <PendingDeleteToasts />
     <!-- Startup credential dialogs first; the vault welcome waits its turn. -->
     <VaultOnboardingDialog v-if="!dataDirVisible && !encryptVisible && !unlockVisible && !keychainLostVisible" />
     <VaultJoinApprovalDialog />
@@ -211,6 +213,8 @@ import EncryptionModeDialog from './components/EncryptionModeDialog.vue'
 import CredentialUnlockDialog from './components/CredentialUnlockDialog.vue'
 import KeychainLostDialog from './components/KeychainLostDialog.vue'
 import HostKeyChangedDialog from './components/HostKeyChangedDialog.vue'
+import DeleteConfirmDialog from './components/DeleteConfirmDialog.vue'
+import PendingDeleteToasts from './components/PendingDeleteToasts.vue'
 import { canAnswerHostKeyChanged, enqueueHostKeyChanged, type HostKeyChangedRequest } from './utils/hostKeyChanged'
 import VaultOnboardingDialog from './components/VaultOnboardingDialog.vue'
 import VaultJoinApprovalDialog from './components/VaultJoinApprovalDialog.vue'

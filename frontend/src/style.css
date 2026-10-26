@@ -1859,3 +1859,17 @@ html[data-theme^="flexterm"] .app-header .tab-item .tab-broadcast-icon,
 html[data-theme^="flexterm"] .app-header .tab-item .transfer-indicator {
   color: var(--header-text);
 }
+
+/* Red "delete" button on --danger-solid: the --error tone is meant for text
+   and fails 4.5:1 under white text in the dark themes (item 42). */
+.el-button.danger-solid-btn {
+  --el-button-bg-color: var(--danger-solid);
+  --el-button-border-color: var(--danger-solid);
+  --el-button-text-color: var(--on-danger);
+  --el-button-hover-bg-color: var(--danger-solid-hover);
+  --el-button-hover-border-color: var(--danger-solid-hover);
+  --el-button-hover-text-color: var(--on-danger);
+  --el-button-active-bg-color: var(--danger-solid-hover);
+  --el-button-active-border-color: var(--danger-solid-hover);
+  font-weight: 700;
+}
