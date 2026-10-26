@@ -50,7 +50,8 @@ func planReplace(appFile, userFile, hostname string, old, appAll []knownhosts.Kn
 		} else {
 			check = append(check, o)
 		}
-		p.OldKeys = append(p.OldKeys, HostKeyOld{KeyType: o.Key.Type(), Fingerprint: ssh.FingerprintSHA256(o.Key), File: file})
+		bits, _ := rsaKeyBits(o.Key)
+		p.OldKeys = append(p.OldKeys, HostKeyOld{KeyType: o.Key.Type(), Fingerprint: ssh.FingerprintSHA256(o.Key), File: file, KeyBits: bits})
 	}
 	if p.UserFileKept {
 		p.RemoveCommand = removeCommand(hostname)

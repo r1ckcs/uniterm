@@ -1,10 +1,11 @@
-// Changed SSH host key (CONTRATO-chave-trocada v1.1): payload of the
+// Changed SSH host key (CONTRATO-chave-trocada v1.2): payload of the
 // ssh:hostkey-changed event and the rules the dialog follows.
 
 export interface HostKeyOldKey {
   keyType: string
   fingerprint: string
   file: 'app' | 'user'
+  keyBits?: number // RSA only; absent when unknown or another type
 }
 
 export interface HostKeyChangedRequest {
@@ -53,18 +54,23 @@ export function keyTypeLabel(keyType: string): string {
 }
 
 // The line above the fingerprints when the new key is weaker or of
-// another type: "ED25519 → RSA 527 bits". Old key sizes are not in the
-// payload, so a same-type size drop only shows when the new key is weak.
-export function keyDowngrade(req: HostKeyChangedRequest): { from: string; to: string; weak: boolean } | null {
+// another type: "ED25519 → RSA 527 bits", or with the same type and fewer
+// bits: "RSA 2048 bits → RSA 1024 bits" (sameType). A size only counts when
+// both sides carry it: an old key without keyBits is not compared.
+export function keyDowngrade(req: HostKeyChangedRequest): { from: string; to: string; weak: boolean; sameType: boolean } | null {
   const to = keyTypeLabel(req.keyType)
-  const oldLabels = [...new Set((req.oldKeys || []).map((k) => keyTypeLabel(k.keyType)))]
+  const toText = req.keyBits ? `${to} ${req.keyBits} bits` : to
+  const oldKeys = req.oldKeys || []
+  const oldLabels = [...new Set(oldKeys.map((k) => keyTypeLabel(k.keyType)))]
   const typeChanged = oldLabels.length > 0 && !oldLabels.includes(to)
-  if (!typeChanged && !req.weak) return null
-  return {
-    from: typeChanged ? oldLabels.join(' / ') : '',
-    to: req.keyBits ? `${to} ${req.keyBits} bits` : to,
-    weak: !!req.weak,
+  if (typeChanged) return { from: oldLabels.join(' / '), to: toText, weak: !!req.weak, sameType: false }
+  const sameBits = oldKeys.filter((k) => keyTypeLabel(k.keyType) === to && k.keyBits).map((k) => k.keyBits as number)
+  const maxOld = sameBits.length ? Math.max(...sameBits) : 0
+  if (req.keyBits && maxOld > req.keyBits) {
+    return { from: `${to} ${maxOld} bits`, to: toText, weak: !!req.weak, sameType: true }
   }
+  if (!req.weak) return null
+  return { from: '', to: toText, weak: true, sameType: false }
 }
 
 // "10.20.1.1:22" / "[fe80::1]:2222" → host and port.

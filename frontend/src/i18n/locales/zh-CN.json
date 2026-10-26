@@ -1861,6 +1861,7 @@
   "hostKeyChanged.title": "主机密钥已更改（{host}）",
   "hostKeyChanged.weakNew": "新密钥较弱：{to}",
   "hostKeyChanged.typeChanged": "密钥类型已更改：{from} → {to}",
+  "hostKeyChanged.bitsDropped": "密钥变短了：{from} → {to}",
   "hostKeyChanged.titleNamed": "{name} 的密钥已更改（{host}）",
   "hostKeyChanged.message": "{host} 的密钥与受信任的密钥不一致。可能有人在拦截连接（中间人攻击），也可能设备已更换。替换前请与管理员确认。",
   "hostKeyChanged.trusted": "受信任的密钥",
