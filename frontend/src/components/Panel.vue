@@ -2,7 +2,7 @@
   <div
     :data-panel-id="panel.id"
     class="panel"
-    :class="{ 'panel-active': isActive }"
+    :class="{ 'panel-active': isActive, 'panel-broadcasting': panelBroadcastActive }"
     draggable="true"
     @dragstart="emit('dragstart', $event)"
   >
@@ -123,6 +123,15 @@
         </div>
         <button class="panel-close" @click.stop="emit('close', panel.id)"><X :size="'0.875rem'" /></button>
       </div>
+    </div>
+    <!-- Broadcast is the riskiest mode: a solid band with text and a stop
+         button, plus a frame around the terminal (not color alone). -->
+    <div v-if="panelBroadcastActive" class="panel-broadcast-band" role="status">
+      <Radio class="panel-broadcast-band-icon" aria-hidden="true" />
+      <span class="panel-broadcast-band-text">{{ t('broadcast.band', { count: tabStore.broadcastSessionCount }) }}</span>
+      <button type="button" class="panel-broadcast-stop" @click.stop="tabStore.disableAllBroadcast()">
+        <X class="panel-broadcast-stop-icon" aria-hidden="true" />{{ t('broadcast.stop') }}
+      </button>
     </div>
     <BaseTerminal
       ref="baseTerminalRef"
@@ -693,11 +702,69 @@ watch(() => props.panel.outputLog, (val) => {
 
 <style scoped>
 .panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
   overflow: hidden;
   background: var(--bg-base);
+}
+/* Frame drawn above the terminal canvas, so xterm cannot paint over it. */
+.panel-broadcasting::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--broadcast);
+  pointer-events: none;
+  z-index: 5;
+}
+.panel-broadcast-band {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  min-height: 1.75rem;
+  padding: 0.125rem 0.375rem 0.125rem 0.625rem;
+  background: var(--broadcast-band);
+  color: var(--on-broadcast);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.panel-broadcast-band-icon {
+  width: 0.9375rem;
+  height: 0.9375rem;
+  flex-shrink: 0;
+}
+.panel-broadcast-band-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.panel-broadcast-stop {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  padding: 0.1875rem 0.5rem;
+  border: 1px solid var(--on-broadcast);
+  border-radius: var(--radius-btn, 0.375rem);
+  background: transparent;
+  color: var(--on-broadcast);
+  font: inherit;
+  cursor: pointer;
+}
+.panel-broadcast-stop:hover,
+.panel-broadcast-stop:focus-visible {
+  background: var(--on-broadcast);
+  color: var(--broadcast-band);
+  outline: none;
+}
+.panel-broadcast-stop-icon {
+  width: 0.75rem;
+  height: 0.75rem;
 }
 .panel-header {
   display: flex;
@@ -814,8 +881,8 @@ watch(() => props.panel.outputLog, (val) => {
   background: var(--bg-hover);
 }
 .panel-broadcast.active {
-  color: var(--accent-text);
-  background: var(--accent-subtle);
+  color: var(--on-broadcast);
+  background: var(--broadcast-band);
 }
 .broadcast-icon {
   display: inline-block;

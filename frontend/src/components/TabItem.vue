@@ -1,7 +1,7 @@
 <template>
   <div
     class="tab-item"
-    :class="{ active: isActive, 'ai-locked': isAILocked, 'tab-down': isDown }"
+    :class="{ active: isActive, 'ai-locked': isAILocked, 'tab-down': isDown, 'tab-broadcasting': canBroadcast && isBroadcastTarget }"
     :data-tab-id="tab.id"
     @click="$emit('activate', tab.id)"
     @mouseenter="hovered = true"
@@ -57,12 +57,13 @@
       :class="`tab-progress-${activeProgress.state}`"
       :style="activeProgress.state === 3 ? undefined : { width: `${Math.max(2, Math.min(100, activeProgress.value))}%` }"
     />
-    <Radio
+    <span
       v-if="showBroadcastIcon"
       class="tab-broadcast-icon"
-      :size="'0.875rem'"
-      :title="t('tab.unbroadcast')"
-    />
+      role="img"
+      :aria-label="t('broadcast.tabMark')"
+      :title="t('broadcast.tabMark')"
+    ><Radio :size="'0.75rem'" /></span>
     <button
       v-if="tabCloseRight && !showBroadcastIcon"
       class="tab-close tab-close-right"
@@ -851,9 +852,24 @@ onMounted(async () => {
 .tab-broadcast-icon {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   margin-left: auto;
-  color: var(--accent-text);
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 50%;
+  background: var(--broadcast-band);
+  color: var(--on-broadcast);
+}
+/* A tab receiving broadcast input gets a frame in the broadcast color, on
+   top of the icon (not color alone). */
+.tab-item.tab-broadcasting::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--broadcast-header);
+  border-radius: inherit;
+  pointer-events: none;
 }
 .tab-notification-dot {
   position: absolute;
