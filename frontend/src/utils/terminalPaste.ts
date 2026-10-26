@@ -33,3 +33,58 @@ export function pasteWithScroll(target: PasteTarget, text: string): void {
   target.write(payload)
   target.scrollToBottom()
 }
+// ── Broadcast paste confirmation (item 48) ──
+// A multi-line paste with broadcast on reaches every target session at
+// once (a 40-line config into 4 OLTs). It waits for an explicit "Paste into
+// N sessions"; one line, or a single target, goes as before.
+
+export interface NamedPasteTarget extends PasteTarget {
+  name: string
+  host: string
+}
+
+export interface BroadcastPasteRequest {
+  lineCount: number
+  sessions: { name: string; host: string }[]
+  preview: string[] // first lines, for the dialog
+  more: number // lines left out of the preview
+}
+
+export const BROADCAST_PASTE_PREVIEW_LINES = 6
+
+// Lines the paste types: one trailing newline (a copied line with its
+// Enter) still counts as one line.
+export function pastedLineCount(text: string): number {
+  const t = normalizePastedText(text).replace(/\n$/, '')
+  return t ? t.split('\n').length : 0
+}
+
+export function needsBroadcastPasteConfirm(text: string, targetCount: number): boolean {
+  return targetCount > 1 && pastedLineCount(text) > 1
+}
+
+export function broadcastPasteRequest(text: string, targets: { name: string; host: string }[]): BroadcastPasteRequest {
+  const lines = normalizePastedText(text).replace(/\n$/, '').split('\n')
+  const preview = lines.slice(0, BROADCAST_PASTE_PREVIEW_LINES)
+  return {
+    lineCount: lines.length,
+    sessions: targets.map(({ name, host }) => ({ name, host })),
+    preview,
+    more: lines.length - preview.length,
+  }
+}
+
+// Paste into every target, asking first when needsBroadcastPasteConfirm.
+// Cancel writes nothing anywhere; confirm writes each target once.
+export async function pasteToTargets(
+  text: string,
+  targets: NamedPasteTarget[],
+  confirm: (req: BroadcastPasteRequest) => Promise<boolean>,
+): Promise<boolean> {
+  if (!targets.length) return false
+  if (needsBroadcastPasteConfirm(text, targets.length)) {
+    if (!(await confirm(broadcastPasteRequest(text, targets)))) return false
+  }
+  for (const target of targets) pasteWithScroll(target, text)
+  return true
+}

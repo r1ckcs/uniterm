@@ -167,6 +167,7 @@
       @connect="(c: ConnectionConfig) => onSidebarConnect(c)"
     />
     <DeleteConfirmDialog />
+    <BroadcastPasteDialog />
     <PendingDeleteToasts />
     <!-- Startup credential dialogs first; the vault welcome waits its turn. -->
     <VaultOnboardingDialog v-if="!dataDirVisible && !encryptVisible && !unlockVisible && !keychainLostVisible" />
@@ -224,6 +225,7 @@ import CredentialUnlockDialog from './components/CredentialUnlockDialog.vue'
 import KeychainLostDialog from './components/KeychainLostDialog.vue'
 import HostKeyChangedDialog from './components/HostKeyChangedDialog.vue'
 import DeleteConfirmDialog from './components/DeleteConfirmDialog.vue'
+import BroadcastPasteDialog from './components/BroadcastPasteDialog.vue'
 import PendingDeleteToasts from './components/PendingDeleteToasts.vue'
 import { canAnswerHostKeyChanged, connectionNameFor, enqueueHostKeyChanged, type HostKeyChangedRequest } from './utils/hostKeyChanged'
 import VaultOnboardingDialog from './components/VaultOnboardingDialog.vue'

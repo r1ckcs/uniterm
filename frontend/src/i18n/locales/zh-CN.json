@@ -2116,5 +2116,14 @@
   "conn.sshLegacySecureNote": "开启“旧设备”后，安全模式将按兼容模式处理。",
   "hostKey.weakKey": "{bits} 位 RSA 密钥——强度较弱。仅当这是你了解的旧设备时才接受。",
   "ssh.legacyKeyError": "该设备使用旧的密钥/算法（RSA {bits} 位）。请为此连接开启“旧设备”。",
-  "ssh.handshakeFailed": "SSH 协商失败（不是密码问题）。按 Enter 重试。"
+  "ssh.handshakeFailed": "SSH 协商失败（不是密码问题）。按 Enter 重试。",
+  "broadcastPaste.title.one": "将 {lines} 行粘贴到 {count} 个会话？",
+  "broadcastPaste.title.other": "将 {lines} 行粘贴到 {count} 个会话？",
+  "broadcastPaste.sessions.one": "接收的会话：",
+  "broadcastPaste.sessions.other": "接收的 {count} 个会话：",
+  "broadcastPaste.preview": "前几行：",
+  "broadcastPaste.more.one": "… 还有 {count} 行",
+  "broadcastPaste.more.other": "… 还有 {count} 行",
+  "broadcastPaste.confirm.one": "粘贴到 {count} 个会话",
+  "broadcastPaste.confirm.other": "粘贴到 {count} 个会话"
 }
