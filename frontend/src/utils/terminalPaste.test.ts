@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { normalizePastedText, bracketPaste, visibleControls, withWritePrefix, pasteWithScroll, pastedLineCount, needsBroadcastPasteConfirm, pasteToTargets, type BroadcastPasteRequest } from './terminalPaste'
+import { normalizePastedText, bracketPaste, visibleControls, withWritePrefix, aiSuggestionText, pasteWithScroll, pastedLineCount, needsBroadcastPasteConfirm, pasteToTargets, type BroadcastPasteRequest } from './terminalPaste'
 import type { PasteTarget } from './terminalPaste'
 
 function mkTarget(overrides: Partial<PasteTarget> = {}): PasteTarget & { scrollToBottom: ReturnType<typeof vi.fn> } {
@@ -188,5 +188,23 @@ describe('controls inside the bracket and AI output (item 53)', () => {
     mode = true
     pasteWithScroll(wrapped, 'x')
     expect(writes).toEqual(['\x15\x1b[200~x\x1b[201~'])
+  })
+})
+
+describe('AI suggestion is one line without controls (item 53, Ferrolho)', () => {
+  it('turns line breaks into spaces and drops C0, DEL and C1', () => {
+    expect(aiSuggestionText('ls\nrm -rf /tmp/x')).toBe('ls rm -rf /tmp/x')
+    expect(aiSuggestionText('a\r\nb\rc\td\x03e\x1b[201~f\x7f\x9b')).toBe('a b cde[201~f')
+    expect(aiSuggestionText('  git status\n')).toBe('git status')
+  })
+
+  it('one session without bracketed mode: no line break reaches it', async () => {
+    const writes: string[] = []
+    const target = { name: '', host: '', bracketedPasteMode: false, write: (p: string) => { writes.push(p) }, scrollToBottom: () => {} }
+    const confirm = vi.fn(async (_req: BroadcastPasteRequest) => true)
+    await pasteToTargets(aiSuggestionText('ls\nrm -rf /tmp/x'), withWritePrefix([target], '\x15'), confirm)
+    expect(writes).toEqual(['\x15ls rm -rf /tmp/x'])
+    expect(writes.join('')).not.toMatch(/[\r\n]/)
+    expect(confirm).not.toHaveBeenCalled()
   })
 })

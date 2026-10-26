@@ -176,7 +176,7 @@ import { stripCursorBlink } from '../utils/cursor'
 import { applyBackspaceKey } from '../utils/backspaceKey'
 import { formatFontFamily } from '../utils/formatFontFamily'
 import { terminalLineHeight } from '../utils/terminalFonts'
-import { pasteToTargets, withWritePrefix, type NamedPasteTarget } from '../utils/terminalPaste'
+import { aiSuggestionText, pasteToTargets, withWritePrefix, type NamedPasteTarget } from '../utils/terminalPaste'
 import { confirmBroadcastPaste } from '../composables/useBroadcastPasteConfirm'
 import {
   sanitizeTerminalOutput,
@@ -646,13 +646,14 @@ async function applySuggestion(item: ReturnType<typeof suggestions.getSelectedIt
   const sid = props.sessionId
 
   if (item.type === 'ai-result') {
-    // AI output is foreign text and may hold several lines: it goes like a
-    // paste (bracket, multi-line broadcast confirmation), led by ^U to
-    // replace the line. Cancel writes nothing anywhere (item 53).
-    const ok = await pasteToTargets(item.value, withWritePrefix(buildPasteTargets(), '\x15'), confirmBroadcastPaste)
-    if (ok && !item.value.includes('\n')) {
-      terminalInput.lineBuffer.value = item.value
-      terminalInput.cursorIndex.value = item.value.length
+    // AI output is foreign text: reduced to one line without controls, it
+    // goes like a paste (bracket when the session has the mode), led by ^U
+    // to replace the line (item 53).
+    const text = aiSuggestionText(item.value)
+    const ok = !!text && await pasteToTargets(text, withWritePrefix(buildPasteTargets(), '\x15'), confirmBroadcastPaste)
+    if (ok) {
+      terminalInput.lineBuffer.value = text
+      terminalInput.cursorIndex.value = text.length
       terminalInput.currentToken.value = ''
     }
   } else if (item.type === 'history' || item.type === 'quick-command') {

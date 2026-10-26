@@ -118,3 +118,15 @@ export function withWritePrefix(targets: NamedPasteTarget[], prefix: string): Na
     scrollToBottom: () => t.scrollToBottom(),
   }))
 }
+
+// An AI suggestion replaces the command line, so it is one line: line breaks
+// become spaces and every other control character (C0, DEL, C1) goes, with
+// or without bracketed mode. Otherwise a reply with "\n" would run its
+// first lines on a session without the mode (OLTs, switches), where the
+// suggestion label, cut at one line, hides them.
+export function aiSuggestionText(value: string): string {
+  return value
+    .replace(/\r\n|[\r\n]/g, ' ')
+    .replace(/[\x00-\x1f\x7f-\x9f]/g, '')
+    .trim()
+}
