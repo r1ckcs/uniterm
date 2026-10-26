@@ -4,6 +4,8 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/rsa"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -490,5 +492,44 @@ func TestChangedKeyBracketedDefaultPortIsReplaced(t *testing.T) {
 	}
 	if out := readFile(t, app); strings.Contains(out, "[srv]:22") || !strings.Contains(out, knownLine("srv:22", next)) {
 		t.Fatalf("file:\n%s", out)
+	}
+}
+
+// The trusted keys carry their RSA size too, so the dialog can show a
+// same-type drop (RSA 2048 → RSA 1024); other types leave it out.
+func TestChangedPromptCarriesOldKeyBits(t *testing.T) {
+	dir := t.TempDir()
+	app := filepath.Join(dir, "known_hosts")
+	old := newRSAKey(t)
+	writeKnown(t, app, "srv:22", old)
+	priv, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	smaller, err := ssh.NewPublicKey(&priv.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got HostKeyPrompt
+	_ = verifyHostKey(app, "", "srv:22", smaller, func(p HostKeyPrompt) (HostKeyAnswer, error) {
+		got = p
+		return HostKeyReject, nil
+	}, true)
+	if !got.Changed || len(got.OldKeys) != 1 || got.OldKeys[0].KeyBits != 2048 || got.KeyBits != 1024 {
+		t.Fatalf("old key bits: %+v", got)
+	}
+
+	app2 := filepath.Join(dir, "known_hosts2")
+	writeKnown(t, app2, "srv:22", newEd25519Key(t))
+	got = HostKeyPrompt{}
+	_ = verifyHostKey(app2, "", "srv:22", newEd25519Key(t), func(p HostKeyPrompt) (HostKeyAnswer, error) {
+		got = p
+		return HostKeyReject, nil
+	}, true)
+	if len(got.OldKeys) != 1 || got.OldKeys[0].KeyBits != 0 {
+		t.Fatalf("non-RSA old key must leave keyBits out: %+v", got.OldKeys)
+	}
+	if b, _ := json.Marshal(got.OldKeys[0]); strings.Contains(string(b), "keyBits") {
+		t.Fatalf("keyBits serialized for ed25519: %s", b)
 	}
 }

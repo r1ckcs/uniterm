@@ -1861,6 +1861,7 @@
   "hostKeyChanged.title": "Host key changed ({host})",
   "hostKeyChanged.weakNew": "Weak new key: {to}",
   "hostKeyChanged.typeChanged": "Key type changed: {from} → {to}",
+  "hostKeyChanged.bitsDropped": "Key got smaller: {from} → {to}",
   "hostKeyChanged.titleNamed": "Key of {name} changed ({host})",
   "hostKeyChanged.message": "The key of {host} is not the trusted one. Someone may be intercepting the connection (man-in-the-middle attack), or the device was replaced. Check with whoever manages it before replacing.",
   "hostKeyChanged.trusted": "Trusted key",

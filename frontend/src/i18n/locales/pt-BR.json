@@ -1861,6 +1861,7 @@
   "hostKeyChanged.title": "A chave do host mudou ({host})",
   "hostKeyChanged.weakNew": "Chave nova fraca: {to}",
   "hostKeyChanged.typeChanged": "Tipo de chave mudou: {from} → {to}",
+  "hostKeyChanged.bitsDropped": "Chave ficou menor: {from} → {to}",
   "hostKeyChanged.titleNamed": "Chave do {name} mudou ({host})",
   "hostKeyChanged.message": "A chave de {host} não é a confiável. Pode ser alguém interceptando a conexão (ataque man-in-the-middle) ou o equipamento foi trocado. Confirme com quem administra antes de substituir.",
   "hostKeyChanged.trusted": "Chave confiável",

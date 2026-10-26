@@ -60,6 +60,9 @@ type HostKeyOld struct {
 	Fingerprint string `json:"fingerprint"`
 	// File is "app" (the app's known_hosts) or "user" (~/.ssh/known_hosts).
 	File string `json:"file"`
+	// KeyBits is the RSA modulus size, as for the new key; absent (0) for
+	// other key types, so a same-type size drop can be shown.
+	KeyBits int `json:"keyBits,omitempty"`
 }
 
 // HostKeyAnswer is the user's decision on a host key prompt.
@@ -339,6 +342,10 @@ func verifyHostKey(appFile, userFile, hostname string, key ssh.PublicKey, prompt
 func describeOld(old []HostKeyOld) string {
 	parts := make([]string, 0, len(old))
 	for _, o := range old {
+		if o.KeyBits > 0 {
+			parts = append(parts, fmt.Sprintf("%s %d bits %s", o.KeyType, o.KeyBits, o.Fingerprint))
+			continue
+		}
 		parts = append(parts, o.KeyType+" "+o.Fingerprint)
 	}
 	return strings.Join(parts, ", ")

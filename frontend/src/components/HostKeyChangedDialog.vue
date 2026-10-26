@@ -23,9 +23,11 @@
       <div v-if="downgrade" class="hkc-downgrade" role="alert">
         <TriangleAlert class="hkc-downgrade-icon" aria-hidden="true" />
         <div>
-          <p class="hkc-downgrade-title">{{ downgrade.from
-            ? t('hostKeyChanged.typeChanged', { from: downgrade.from, to: downgrade.to })
-            : t('hostKeyChanged.weakNew', { to: downgrade.to }) }}</p>
+          <p class="hkc-downgrade-title">{{ downgrade.sameType
+            ? t('hostKeyChanged.bitsDropped', { from: downgrade.from, to: downgrade.to })
+            : downgrade.from
+              ? t('hostKeyChanged.typeChanged', { from: downgrade.from, to: downgrade.to })
+              : t('hostKeyChanged.weakNew', { to: downgrade.to }) }}</p>
           <p v-if="downgrade.weak" class="hkc-downgrade-hint">{{ t('hostKey.weakKey', { bits: request.keyBits || '?' }) }}</p>
         </div>
       </div>

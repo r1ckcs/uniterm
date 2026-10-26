@@ -44,10 +44,25 @@ describe('changed host key: name and downgrade', () => {
 
   it('flags a type change and a weak new key, not a same-type change', () => {
     expect(keyDowngrade(req({ keyType: 'ssh-rsa', keyBits: 527, weak: true, oldKeys: [{ keyType: 'ssh-ed25519', fingerprint: 'x', file: 'app' }] })))
-      .toEqual({ from: 'ED25519', to: 'RSA 527 bits', weak: true })
+      .toEqual({ from: 'ED25519', to: 'RSA 527 bits', weak: true, sameType: false })
     expect(keyDowngrade(req({ keyType: 'ssh-ed25519', oldKeys: [{ keyType: 'ssh-ed25519', fingerprint: 'x', file: 'app' }] }))).toBeNull()
     expect(keyDowngrade(req({ keyType: 'ssh-rsa', keyBits: 768, weak: true, oldKeys: [{ keyType: 'ssh-rsa', fingerprint: 'x', file: 'user' }] })))
-      .toEqual({ from: '', to: 'RSA 768 bits', weak: true })
+      .toEqual({ from: '', to: 'RSA 768 bits', weak: true, sameType: false })
+  })
+
+  it('a same-type size drop is a downgrade even when the new key is not weak', () => {
+    const rsa = (bits?: number) => ({ keyType: 'ssh-rsa', fingerprint: 'x', file: 'app' as const, keyBits: bits })
+    expect(keyDowngrade(req({ keyType: 'rsa-sha2-512', keyBits: 1024, oldKeys: [rsa(2048)] })))
+      .toEqual({ from: 'RSA 2048 bits', to: 'RSA 1024 bits', weak: false, sameType: true })
+    // The largest trusted size of that type is the reference.
+    expect(keyDowngrade(req({ keyType: 'ssh-rsa', keyBits: 2048, oldKeys: [rsa(1024), rsa(4096)] }))?.from).toBe('RSA 4096 bits')
+    // Same or larger size, or an old key without bits: nothing to flag.
+    expect(keyDowngrade(req({ keyType: 'ssh-rsa', keyBits: 2048, oldKeys: [rsa(2048)] }))).toBeNull()
+    expect(keyDowngrade(req({ keyType: 'ssh-rsa', keyBits: 4096, oldKeys: [rsa(2048)] }))).toBeNull()
+    expect(keyDowngrade(req({ keyType: 'ssh-rsa', keyBits: 1024, oldKeys: [rsa()] }))).toBeNull()
+    // Weak and smaller: the size drop wins the title, the weak hint stays.
+    expect(keyDowngrade(req({ keyType: 'ssh-rsa', keyBits: 768, weak: true, oldKeys: [rsa(2048)] })))
+      .toEqual({ from: 'RSA 2048 bits', to: 'RSA 768 bits', weak: true, sameType: true })
   })
 
   it('finds the connection name by host:port, sessions first, never a guess', () => {
