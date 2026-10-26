@@ -95,7 +95,11 @@ describe('FlexTerm (D1c) themes', () => {
     const dlg = Object.values(import.meta.glob('./components/HostKeyChangedDialog.vue', { query: '?raw', import: 'default', eager: true }))[0] as string
     expect(dlg).toMatch(/\.hkc-alert \{[^}]*background: var\(--alert-card\);\s*color: var\(--alert-text\);/)
     expect(dlg).toMatch(/\.hkc-title \{[^}]*color: var\(--error\);/)
-    expect(dlg).toMatch(/\.hkc-replace \{[^}]*--el-button-bg-color: var\(--danger-solid\);[^}]*--el-button-text-color: var\(--on-danger\);/)
+    // Replace is a red outline (text --error, covered on every surface);
+    // the --danger-solid fill shows only on hover/press.
+    expect(dlg).toMatch(/\.hkc-replace \{[^}]*--el-button-bg-color: transparent;[^}]*--el-button-text-color: var\(--error\);[^}]*--el-button-hover-bg-color: var\(--danger-solid\);[^}]*--el-button-hover-text-color: var\(--on-danger\);/)
+    expect(dlg).toMatch(/\.hkc-downgrade \{[^}]*background: var\(--alert-card\);\s*color: var\(--alert-text\);/)
+    expect(dlg).toMatch(/ref="safeRef" type="primary" class="hkc-cancel"/)
   })
 
   it('the terminal follows the app theme with the matching palette', () => {
